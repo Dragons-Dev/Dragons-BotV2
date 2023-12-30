@@ -1,0 +1,23 @@
+aiohttp==3.8.6
+aiosignal==1.3.1
+async-timeout==4.0.3
+attrs==23.1.0
+better-ipc==2.0.3
+cfgv==3.4.0
+charset-normalizer==3.3.2
+colorama==0.4.6
+colorlog==6.8.0
+distlib==0.3.8
+filelock==3.13.1
+frozenlist==1.4.1
+identify==2.5.33
+idna==3.6
+multidict==6.0.4
+nodeenv==1.8.0
+platformdirs==4.1.0
+pre-commit==3.6.0
+py-cord @ git+https://github.com/pycord-development/pycord@ec212e2af388c8dc974a9917ab793745a53c3352
+PyYAML==6.0.1
+virtualenv==20.25.0
+websockets==12.0
+yarl==1.9.4

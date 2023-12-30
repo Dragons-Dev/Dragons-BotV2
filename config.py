@@ -1,0 +1,4 @@
+DISCORD_TOKEN = ""
+DEBUG_GUILDS = None
+
+IPC_SECRET = "ihufsad"
