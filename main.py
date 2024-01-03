@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 
 from config import DEBUG_GUILDS, DISCORD_TOKEN
-from utils import Bot, individual_users, rem_log
+from utils import Bot, ContentDB, individual_users, rem_log
 
 bot = Bot(
     command_prefix=commands.when_mentioned,
@@ -21,6 +21,8 @@ bot = Bot(
 
 @bot.listen("on_ready", once=True)
 async def on_boot():
+    bot.db = ContentDB(path="data/content.sqlite")
+    await bot.db.setup()
     resp = await bot.api.get("/api/v10/gateway/bot")
     data = await resp.json()
     rem_log()
@@ -31,7 +33,7 @@ async def on_boot():
             time.time()+(int(data['session_start_limit']['reset_after'])/1000)).strftime('%d.%m.%Y %H:%M:%S')}"""
     )
     bot.logger.info(
-        f"Name {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency*1000)}ms"
+        f"Name: {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency*1000)}ms"
     )
     bot.logger.info(
         f"It's on {len(bot.guilds)} guilds seeing {len(bot.users)} users from which {len(individual_users(bot.users))} "

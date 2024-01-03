@@ -35,7 +35,7 @@ repos:
     rev: v1.6.0
     hooks:
       - id: mypy
-        # args: [--disable-error-code=name-defined, --disable-error-code=import]
+        args: [--disable-error-code=name-defined, --disable-error-code=import, --check-untyped-defs]
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.15.0
