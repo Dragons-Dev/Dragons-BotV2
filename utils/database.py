@@ -10,11 +10,10 @@ class ContentDB:
         self.path = path
 
     async def setup(self):
+        """Create new tables in the database if they don't already exist'"""
         self.db = await aiosqlite.connect(self.path)
         async with self.db.cursor() as cursor:
-            await cursor.execute(
-                "CREATE TABLE IF NOT EXISTS settings " "(setting INTEGER, value INTEGER, guild INTEGER)"
-            )
+            await cursor.execute("CREATE TABLE IF NOT EXISTS settings " "(setting TEXT, value INTEGER, guild INTEGER)")
             await cursor.execute(
                 "CREATE TABLE IF NOT EXISTS join2create "
                 "(channel INTEGER, owner INTEGER, locked INTEGER, ghosted INTEGER, guild INTEGER)"
@@ -24,11 +23,13 @@ class ContentDB:
         await self.db.execute(
             "INSERT INTO settings (setting, value, guild) VALUES (?,?,?)", (setting.value, value, guild.id)
         )
+        await self.db.commit()
 
     async def get_setting(self, setting: SettingsEnum, guild: discord.Guild) -> int | None:
+        """Returns the raw setting from database or None if not found"""
         async with self.db.cursor() as cursor:
             resp = await cursor.execute(
-                "SELECT * FROM settings WHERE setting = ? AND guild = ?", (setting.value, guild.id)
+                "SELECT value FROM settings WHERE setting = ? AND guild = ?", (setting.value, guild.id)
             )
             data = await resp.fetchone()
         if data is None:
@@ -36,14 +37,16 @@ class ContentDB:
         return data[0]
 
     async def update_setting(self, setting: SettingsEnum, value: int, guild: discord.Guild) -> None:
+        """Function requests current setting if not exists create it, else update it"""
         resp = await self.get_setting(setting, guild)
         if resp is None:
             await self._add_setting(setting=setting, value=value, guild=guild)
             return
         async with self.db.cursor() as cursor:
             await cursor.execute(
-                "UPDATE settings SET value = ? WHERE setting = ? AND guild = ?", (setting.value, guild.id)
+                "UPDATE settings SET value = ? WHERE setting = ? AND guild = ?", (value, setting.value, guild.id)
             )
+            await self.db.commit()
 
     async def onjoin2create(self, new_channel: discord.VoiceChannel, owner: discord.Member):
         await self.db.execute(

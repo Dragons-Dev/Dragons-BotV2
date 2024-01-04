@@ -2,9 +2,9 @@ from enum import Enum, auto
 
 
 class SettingsEnum(Enum):
-    TeamRole = 1
-    VerifiedRole = auto()
-    ModLogChannel = auto()
-    ModmailChannel = auto()
-    VerificationChannel = auto()
-    Join2CreateChannel = auto()
+    TeamRole = "Team Role"
+    VerifiedRole = "Verified Role"
+    ModLogChannel = "Mod Log Channel"
+    ModmailChannel = "Modmail Channel"
+    VerificationChannel = "Verification Channel"
+    Join2CreateChannel = "Join2Create Channel"
