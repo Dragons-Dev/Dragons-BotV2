@@ -48,8 +48,12 @@ class ContentDB:
             )
             await self.db.commit()
 
-    async def onjoin2create(self, new_channel: discord.VoiceChannel, owner: discord.Member):
+    async def join2create(self, new_channel: discord.VoiceChannel, owner: discord.Member):
         await self.db.execute(
-            "INSERT INTO join2create " "(channel, owner, locked, ghosted, guild) " "VALUES " "(?, ?, 0, 0, ?)",
+            "INSERT INTO join2create (channel, owner, locked, ghosted, guild) VALUES (?, ?, 0, 0, ?)",
             (new_channel.id, owner.id, new_channel.guild.id),
         )
+        await self.db.commit()
+
+    async def join2delete(self, channel: discord.VoiceChannel):
+        await self.db.execute("DELETE FROM join2delete WHERE channel = ? AND guild = ?", (channel.id, channel.guild.id))
