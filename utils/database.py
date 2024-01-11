@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import aiosqlite
 import discord
 
@@ -5,12 +8,17 @@ from .enums import SettingsEnum
 
 
 class ContentDB:
-    def __init__(self, path: str):
+    def __init__(self, path: str | Path):
         self.db: aiosqlite.Connection = None
-        self.path = path
+        if not type(path) == Path:
+            path = Path(path)
+        self.path: Path = path
 
     async def setup(self):
         """Create new tables in the database if they don't already exist'"""
+        if not self.path.exists():
+            self.path.parent.mkdir(exist_ok=True)
+            self.path.touch()
         self.db = await aiosqlite.connect(self.path)
         async with self.db.cursor() as cursor:
             await cursor.execute("CREATE TABLE IF NOT EXISTS settings " "(setting TEXT, value INTEGER, guild INTEGER)")

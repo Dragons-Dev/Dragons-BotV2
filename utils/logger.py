@@ -111,10 +111,20 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 
+def rem_log():
+    if not Path("logs").exists():
+        os.mkdir("logs")
+    while len(os.listdir("logs")) > 7:
+        for file in os.listdir("logs"):
+            os.remove("logs/" + file)
+            break
+
+
 class CustomLogger(logging.Logger):
     """A custom file and console logger"""
 
     def __init__(self, name, start_stamp: dt):
+        rem_log()
         self.name = name
         super().__init__(name=self.name)
         self.start_stamp = start_stamp
@@ -126,15 +136,6 @@ class CustomLogger(logging.Logger):
         console_handler.setLevel(logging.DEBUG)
         console_handler.setFormatter(CustomFormatter())
         self.addHandler(console_handler)
-
-
-def rem_log():
-    if not Path("logs").exists():
-        os.mkdir("logs")
-    while len(os.listdir("logs")) > 7:
-        for file in os.listdir("logs"):
-            os.remove("logs/" + file)
-            break
 
 
 if __name__ == "__main__":
