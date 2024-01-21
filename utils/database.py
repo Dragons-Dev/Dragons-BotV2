@@ -1,15 +1,17 @@
-import os
+from datetime import datetime
 from pathlib import Path
 
 import aiosqlite
 import discord
 
 from .enums import SettingsEnum
+from .logger import CustomLogger
 
 
 class ContentDB:
     def __init__(self, path: str | Path):
         self.db: aiosqlite.Connection = None
+        self.logger = CustomLogger("database", datetime.now())
         if not type(path) == Path:
             path = Path(path)
         self.path: Path = path
@@ -21,11 +23,12 @@ class ContentDB:
             self.path.touch()
         self.db = await aiosqlite.connect(self.path)
         async with self.db.cursor() as cursor:
-            await cursor.execute("CREATE TABLE IF NOT EXISTS settings " "(setting TEXT, value INTEGER, guild INTEGER)")
+            await cursor.execute("CREATE TABLE IF NOT EXISTS settings (setting TEXT, value INTEGER, guild INTEGER)")
             await cursor.execute(
                 "CREATE TABLE IF NOT EXISTS join2create "
-                "(channel INTEGER, owner INTEGER, locked INTEGER, ghosted INTEGER, guild INTEGER)"
+                "(channel INTEGER, owner INTEGER, locked INTEGER, ghosted INTEGER)"
             )
+        self.logger.debug("Database set up!")
 
     async def _add_setting(self, setting: SettingsEnum, value: int, guild: discord.Guild) -> None:
         await self.db.execute(
@@ -40,6 +43,7 @@ class ContentDB:
                 "SELECT value FROM settings WHERE setting = ? AND guild = ?", (setting.value, guild.id)
             )
             data = await resp.fetchone()
+            self.logger.debug(f"{setting} for {guild} is {data}")
         if data is None:
             return None
         return data[0]
@@ -49,19 +53,35 @@ class ContentDB:
         resp = await self.get_setting(setting, guild)
         if resp is None:
             await self._add_setting(setting=setting, value=value, guild=guild)
+            self.logger.debug(f"{setting} was added with {value} at {guild}")
             return
         async with self.db.cursor() as cursor:
             await cursor.execute(
                 "UPDATE settings SET value = ? WHERE setting = ? AND guild = ?", (value, setting.value, guild.id)
             )
             await self.db.commit()
+            self.logger.debug(f"{setting} was updated with {value} at {guild}")
 
     async def join2create(self, new_channel: discord.VoiceChannel, owner: discord.Member):
+        """saves the channel id, member id into the db, sets locked and ghost to 0"""
         await self.db.execute(
-            "INSERT INTO join2create (channel, owner, locked, ghosted, guild) VALUES (?, ?, 0, 0, ?)",
-            (new_channel.id, owner.id, new_channel.guild.id),
+            "INSERT INTO join2create (channel, owner, locked, ghosted) VALUES (?, ?, 0, 0)",
+            (new_channel.id, owner.id),
         )
         await self.db.commit()
+        self.logger.debug(f"{new_channel.name} was created for {owner.name}")
+
+    async def join2get(self, channel: discord.VoiceChannel) -> bool:
+        """Returns `True` if the channel id is in the database"""
+        resp: aiosqlite.Cursor = await self.db.execute("SELECT * FROM join2create WHERE channel = ?", (channel.id,))
+        resp = await resp.fetchone()  # type: ignore
+        self.logger.debug(f"join2get returned {resp}")  # ignored because first resp returns Cursor not Row
+        if resp is not None:
+            return True
+        return False
 
     async def join2delete(self, channel: discord.VoiceChannel):
-        await self.db.execute("DELETE FROM join2delete WHERE channel = ? AND guild = ?", (channel.id, channel.guild.id))
+        """deletes the row using the channel id"""
+        await self.db.execute("DELETE FROM join2create WHERE channel = ?", (channel.id,))
+        await self.db.commit()
+        self.logger.debug(f"Deleted {channel.name}|{channel.id} from the database")
