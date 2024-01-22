@@ -10,17 +10,19 @@ from .logger import CustomLogger
 
 class ContentDB:
     def __init__(self, path: str | Path):
-        self.db: aiosqlite.Connection = None
-        self.logger = CustomLogger("database", datetime.now())
-        if not type(path) == Path:
+        self.db: aiosqlite.Connection = None  # type: ignore
+        self.logger: CustomLogger = None  # type: ignore
+        if not isinstance(path, Path):
             path = Path(path)
         self.path: Path = path
 
-    async def setup(self):
-        """Create new tables in the database if they don't already exist'"""
+    async def setup(self, boot: datetime):
+        """Create new tables in the database if they don't already exist"""
+        self.logger = CustomLogger("database", boot)
         if not self.path.exists():
             self.path.parent.mkdir(exist_ok=True)
             self.path.touch()
+            self.logger.info("Created database path/file")
         self.db = await aiosqlite.connect(self.path)
         async with self.db.cursor() as cursor:
             await cursor.execute("CREATE TABLE IF NOT EXISTS settings (setting TEXT, value INTEGER, guild INTEGER)")

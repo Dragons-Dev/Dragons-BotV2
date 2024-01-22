@@ -22,7 +22,7 @@ bot = Bot(
 @bot.listen("on_ready", once=True)
 async def on_boot():
     bot.db = ContentDB(path="data/content.sqlite")
-    await bot.db.setup()
+    await bot.db.setup(bot.boot)
     resp = await bot.api.get("/api/v10/gateway/bot")
     data = await resp.json()
     rem_log()
