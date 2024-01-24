@@ -27,7 +27,7 @@ class ModBackground(commands.Cog):
 
         await hook.send(
             content=entry.action,
-            username="TheDragons Audit-Log",
+            username=f"{self.client.user.name} Log",
             avatar_url=self.client.user.avatar.url,
         )
 
