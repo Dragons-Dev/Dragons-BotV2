@@ -38,6 +38,10 @@ class SettingsCog(commands.Cog):
         db_setting = SettingsEnum(setting)
         db_value = value.strip("<@&#>")
         await self.client.db.update_setting(setting=db_setting, value=db_value, guild=ctx.guild)
+        if db_setting == SettingsEnum.TeamRole or db_setting == SettingsEnum.VerifiedRole:
+            value = f"<@&{db_value}>"
+        else:
+            value = f"<#{db_value}>"
         await ctx.response.send_message(
             embed=discord.Embed(
                 title="Success",
