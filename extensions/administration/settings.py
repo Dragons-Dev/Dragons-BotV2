@@ -4,12 +4,13 @@ from discord.ext import commands
 from utils import Bot, CustomLogger, SettingsEnum
 
 SettingChoices = [
-    discord.OptionChoice("Team Role"),
-    discord.OptionChoice("Verified Role"),
+    discord.OptionChoice("Audit-Log Channel"),
+    discord.OptionChoice("Join2Create Channel"),
     discord.OptionChoice("Mod-Log Channel"),
     discord.OptionChoice("Modmail Channel"),
     discord.OptionChoice("Verification Channel"),
-    discord.OptionChoice("Join2Create Channel"),
+    discord.OptionChoice("Verified Role"),
+    discord.OptionChoice("Team Role"),
 ]
 
 

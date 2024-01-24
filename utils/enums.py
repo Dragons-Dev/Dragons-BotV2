@@ -8,3 +8,4 @@ class SettingsEnum(Enum):
     ModmailChannel = "Modmail Channel"
     VerificationChannel = "Verification Channel"
     Join2CreateChannel = "Join2Create Channel"
+    AuditLogChannel = "Audit-Log Channel"
