@@ -8,7 +8,7 @@ def setting_choices(ctx: discord.AutocompleteContext) -> list[str]:
     settings = []
     for setting in SettingsEnum:
         settings.append(setting.value)
-    return settings
+    return sorted(settings)
 
 
 class SettingsCog(commands.Cog):
