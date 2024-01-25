@@ -5,10 +5,32 @@ from utils import Bot, CustomLogger, SettingsEnum
 
 
 def setting_choices(ctx: discord.AutocompleteContext) -> list[str]:
+    """Displays every setting from utils/enums.py"""
     settings = []
     for setting in SettingsEnum:
         settings.append(setting.value)
     return sorted(settings)
+
+
+def value_choices(ctx: discord.AutocompleteContext) -> list[str]:
+    """Responds with every Role or Channel depending on the setting and searched term"""
+    values = []
+    entered = ctx.value
+    setting: str = ctx.options.items().mapping["setting"]
+    if setting is None:
+        return ["Please select a setting first"]
+    elif setting.endswith("Role"):
+        for role in ctx.interaction.guild.roles:
+            if entered in role.name:
+                values.append(role.name)
+        return values
+    elif setting.endswith("Channel"):
+        for channel in ctx.interaction.guild.channels:
+            if entered in channel.name:
+                values.append(channel.name)
+        return values
+    else:
+        return ["A super rare bug appeared and I don't know why!"]
 
 
 class SettingsCog(commands.Cog):
@@ -27,23 +49,23 @@ class SettingsCog(commands.Cog):
             required=True,
         ),  # ignoring those two @mypy because it's the intended behavior by the library
         value: discord.Option(  # type: ignore
-            input_type=discord.SlashCommandOptionType.mentionable,
+            autocomplete=value_choices,
             name="value",
             description="The value you want to set the setting to.",
             required=True,
         ),
     ):
         db_setting = SettingsEnum(setting)
-        db_value = value.strip("<@&#>")
-        await self.client.db.update_setting(setting=db_setting, value=db_value, guild=ctx.guild)
-        if db_setting == SettingsEnum.TeamRole or db_setting == SettingsEnum.VerifiedRole:
-            value = f"<@&{db_value}>"
+        if db_setting.value.endswith("Role"):
+            settings_value = discord.utils.find(lambda c: c.name == value, ctx.guild.roles)
         else:
-            value = f"<#{db_value}>"
+            settings_value = discord.utils.find(lambda c: c.name == value, ctx.guild.channels)
+        await self.client.db.update_setting(setting=db_setting, value=settings_value.id, guild=ctx.guild)
+
         await ctx.response.send_message(
             embed=discord.Embed(
                 title="Success",
-                description=f"Changed {setting} to {value}!",
+                description=f"Changed {setting} to {settings_value.mention}!",
                 color=discord.Color.brand_green(),
             ),
             ephemeral=True,
