@@ -39,6 +39,7 @@ async def on_boot():
         f"It's on {len(bot.guilds)} guilds seeing {len(bot.users)} users from which {len(individual_users(bot.users))} "
         f"are individual."
     )
+    bot.dispatch("start_done")
 
 
 if __name__ == "__main__":

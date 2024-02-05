@@ -17,3 +17,4 @@ class SettingsEnum(Enum):
     VerificationChannel = "Verification Channel"
     Join2CreateChannel = "Join2Create Channel"
     AuditLogChannel = "Audit-Log Channel"
+    TagesschauChannel = "Tagesschau Channel"
