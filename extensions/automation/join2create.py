@@ -20,7 +20,6 @@ class Join2Create(commands.Cog):
         Creates a new database entry for the new voice channel and deletes it if everyone left it.
         """
         if after.channel is not None:
-            self.logger.debug(f"{member.name} joined {after.channel.name} on {member.guild}")
             if after.channel.id == await self.client.db.get_setting(
                 setting=SettingsEnum.Join2CreateChannel, guild=member.guild
             ):
@@ -52,13 +51,14 @@ class Join2Create(commands.Cog):
                     overwrites=perms,
                 )
                 await self.client.db.join2create(channel, member)
+                self.logger.debug(f"{member.name} created {channel.name} in {member.guild}")
                 await member.move_to(channel)
 
         if before.channel is not None:
-            self.logger.debug(f"{member.name} left {before.channel.name} on {member.guild}")
             if await self.client.db.join2get(before.channel):
                 if len([m for m in before.channel.members if not m.bot]) == 0:
                     await self.client.db.join2delete(before.channel)
+                    self.logger.debug(f"{before.channel.name} was deleted on {member.guild}")
                     await before.channel.delete(reason="Join2Delete")
 
 

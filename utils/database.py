@@ -50,6 +50,13 @@ class ContentDB:
             return None
         return data[0]
 
+    async def get_global_setting(self, setting: SettingsEnum) -> list[(int, int)]:  # type: ignore
+        """Returns the setting for every guild in the database"""
+        async with self.db.cursor() as cursor:
+            resp = await cursor.execute("SELECT value, guild FROM settings WHERE setting = ?", (setting.value,))
+            data = await resp.fetchall()
+        return data
+
     async def update_setting(self, setting: SettingsEnum, value: int, guild: discord.Guild) -> None:
         """Function requests current setting if not exists create it, else update it"""
         resp = await self.get_setting(setting, guild)
