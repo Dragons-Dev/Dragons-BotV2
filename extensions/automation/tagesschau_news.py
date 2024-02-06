@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime
 
@@ -7,7 +8,7 @@ from discord.ext import commands, tasks
 
 from utils import Bot, CustomLogger, SettingsEnum
 
-regex = r"https:\/\/images\.tagesschau\.de\/image\/[a-zA-Z0-9-]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-]*/[a-zA-Z0-9-]*-[a-zA-Z0-9-]*/[a-zA-Z0-9-]*.jpg"
+regex = r"https://images.tagesschau.de/image/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-]*-[a-zA-Z0-9-]*/[a-zA-Z0-9-]*.jpg"
 
 
 def parse_tagesschau_feed(entry: dict) -> dict:
@@ -27,6 +28,10 @@ def parse_tagesschau_feed(entry: dict) -> dict:
         entry["updated_parsed"][4],
         entry["updated_parsed"][5],
     )
+    image_link = re.finditer(regex, str(entry), re.MULTILINE)
+    image = None
+    for match in image_link:
+        image = match.group()
     return {
         "title": entry["title_detail"]["value"],
         "summary": entry["summary_detail"]["value"],
@@ -34,7 +39,7 @@ def parse_tagesschau_feed(entry: dict) -> dict:
         "published": published,
         "updated": updated,
         "id": entry["id"][-36:],
-        "image": re.match(regex, str(entry), re.MULTILINE),
+        "image": image,
     }
 
 
