@@ -8,6 +8,20 @@ from .enums import SettingsEnum
 from .logger import CustomLogger
 
 
+def datetime_to_db(val):
+    """Adapt datetime.datetime to timezone-naive ISO 8601 date."""
+    return val.isoformat()
+
+
+def db_to_datetime(val):
+    """Convert ISO 8601 datetime to datetime.datetime object."""
+    return datetime.fromisoformat(val.decode())
+
+
+aiosqlite.register_adapter(datetime, datetime_to_db)
+aiosqlite.register_converter("DATETIME", db_to_datetime)
+
+
 class ContentDB:
     def __init__(self, path: str | Path):
         self.db: aiosqlite.Connection = None  # type: ignore
@@ -111,11 +125,9 @@ class ShortTermStorage:
             self.path.parent.mkdir(exist_ok=True)
             self.path.touch()
             self.logger.info("Created database path/file")
-        self.db = await aiosqlite.connect(self.path)
+        self.db = await aiosqlite.connect(self.path, detect_types=1)
         async with self.db.cursor() as cursor:
-            await cursor.execute("CREATE TABLE IF NOT EXISTS shortstore (data TEXT, owner INTEGER, expires DATETIME)")
+            await cursor.execute("CREATE TABLE IF NOT EXISTS tagesschau (id TEXT, updated DATETIME, expires DATETIME)")
         self.logger.debug("Database set up!")
-
-    # TODO Implement auto conversion ISO-Datetime <--> Datetime object
 
     # TODO Insert, Get, Delete functions
