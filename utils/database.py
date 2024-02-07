@@ -94,3 +94,28 @@ class ContentDB:
         await self.db.execute("DELETE FROM join2create WHERE channel = ?", (channel.id,))
         await self.db.commit()
         self.logger.debug(f"Deleted {channel.name}|{channel.id} from the database")
+
+
+class ShortTermStorage:
+    def __init__(self, path: str | Path):
+        self.db: aiosqlite.Connection = None  # type: ignore
+        self.logger: CustomLogger = None  # type: ignore
+        if not isinstance(path, Path):
+            path = Path(path)
+        self.path: Path = path
+
+    async def setup(self, boot: datetime):
+        """Create new tables in the database if they don't already exist"""
+        self.logger = CustomLogger("shortstore", boot)
+        if not self.path.exists():
+            self.path.parent.mkdir(exist_ok=True)
+            self.path.touch()
+            self.logger.info("Created database path/file")
+        self.db = await aiosqlite.connect(self.path)
+        async with self.db.cursor() as cursor:
+            await cursor.execute("CREATE TABLE IF NOT EXISTS shortstore (data TEXT, owner INTEGER, expires DATETIME)")
+        self.logger.debug("Database set up!")
+
+    # TODO Implement auto conversion ISO-Datetime <--> Datetime object
+
+    # TODO Insert, Get, Delete functions
