@@ -8,7 +8,7 @@ from utils.enums import SettingsEnum
 class ModBackground(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
-        self.logger = CustomLogger(self.qualified_name, self.client.boot)
+        self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
     @commands.Cog.listener("on_audit_log_entry")
     async def audit_listener(self, entry: discord.AuditLogEntry):

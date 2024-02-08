@@ -9,7 +9,7 @@ from utils import Bot, CustomLogger, SettingsEnum
 class Join2Create(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
-        self.logger = CustomLogger(self.qualified_name, self.client.boot)
+        self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         with open("suffix.txt") as f:
             self.suffixes = f.readlines()
 
