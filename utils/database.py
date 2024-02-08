@@ -44,7 +44,7 @@ class ContentDB:
                 "CREATE TABLE IF NOT EXISTS join2create "
                 "(channel INTEGER, owner INTEGER, locked INTEGER, ghosted INTEGER)"
             )
-        self.logger.debug("Database set up!")
+        self.logger.debug("ContentDB set up!")
 
     async def _add_setting(self, setting: SettingsEnum, value: int, guild: discord.Guild) -> None:
         await self.db.execute(
@@ -128,6 +128,26 @@ class ShortTermStorage:
         self.db = await aiosqlite.connect(self.path, detect_types=1)
         async with self.db.cursor() as cursor:
             await cursor.execute("CREATE TABLE IF NOT EXISTS tagesschau (id TEXT, updated DATETIME, expires DATETIME)")
-        self.logger.debug("Database set up!")
+        self.logger.debug("ShortTermStorage set up!")
 
-    # TODO Insert, Get, Delete functions
+    async def enter_tagesschau_id(self, uuid: str, updated: datetime, expires: datetime):
+        async with self.db.cursor() as cursor:
+            await cursor.execute(
+                "INSERT INTO tagesschau (id, updated, expires) VALUES (?, ?, ?)", (uuid, updated, expires)
+            )
+        await self.db.commit()
+
+    async def get_tagesschau_id(self, uuid: str):
+        """Returns ID, Updated and Expires"""
+        async with self.db.cursor() as cursor:
+            await cursor.execute("SELECT * FROM tagesschau WHERE id = ?", (uuid,))
+            resp = await cursor.fetchone()
+        if resp is None:
+            return None
+        else:
+            return {"id": uuid, "updated": resp[1], "expires": resp[2]}
+
+    async def delete_tagesschau_id(self, uuid: str):
+        async with self.db.cursor() as cursor:
+            await cursor.execute("DELETE FROM tagesschau WHERE id = ?", (uuid,))
+            await cursor.commit()

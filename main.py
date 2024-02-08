@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 
 from config import DEBUG_GUILDS, DISCORD_TOKEN
-from utils import Bot, ContentDB, individual_users, rem_log
+from utils import Bot, ContentDB, ShortTermStorage, individual_users, rem_log
 
 bot = Bot(
     command_prefix=commands.when_mentioned,
@@ -22,12 +22,16 @@ bot = Bot(
 @bot.listen("on_ready", once=True)
 async def on_boot():
     bot.db = ContentDB(path="data/content.sqlite")
-    await bot.db.setup(bot.boot)
+    await bot.db.setup(bot.boot_time)
+    bot.sts = ShortTermStorage(path="data/sts.sqlite")
+    await bot.sts.setup(bot.boot_time)
     resp = await bot.api.get("/api/v10/gateway/bot")
     data = await resp.json()
     rem_log()
     bot.logger.debug(f"Requested {resp.url}; Received {resp.status}")
-    bot.logger.info(f"Bot started at {bot.boot.strftime('%H:%M:%S')} Boot took ~{(dt.now()-bot.boot).seconds}s")
+    bot.logger.info(
+        f"Bot started at {bot.boot_time.strftime('%H:%M:%S')} Boot took ~{(dt.now()-bot.boot_time).seconds}s"
+    )
     bot.logger.info(
         f"""Session start limit {data['session_start_limit']['remaining']} | Resets at {dt.fromtimestamp(
             time.time()+(int(data['session_start_limit']['reset_after'])/1000)).strftime('%d.%m.%Y %H:%M:%S')}"""
