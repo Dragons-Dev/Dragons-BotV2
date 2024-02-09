@@ -36,7 +36,7 @@ def value_choices(ctx: discord.AutocompleteContext) -> list[str]:
 class SettingsCog(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
-        self.logger = CustomLogger(self.qualified_name, self.client.boot)
+        self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
     @commands.slash_command(name="setting", description="Set settings for this guild.")
     async def setting(

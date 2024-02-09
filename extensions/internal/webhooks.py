@@ -8,7 +8,7 @@ from utils.enums import SettingsEnum
 class InternalHooks(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
-        self.logger = CustomLogger(self.qualified_name, self.client.boot)
+        self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.news = []
         self.news_webhooks = {}
 
@@ -29,6 +29,8 @@ class InternalHooks(commands.Cog):
                 else:
                     webhook = await c.create_webhook(name="Tagesschau")
                     self.news_webhooks[f"{guild}"] = webhook
+            if len(self.news) == 0:
+                return
             if len(self.news) > 10:
                 sub = []
                 for _ in range(10):

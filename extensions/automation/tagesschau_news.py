@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import discord
 import feedparser
@@ -46,9 +46,8 @@ def parse_tagesschau_feed(entry: dict) -> dict:
 class TagesschauFeed(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
-        self.logger = CustomLogger(self.qualified_name, self.client.boot)
+        self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.url = "https://www.tagesschau.de/infoservices/alle-meldungen-100~rss2.xml"
-        self.gather_news.start()
 
     @tasks.loop(minutes=1)
     async def gather_news(self):
@@ -57,17 +56,39 @@ class TagesschauFeed(commands.Cog):
         new = []
         for entry in news["entries"]:
             ent = parse_tagesschau_feed(entry)
-            em = discord.Embed(
-                title=ent["title"],
-                url=ent["link"],
-                description=ent["summary"]
-                + f"\n\nPublished: {discord.utils.format_dt(ent['published'])}"
-                + f"\n Updated: {discord.utils.format_dt(ent['updated'])}",
-                image=discord.EmbedMedia(ent["image"]),
-                color=discord.Color.from_rgb(60, 87, 141),
-            )
+            resp = await self.client.sts.get_tagesschau_id(ent["id"])
+            if resp is not None:
+                if resp["updated"] == ent["updated"]:
+                    return
+                else:
+                    em = discord.Embed(
+                        title=ent["title"],
+                        url=ent["link"],
+                        description=ent["summary"]
+                        + f"\n\nPublished: {discord.utils.format_dt(ent['published'])}"
+                        + f"\n Updated: {discord.utils.format_dt(ent['updated'])}",
+                        image=discord.EmbedMedia(ent["image"]),
+                        color=discord.Color.from_rgb(60, 87, 141),
+                    )
+            else:
+                em = discord.Embed(
+                    title=ent["title"],
+                    url=ent["link"],
+                    description=ent["summary"]
+                    + f"\n\nPublished: {discord.utils.format_dt(ent['published'])}"
+                    + f"\n Updated: {discord.utils.format_dt(ent['updated'])}",
+                    image=discord.EmbedMedia(ent["image"]),
+                    color=discord.Color.from_rgb(60, 87, 141),
+                )
+                await self.client.sts.enter_tagesschau_id(
+                    uuid=ent["id"], updated=ent["updated"], expires=datetime.now() + timedelta(5)
+                )
             new.append(em)
         self.client.dispatch("tagesschau_entry", new)
+
+    @commands.Cog.listener("on_start_done")
+    async def on_start_done(self):
+        self.gather_news.start()
 
 
 def setup(client):
