@@ -4,6 +4,7 @@
     <a href="https://github.com/Dragons-Dev/Dragons-BotV2/releases"><img src="https://img.shields.io/github/v/release/Dragons-Dev/Dragons-BotV2"></img></a>
     <a href="https://github.com/Dragons-Dev/Dragons-BotV2/commits"><img src="https://img.shields.io/github/commits-since/Dragons-Dev/Dragons-BotV2/latest" alt="Commit activity" /></a>
     <a href="https://github.com/Dragons-Dev/Dragons-BotV2/actions"><img src="https://github.com/Dragons-Dev/Dragons-BotV2/actions/workflows/github-code-scanning/codeql/badge.svg"</img></a>
+    <a href="https://www.codefactor.io/repository/github/dragons-dev/dragons-botv2"><img src="https://www.codefactor.io/repository/github/dragons-dev/dragons-botv2/badge" alt="CodeFactor" /></a>
 </p>
 
 
