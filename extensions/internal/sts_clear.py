@@ -1,10 +1,8 @@
 from datetime import datetime
 
-import discord
 from discord.ext import commands, tasks
 
 from utils import Bot, CustomLogger
-from utils.enums import SettingsEnum
 
 
 class STSClear(commands.Cog):
@@ -16,10 +14,8 @@ class STSClear(commands.Cog):
     @tasks.loop(hours=1)
     async def delete_expired(self):
         response = await self.client.sts.get_tagesschau_rows()
-        print(response)
         for row in response:
             if row["expires"] < datetime.now():
-                print(f"{row} is expired")
                 await self.client.sts.delete_tagesschau_id(row["id"])
 
     @commands.Cog.listener("on_start_done")
