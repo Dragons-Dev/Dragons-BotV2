@@ -1,4 +1,3 @@
-import logging
 import re
 from datetime import datetime, timedelta
 
@@ -6,7 +5,7 @@ import discord
 import feedparser
 from discord.ext import commands, tasks
 
-from utils import Bot, CustomLogger, SettingsEnum
+from utils import Bot, CustomLogger
 
 regex = r"https://images.tagesschau.de/image/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-]*-[a-zA-Z0-9-]*/[a-zA-Z0-9-]*.jpg"
 
