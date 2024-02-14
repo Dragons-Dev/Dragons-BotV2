@@ -54,4 +54,10 @@ if __name__ == "__main__":
         else:
             bot.logger.critical(f"{extension}: {str(status)}")
             exit_("Error loading extensions!")
+    if DISCORD_TOKEN == "":
+        bot.logger.critical(f"No token has been passed to the bot.")
+        exit_(1)
+    if DEBUG_GUILDS is None or not DEBUG_GUILDS:
+        bot.logger.warning("No Debug guild specified. Commands can take up to 1 hour to sync!")
+
     bot.run(DISCORD_TOKEN)
