@@ -147,7 +147,20 @@ class ShortTermStorage:
         else:
             return {"id": uuid, "updated": resp[1], "expires": resp[2]}
 
+    async def get_tagesschau_rows(self):
+        """Returns first 50 entries ordered by expires: ID, Updated and Expires"""
+        response = []
+        async with self.db.cursor() as cursor:
+            await cursor.execute("SELECT * FROM tagesschau ORDER BY expires LIMIT 50")
+            rows = await cursor.fetchall()
+        if rows is None:
+            return None
+        else:
+            for resp in rows:
+                response.append({"id": resp[0], "updated": resp[1], "expires": resp[2]})
+            return response
+
     async def delete_tagesschau_id(self, uuid: str):
         async with self.db.cursor() as cursor:
             await cursor.execute("DELETE FROM tagesschau WHERE id = ?", (uuid,))
-            await cursor.commit()
+        await self.db.commit()
