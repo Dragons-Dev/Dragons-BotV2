@@ -5,7 +5,14 @@ from utils import Bot, CustomLogger, SettingsEnum
 
 
 def setting_choices(ctx: discord.AutocompleteContext) -> list[str]:
-    """Displays every setting from utils/enums.py"""
+    """Supplies every setting from utils/enums.py for commands
+
+    Args:
+        ctx (discord.AutocompleteContext):
+
+    Returns:
+        list[str]: every setting from utils/enums.py
+    """
     settings = []
     for setting in SettingsEnum:
         settings.append(setting.value)
@@ -13,7 +20,14 @@ def setting_choices(ctx: discord.AutocompleteContext) -> list[str]:
 
 
 def value_choices(ctx: discord.AutocompleteContext) -> list[str]:
-    """Responds with every Role or Channel depending on the setting and searched term"""
+    """Responds with every Role or Channel depending on the setting and searched term
+
+    Args:
+        ctx (discord.AutocompleteContext):
+
+    Returns:
+        list[str]: Role or Channel names depending on the searched term
+    """
     values = []
     entered = ctx.value
     setting: str = ctx.options.items().mapping["setting"]

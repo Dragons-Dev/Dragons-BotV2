@@ -9,7 +9,6 @@ class STSClear(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.to_delete = []
 
     @tasks.loop(hours=1)
     async def delete_expired(self):

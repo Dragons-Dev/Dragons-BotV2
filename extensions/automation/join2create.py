@@ -18,6 +18,11 @@ class Join2Create(commands.Cog):
         """
         Checks if a person joins a dedicated voice channel. If so creates a new voice channel and moves the person to it
         Creates a new database entry for the new voice channel and deletes it if everyone left it.
+
+        Args:
+            member (discord.Member): member who updated his voice state
+            before (discord.VoiceState): members voice state before
+            after (discord.VoiceState): members voice state after
         """
         if after.channel is not None:
             if after.channel.id == await self.client.db.get_setting(
