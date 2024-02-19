@@ -11,6 +11,14 @@ regex = r"https://images.tagesschau.de/image/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA
 
 
 def parse_tagesschau_feed(entry: dict) -> dict:
+    """Parses an entry from feedparser to values that are important
+
+    Args:
+        entry (dict): feedparser.entry
+
+    Returns:
+        dict: Python standart dict
+    """
     published = datetime(
         entry["published_parsed"][0],
         entry["published_parsed"][1],
