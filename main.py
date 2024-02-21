@@ -1,3 +1,4 @@
+import json
 import time
 from datetime import datetime as dt
 from sys import exit as exit_
@@ -48,12 +49,21 @@ async def on_boot():
 
 if __name__ == "__main__":
     extensions = bot.load_extensions("extensions", recursive=True, store=True)
+    with open("./assets/disabled.json") as f:
+        extension_store = json.load(f)
     for extension, status in extensions.items():
+        if extension not in extension_store:
+            extension_store[extension] = True
         if status is True:
-            bot.logger.info(f"{extension} loaded successfully!")
+            if not extension_store[extension]:
+                bot.logger.warning(f"{extension} is disabled!")
+            else:
+                bot.logger.info(f"{extension} loaded successfully!")
         else:
             bot.logger.critical(f"{extension}: {str(status)}")
             exit_("Error loading extensions!")
+    with open("./assets/disabled.json", "w") as f:
+        json.dump(extension_store, f, indent=4)
     if DISCORD_TOKEN == "":
         bot.logger.critical(f"No token has been passed to the bot.")
         exit_(1)

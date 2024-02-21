@@ -1,0 +1,9 @@
+{
+    "extensions.administration.settings": true,
+    "extensions.automation.join2create": false,
+    "extensions.automation.tagesschau_news": false,
+    "extensions.fun.nato_translate": false,
+    "extensions.internal.sts_clear": false,
+    "extensions.internal.webhooks": false,
+    "extensions.moderation.background": true
+}
