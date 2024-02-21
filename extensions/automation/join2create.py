@@ -10,7 +10,7 @@ class Join2Create(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        with open("suffix.txt") as f:
+        with open("assets/suffix.txt") as f:
             self.suffixes = f.readlines()
 
     @commands.Cog.listener("on_voice_state_update")
