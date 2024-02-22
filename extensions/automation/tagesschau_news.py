@@ -60,6 +60,7 @@ class TagesschauFeed(commands.Cog):
     async def gather_news(self):
         await self.client.wait_until_ready()
         news = feedparser.parse(self.url)
+        self.logger.debug(f"Requested {self.url}")
         new = []
         for entry in news["entries"]:
             ent = parse_tagesschau_feed(entry)
@@ -76,6 +77,17 @@ class TagesschauFeed(commands.Cog):
                         + f"\n Updated: {discord.utils.format_dt(ent['updated'])}",
                         image=discord.EmbedMedia(ent["image"]),
                         color=discord.Color.from_rgb(60, 87, 141),
+                        footer=discord.EmbedFooter(
+                            text="Distributed in compliance with the Creative Commons license\n(CC BY-SA)",
+                            icon_url="https://raw.githubusercontent.com/github/explore/"
+                            "48db34428146b2d62f0b7079fa6c12c711e2322f/topics/creative-commons/"
+                            "creative-commons.png",
+                        ),
+                        author=discord.EmbedAuthor(
+                            name="Source: Tagesschau.de",
+                            url="https://www.tagesschau.de",
+                            icon_url="https://www.ard.de/static/media/appIcon.ts.b846aebc4c4b299d0fbd.jpg",
+                        ),
                     )
             else:
                 em = discord.Embed(
@@ -86,12 +98,23 @@ class TagesschauFeed(commands.Cog):
                     + f"\n Updated: {discord.utils.format_dt(ent['updated'])}",
                     image=discord.EmbedMedia(ent["image"]),
                     color=discord.Color.from_rgb(60, 87, 141),
+                    footer=discord.EmbedFooter(
+                        text="Distributed in compliance with the Creative Commons license\n(CC BY-SA)",
+                        icon_url="https://raw.githubusercontent.com/github/explore/"
+                        "48db34428146b2d62f0b7079fa6c12c711e2322f/topics/creative-commons/creative-commons.png",
+                    ),
+                    author=discord.EmbedAuthor(
+                        name="Source: Tagesschau.de",
+                        url="https://www.tagesschau.de",
+                        icon_url="https://www.ard.de/static/media/appIcon.ts.b846aebc4c4b299d0fbd.jpg",
+                    ),
                 )
                 await self.client.sts.enter_tagesschau_id(
                     uuid=ent["id"], updated=ent["updated"], expires=datetime.now() + timedelta(5)
                 )
             new.append(em)
-        self.client.dispatch("tagesschau_entry", new)
+        self.logger.debug(f"Sent {len(new)} entries to `on_tagesschau_entry`")
+        self.client.dispatch("tagesschau_entry", new)  # rest is handled by /extensions/internal/webhooks.py
 
     @commands.Cog.listener("on_start_done")
     async def on_start_done(self):
