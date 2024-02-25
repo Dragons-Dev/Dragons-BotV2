@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import discord
 from discord.ext import commands
-from discord.utils import format_dt, get_or_fetch
+from discord.utils import format_dt
 
 from utils import Bot, ButtonInfo, CustomLogger, is_team
 
@@ -47,7 +47,7 @@ class Timeout(commands.Cog):
             return await ctx.response.send_message("I do not timeout any bot", ephemeral=True)
         if member.top_role >= ctx.guild.me.top_role:
             return await ctx.response.send_message(
-                "I can't timeout that member since his top role is higher " "or even to mine", ephemeral=True
+                "I can't timeout that member since his top role is higher or even to mine", ephemeral=True
             )
         try:
             if length[-1] == "s":
@@ -80,8 +80,12 @@ class Timeout(commands.Cog):
             )
 
             try:
+                member_em = em.copy()
+                member_em.title = "Timeout"
+                member_em.colour = discord.Color.yellow()
+
                 await member.send(
-                    embed=em,
+                    embed=member_em,
                     view=ButtonInfo("A copy of this was sent to the log channel and was stored in the database!"),
                 )
             except discord.HTTPException or discord.Forbidden:

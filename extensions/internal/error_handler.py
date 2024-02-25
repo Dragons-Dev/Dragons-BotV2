@@ -32,6 +32,9 @@ class ErrorHandler(commands.Cog):
                     ephemeral=True,
                 )
 
+            case _:
+                raise exc
+
 
 def setup(client):
     client.add_cog(ErrorHandler(client))
