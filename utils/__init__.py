@@ -4,4 +4,4 @@ from .database import ContentDB, ShortTermStorage
 from .enums import SettingsEnum
 from .logger import CustomLogger, rem_log
 from .utils import individual_users, sec_to_readable
-from .views import ButtonInfo
+from .views import ButtonConfirm, ButtonInfo

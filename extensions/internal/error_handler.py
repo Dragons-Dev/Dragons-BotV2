@@ -35,6 +35,8 @@ class ErrorHandler(commands.Cog):
             case _:
                 raise exc
 
+        # TODO: BAN COMMAND USER NOT IN GUILD
+
 
 def setup(client):
     client.add_cog(ErrorHandler(client))
