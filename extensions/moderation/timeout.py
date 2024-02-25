@@ -4,19 +4,7 @@ import discord
 from discord.ext import commands
 from discord.utils import format_dt, get_or_fetch
 
-from utils import Bot, CustomLogger, is_team, sec_to_readable
-
-
-class ButtonInfo(discord.ui.View):
-    def __init__(self, text):
-        if len(text) > 80:
-            raise discord.ValidationError("Buttons text is limited to 80 characters")
-        self.text = text
-        super().__init__(timeout=0)
-
-    @discord.ui.button(label="", disabled=True, style=discord.ButtonStyle.red)
-    async def info_button(self, button: discord.Button, inter: discord.Interaction):
-        return
+from utils import Bot, ButtonInfo, CustomLogger, is_team
 
 
 class Timeout(commands.Cog):

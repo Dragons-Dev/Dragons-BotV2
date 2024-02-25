@@ -56,6 +56,7 @@ if __name__ == "__main__":
             extension_store[extension] = True
         if status is True:
             if not extension_store[extension]:
+                bot.unload_extension(extension)
                 bot.logger.warning(f"{extension} is disabled!")
             else:
                 bot.logger.info(f"{extension} loaded successfully!")
