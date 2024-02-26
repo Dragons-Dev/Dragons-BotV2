@@ -54,6 +54,18 @@ class Kick(commands.Cog):
                 ephemeral=True,
             )
 
+    @kick.error
+    async def kick_error_handler(self, ctx: discord.ApplicationContext, exc: discord.DiscordException):
+        if isinstance(exc, discord.ApplicationCommandInvokeError):
+            return await ctx.response.send_message(
+                embed=discord.Embed(
+                    title="Error", description=f"This user is no member of this guild.", color=discord.Color.brand_red()
+                ),
+                ephemeral=True,
+            )
+        else:
+            raise exc
+
 
 def setup(client):
     client.add_cog(Kick(client))

@@ -54,6 +54,18 @@ class Ban(commands.Cog):
                 ephemeral=True,
             )
 
+    @ban.error
+    async def ban_error_handler(self, ctx: discord.ApplicationContext, exc: discord.ApplicationCommandError):
+        if isinstance(exc, discord.ApplicationCommandInvokeError):
+            return await ctx.response.send_message(
+                embed=discord.Embed(
+                    title="Error", description=f"This user is no member of this guild.", color=discord.Color.brand_red()
+                ),
+                ephemeral=True,
+            )
+        else:
+            raise exc
+
 
 def setup(client):
     client.add_cog(Ban(client))

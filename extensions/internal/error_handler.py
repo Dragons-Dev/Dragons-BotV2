@@ -20,6 +20,8 @@ class ErrorHandler(commands.Cog):
 
     @commands.Cog.listener("on_application_command_error")
     async def app_cmd_error(self, ctx: discord.ApplicationContext, exc: discord.DiscordException):
+        if ctx.command.has_error_handler():
+            return
         self.logger.warning(f"Commandname: {ctx.command.name}   Exception: {exc}: {type(exc)}")
         match type(exc):
             case discord.CheckFailure:
@@ -34,8 +36,6 @@ class ErrorHandler(commands.Cog):
 
             case _:
                 raise exc
-
-        # TODO: BAN COMMAND USER NOT IN GUILD
 
 
 def setup(client):
