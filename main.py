@@ -6,7 +6,7 @@ from sys import exit as exit_
 import discord
 from discord.ext import commands
 
-from config import DEBUG_GUILDS, DISCORD_TOKEN
+from config import DEBUG_GUILDS, DISCORD_API_KEY
 from utils import Bot, ContentDB, ShortTermStorage, individual_users, rem_log
 
 bot = Bot(
@@ -65,10 +65,10 @@ if __name__ == "__main__":
             exit_("Error loading extensions!")
     with open("./assets/disabled.json", "w") as f:
         json.dump(extension_store, f, indent=4)
-    if DISCORD_TOKEN == "":
+    if DISCORD_API_KEY == "":
         bot.logger.critical(f"No token has been passed to the bot.")
         exit_(1)
     if DEBUG_GUILDS is None or not DEBUG_GUILDS:
         bot.logger.warning("No Debug guild specified. Commands can take up to 1 hour to sync!")
 
-    bot.run(DISCORD_TOKEN)
+    bot.run(DISCORD_API_KEY)
