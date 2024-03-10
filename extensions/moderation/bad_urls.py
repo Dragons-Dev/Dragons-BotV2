@@ -16,12 +16,11 @@ class BadURL(commands.Cog):
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.bad_hashes = []
         self.detect_session = aiohttp.ClientSession()
-        self.update_discord_domains.start()
         self.reg_url = r"(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+"
 
     async def bad_url(self, listed_urls: list) -> bool:
         if GOOGLE_API_KEY == "":
-            return False
+            return False  # since no api key is given, we can't check for bad urls
         else:
             try:
                 headers = {"Content-type": "application/json"}
@@ -46,9 +45,8 @@ class BadURL(commands.Cog):
                     data=json.dumps(data),
                 )
                 response = await request.json()
-                self.logger.debug(f"{request.status}: Requested safebrowsing api {json.dumps(data)}")
-                print(response)
-                if response == "":
+                self.logger.debug(f"{request.status}: Requested safebrowsing api -> {json.dumps(data)}")
+                if response == {}:
                     return False
                 else:
                     return True
@@ -59,10 +57,14 @@ class BadURL(commands.Cog):
     @commands.Cog.listener("on_message")
     async def message_event(self, msg: discord.Message) -> None:
         matches = re.finditer(self.reg_url, msg.content, re.MULTILINE)
-        if len([match.group() for match in matches]) == 0:
+        urls = []
+        for match in matches:
+            if match is not None:
+                urls.append(match.group())
+        if len(urls) == 0:
             return
         else:
-            is_bad = await self.bad_url([match.group() for match in matches])
+            is_bad = await self.bad_url(urls)
             if is_bad:
                 await msg.delete()
 
