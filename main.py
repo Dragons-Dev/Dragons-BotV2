@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 
 from config import DEBUG_GUILDS, DISCORD_API_KEY
-from utils import Bot, ContentDB, ShortTermStorage, individual_users, rem_log
+from utils import Bot, ContentDB, ShortTermStorage, rem_log
 
 bot = Bot(
     command_prefix=commands.when_mentioned,
@@ -38,30 +38,28 @@ async def on_boot():
             time.time()+(int(data['session_start_limit']['reset_after'])/1000)).strftime('%d.%m.%Y %H:%M:%S')}"""
     )
     bot.logger.info(
-        f"Name: {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency*1000)}ms"
+        f"Name: {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency*1000)}ms | "
+        f"Version: {bot.version}"
     )
-    bot.logger.info(
-        f"It's on {len(bot.guilds)} guilds seeing {len(bot.users)} users from which {len(individual_users(bot.users))} "
-        f"are individual."
-    )
+    bot.logger.info(f"It's on {len(bot.guilds)} servers")
     bot.dispatch("start_done")
 
 
 if __name__ == "__main__":
-    extensions = bot.load_extensions("extensions", recursive=True, store=True)
+    extensions = bot.load_extensions("extensions", recursive=True, store=True)  # load every extension
     with open("./assets/disabled.json") as f:
         extension_store = json.load(f)
-    for extension, status in extensions.items():
+    for extension, status in extensions.items():  # go through every extension and save not registered
         if extension not in extension_store:
             extension_store[extension] = True
         if status is True:
             if not extension_store[extension]:
-                bot.unload_extension(extension)
+                bot.unload_extension(extension)  # unload extensions marked with false in /assets/disabled.json
                 bot.logger.warning(f"{extension} is disabled!")
             else:
                 bot.logger.info(f"{extension} loaded successfully!")
         else:
-            bot.logger.critical(f"{extension}: {str(status)}")
+            bot.logger.critical(f"{extension}: {str(status)}")  # raise errors and stop connecting to discord
             exit_("Error loading extensions!")
     with open("./assets/disabled.json", "w") as f:
         json.dump(extension_store, f, indent=4)
