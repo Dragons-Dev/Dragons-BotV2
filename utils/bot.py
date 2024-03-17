@@ -3,10 +3,11 @@ from datetime import datetime
 from aiohttp import ClientSession
 from discord.ext import commands, ipc
 
-from config import DISCORD_API_KEY, IPC_SECRET, client_version
+from config import DISCORD_API_KEY, IPC_SECRET
 
 from .database import ContentDB, ShortTermStorage
 from .logger import CustomLogger
+from .utils import VersionInfo
 
 
 class Bot(commands.Bot):
@@ -18,4 +19,4 @@ class Bot(commands.Bot):
         self.sts: ShortTermStorage = None  # type: ignore
         self.ipc = ipc.Server(self, secret_key=IPC_SECRET)
         self.logger = CustomLogger(name="bot.core", start_stamp=self.boot_time)
-        self.version = client_version
+        self.client_version = VersionInfo(1, 2, 0, "a1")

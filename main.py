@@ -39,7 +39,7 @@ async def on_boot():
     )
     bot.logger.info(
         f"Name: {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency*1000)}ms | "
-        f"Version: {bot.version}"
+        f"Version: {bot.client_version}"
     )
     bot.logger.info(f"It's on {len(bot.guilds)} servers")
     bot.dispatch("start_done")

@@ -1,12 +1,11 @@
-import hashlib
 import json
 import re
 
 import aiohttp
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 
-from config import GOOGLE_API_KEY, VersionInfo
+from config import GOOGLE_API_KEY
 from utils import Bot, CustomLogger
 
 
@@ -25,7 +24,7 @@ class BadURL(commands.Cog):
             try:
                 headers = {"Content-type": "application/json"}
                 data = {
-                    "client": {"clientId": "private", "clientVersion": self.client.version.__str__()},
+                    "client": {"clientId": "private", "clientVersion": self.client.client_version.__str__()},
                     "threatInfo": {
                         "threatTypes": [
                             "MALWARE",
