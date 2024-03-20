@@ -7,6 +7,11 @@
 - on_start_done
   - is dispatched after the initial on_ready event. since the `wait_until_ready` function dispatches too early for the
   database setup
-- stat_counter
-  - is linked up to a database to track the last 7 days of committed stats
+- on_stat_counter
+  - is linked up to a database to track stats
     - e.g. Minuets in voice, messages sent, requests made...
+  - **Parameters:**
+    - stat: `str`
+      - e.g. Bad URLs
+    - count: `int`
+    - entry: `Optional[discord.User | discord.Member | discord.Guild | None | ...]`
