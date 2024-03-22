@@ -65,26 +65,26 @@ class BadURL(commands.Cog):
             self.client.dispatch("stat_counter", "URLs checked", len(urls), msg.guild)
             is_bad_store = await self.bad_url(urls)
             if is_bad_store:  # false wont get to the for loop
+                await msg.delete(reason="Detected as bad url")  # First delete the bad urls
                 modmail_channel = await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)
                 channel = await get_or_fetch(msg.guild, "channel", modmail_channel, default=None)
-                link_reason = []
+                link_reason = []  # get the bad urls and reasons from the api answer
                 for entry in is_bad_store["matches"]:  # type: ignore
                     link_reason.append(f'{entry["threat"]["url"]} - {entry["threatType"]}')
                 if channel is None:
                     try:
                         await msg.guild.owner.send(
                             "Your modmail channel is not set up correctly. "
-                            "I need this to inform you about rule breaker!"
-                            f"User: {msg.author.mention}({msg.author.id})"
-                            f"Channel: {msg.channel.mention}\n" + "\n".join(link_reason)
+                            "I need this to inform you about rule breaker!\n"
+                            f"User: {msg.author.mention}({msg.author.id})\n"  # inform owner directly
+                            f"Channel: {msg.channel.mention}\n" + "\n".join(link_reason)  # if possible
                         )
                     except discord.HTTPException or discord.Forbidden:
                         pass
                 else:
-                    await msg.delete(reason="Detected as bad url")
                     if channel.type == discord.ChannelType.forum:
                         await channel.create_thread(
-                            ":warning: Bad Link :warning:",
+                            "⚠️ Bad Link",
                             f"""
 User: {msg.author.mention} ({msg.author.id})
 Channel: {msg.channel.mention}\n
