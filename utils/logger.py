@@ -5,6 +5,8 @@ from pathlib import Path
 
 from colorama import Fore, Style
 
+from config import log_level
+
 FMT = "{levelname[0]} | [{asctime}] | [{name}] | [{module}:{lineno}] | {message}"
 
 FORMATS = {
@@ -133,7 +135,7 @@ class CustomLogger(logging.Logger):
         file_handler.setFormatter(logging.Formatter(FMT, style="{", datefmt="%Y-%m-%d %H:%M:%S"))
         self.addHandler(file_handler)
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
+        console_handler.setLevel(log_level)
         console_handler.setFormatter(CustomFormatter())
         self.addHandler(console_handler)
 
