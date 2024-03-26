@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 import discord
+import pycord.multicog as pycog
 from discord.ext import commands
 from discord.utils import format_dt
 
@@ -12,6 +13,7 @@ class Timeout(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
+    @pycog.subcommand("mod", independent=True)
     @commands.slash_command(name="timeout", description="Timeouts a given member for a given time")
     @is_team()
     @discord.option("member", description="The member you want to timeout", input_type=discord.Member, required=True)

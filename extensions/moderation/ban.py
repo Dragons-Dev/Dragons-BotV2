@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import discord
+import pycord.multicog as pycog
 from discord.ext import commands
 
 from utils import Bot, ButtonConfirm, ButtonInfo, CustomLogger, is_team
@@ -11,6 +12,7 @@ class Ban(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
+    @pycog.subcommand("mod", independent=True)
     @commands.slash_command(name="ban", description="Bans a given member")
     @is_team()
     @discord.option("member", description="The member you want to ban", input_type=discord.Member, required=True)

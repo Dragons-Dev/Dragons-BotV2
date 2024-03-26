@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import discord
+import pycord.multicog as pycog
 from discord.ext import commands
 
 from utils import Bot, ButtonConfirm, ButtonInfo, CustomLogger, is_team
@@ -11,6 +12,7 @@ class Kick(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
+    @pycog.subcommand("mod", independent=True)
     @commands.slash_command(name="kick", description="Kicks a given member")
     @is_team()
     @discord.option("member", description="The member you want to kick", input_type=discord.Member, required=True)
