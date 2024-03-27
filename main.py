@@ -4,6 +4,7 @@ from datetime import datetime as dt
 from sys import exit as exit_
 
 import discord
+import wavelink
 from discord.ext import commands
 
 from config import DEBUG_GUILDS, DISCORD_API_KEY
@@ -28,17 +29,28 @@ async def on_boot():
     await bot.sts.setup(bot.boot_time)
     resp = await bot.api.get("/api/v10/gateway/bot")
     data = await resp.json()
+    await wavelink.Pool.connect(
+        nodes=[
+            wavelink.Node(
+                identifier="Private Node",
+                uri="http://85.215.133.202:2333",
+                password="7HX8wDfOLDT0IVIpgz6mqnWHnqcnIXF9rvjFUqZM3oyyVWybBOiFvcfZyPBr",
+            )
+        ],
+        client=bot,
+        cache_capacity=1000,
+    )
     rem_log()
     bot.logger.debug(f"Requested {resp.url}; Received {resp.status}")
     bot.logger.info(
-        f"Bot started at {bot.boot_time.strftime('%H:%M:%S')} Boot took ~{(dt.now()-bot.boot_time).seconds}s"
+        f"Bot started at {bot.boot_time.strftime('%H:%M:%S')} Boot took ~{(dt.now() - bot.boot_time).seconds}s"
     )
     bot.logger.info(
         f"""Session start limit {data['session_start_limit']['remaining']} | Resets at {dt.fromtimestamp(
-            time.time()+(int(data['session_start_limit']['reset_after'])/1000)).strftime('%d.%m.%Y %H:%M:%S')}"""
+            time.time() + (int(data['session_start_limit']['reset_after']) / 1000)).strftime('%d.%m.%Y %H:%M:%S')}"""
     )
     bot.logger.info(
-        f"Name: {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency*1000)}ms | "
+        f"Name: {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency * 1000)}ms | "
         f"Version: {bot.client_version}"
     )
     bot.logger.info(f"It's on {len(bot.guilds)} servers")
