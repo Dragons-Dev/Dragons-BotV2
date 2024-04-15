@@ -38,7 +38,7 @@ repos:
         args: [--disable-error-code=name-defined, --disable-error-code=import, --check-untyped-defs]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.15.1
+    rev: v3.15.2
     hooks:
       - id: pyupgrade
         args: [--py310-plus]
