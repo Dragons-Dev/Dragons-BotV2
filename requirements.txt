@@ -1,4 +1,4 @@
-aiohttp~=3.9.3
+aiohttp~=3.9.4
 aiosqlite==0.20.0
 colorama==0.4.6
 feedparser~=6.0.11
