@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 import discord
 import pycord.multicog as pycog
 from discord.ext import commands
-from discord.utils import format_dt
+from discord.utils import format_dt, get_or_fetch
 
-from utils import Bot, ButtonInfo, CustomLogger, is_team
+from utils import Bot, ButtonInfo, CustomLogger, InfractionsEnum, SettingsEnum, is_team
 
 
 class Timeout(commands.Cog):
@@ -69,30 +69,38 @@ class Timeout(commands.Cog):
                 until = timedelta(weeks=length)
                 if length == 4:
                     until = timedelta(days=27, hours=23, minutes=59)
+            else:
+                until = timedelta(seconds=1)
+                self.logger.critical(f"Invalid duration provided: {length}")
             await member.timeout_for(duration=until, reason=reason)
-            em = discord.Embed(title="Timeout successful", color=discord.Color.brand_green(), timestamp=datetime.now())
+            case = await self.client.db.create_infraction(
+                user=member, infraction=InfractionsEnum.Timeout, reason=reason, guild=ctx.guild
+            )
+            em = discord.Embed(title="Timeout successful", color=discord.Color.brand_green())
             em.add_field(name="User", value=member.mention, inline=False)
             em.add_field(name="Moderator", value=ctx.author.mention, inline=False)
             em.add_field(name="Until", value=format_dt((datetime.now() + until), "R"), inline=False)
             em.add_field(name="Reason", value=reason, inline=False)
+            em.add_field(name="Date", value=format_dt(datetime.now(), "F"), inline=False)
+            em.set_footer(text=f"Case ID: {case}")
             await ctx.response.send_message(
                 embed=em,
                 view=ButtonInfo("A copy of this was sent to the timeouted member and the log channel!"),
                 ephemeral=True,
             )
-
+            member_em = em.copy()
+            member_em.title = "Timeout"
+            member_em.colour = discord.Color.yellow()
             try:
-                member_em = em.copy()
-                member_em.title = "Timeout"
-                member_em.colour = discord.Color.yellow()
-
                 await member.send(
                     embed=member_em,
                     view=ButtonInfo("A copy of this was sent to the log channel and was stored in the database!"),
                 )
             except discord.HTTPException or discord.Forbidden:
                 pass
-
+            setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
+            log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting, default=None)
+            await log_channel.send(embed=member_em)
         except discord.Forbidden or discord.HTTPException as e:
             raise e
 

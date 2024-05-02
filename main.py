@@ -29,17 +29,6 @@ async def on_boot():
     await bot.sts.setup(bot.boot_time)
     resp = await bot.api.get("/api/v10/gateway/bot")
     data = await resp.json()
-    await wavelink.Pool.connect(
-        nodes=[
-            wavelink.Node(
-                identifier="Private Node",
-                uri="http://85.215.133.202:2333",
-                password="7HX8wDfOLDT0IVIpgz6mqnWHnqcnIXF9rvjFUqZM3oyyVWybBOiFvcfZyPBr",
-            )
-        ],
-        client=bot,
-        cache_capacity=1000,
-    )
     rem_log()
     bot.logger.debug(f"Requested {resp.url}; Received {resp.status}")
     bot.logger.info(

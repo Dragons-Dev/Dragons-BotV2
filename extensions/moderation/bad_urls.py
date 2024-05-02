@@ -1,13 +1,14 @@
 import json
 import re
+from datetime import datetime
 
 import aiohttp
 import discord
 from discord.ext import commands
-from discord.utils import get_or_fetch
+from discord.utils import format_dt, get_or_fetch
 
 from config import GOOGLE_API_KEY
-from utils import Bot, CustomLogger, SettingsEnum
+from utils import Bot, CustomLogger, InfractionsEnum, SettingsEnum
 
 
 class BadURL(commands.Cog):
@@ -66,39 +67,20 @@ class BadURL(commands.Cog):
             is_bad_store = await self.bad_url(urls)
             if is_bad_store:  # false wont get to the for loop
                 await msg.delete(reason="Detected as bad url")  # First delete the bad urls
-                modmail_channel = await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)
-                channel = await get_or_fetch(msg.guild, "channel", modmail_channel, default=None)
-                link_reason = []  # get the bad urls and reasons from the api answer
-                for entry in is_bad_store["matches"]:  # type: ignore
-                    link_reason.append(f'{entry["threat"]["url"]} - {entry["threatType"]}')
-                if channel is None:
-                    try:
-                        await msg.guild.owner.send(
-                            "Your modmail channel is not set up correctly. "
-                            "I need this to inform you about rule breaker!\n"
-                            f"User: {msg.author.mention}({msg.author.id})\n"  # inform owner directly
-                            f"Channel: {msg.channel.mention}\n" + "\n".join(link_reason)  # if possible
-                        )
-                    except discord.HTTPException or discord.Forbidden:
-                        pass
-                else:
-                    if channel.type == discord.ChannelType.forum:
-                        await channel.create_thread(
-                            "⚠️ Bad Link",
-                            f"""
-User: {msg.author.mention} ({msg.author.id})
-Channel: {msg.channel.mention}\n
-"""
-                            + "\n".join(link_reason),
-                        )
-                    else:
-                        await channel.send(
-                            f"""
-User: {msg.author.mention} ({msg.author.id})
-Channel: {msg.channel.mention}\n
-"""
-                            + "\n".join(link_reason)
-                        )
+                case = await self.client.db.create_infraction(
+                    user=msg.author, infraction=InfractionsEnum.Ban, reason="Bad URL sent", guild=msg.guild
+                )
+
+                em = discord.Embed(title="Message delete", color=discord.Color.yellow())
+                em.add_field(name="User", value=msg.author.mention, inline=False)
+                em.add_field(name="Moderator", value=self.client.user.mention, inline=False)
+                em.add_field(name="Reason", value="Sending a malicious link", inline=False)
+                em.add_field(name="Date", value=format_dt(datetime.now(), "F"), inline=False)
+                em.set_footer(text=f"Case ID: {case}")
+
+                setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=msg.guild)
+                log_channel: discord.TextChannel = await get_or_fetch(msg.guild, "channel", setting, default=None)
+                await log_channel.send(embed=em)
 
 
 def setup(client):

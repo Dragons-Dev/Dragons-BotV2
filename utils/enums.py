@@ -18,3 +18,10 @@ class SettingsEnum(Enum):
     Join2CreateChannel = "Join2Create Channel"
     AuditLogChannel = "Audit-Log Channel"
     TagesschauChannel = "Tagesschau Channel"
+
+
+class InfractionsEnum(Enum):
+    Timeout = "Timeout"
+    Kick = "Kick"
+    Ban = "Ban"
+    Warn = "Warn"

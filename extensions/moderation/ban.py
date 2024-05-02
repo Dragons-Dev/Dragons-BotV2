@@ -3,8 +3,17 @@ from datetime import datetime
 import discord
 import pycord.multicog as pycog
 from discord.ext import commands
+from discord.utils import format_dt, get_or_fetch
 
-from utils import Bot, ButtonConfirm, ButtonInfo, CustomLogger, is_team
+from utils import (
+    Bot,
+    ButtonConfirm,
+    ButtonInfo,
+    CustomLogger,
+    InfractionsEnum,
+    SettingsEnum,
+    is_team,
+)
 
 
 class Ban(commands.Cog):
@@ -27,10 +36,11 @@ class Ban(commands.Cog):
             return await ctx.response.send_message(
                 "I can't ban that member since his top role is higher or even to mine", ephemeral=True
             )
-        em = discord.Embed(title="Ban successful", color=discord.Color.brand_green(), timestamp=datetime.now())
+        em = discord.Embed(title="Ban successful", color=discord.Color.brand_green())
         em.add_field(name="User", value=member.mention, inline=False)
         em.add_field(name="Moderator", value=ctx.author.mention, inline=False)
         em.add_field(name="Reason", value=reason, inline=False)
+        em.add_field(name="Date", value=format_dt(datetime.now(), "F"), inline=False)
 
         view = ButtonConfirm(cancel_title="Ban cancelled!")
         msg = await ctx.response.send_message(f"Do you really want to ban {member.mention}", view=view, ephemeral=True)
@@ -39,10 +49,14 @@ class Ban(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
+            case = await self.client.db.create_infraction(
+                user=member, infraction=InfractionsEnum.Ban, reason=reason, guild=ctx.guild
+            )
+            em.set_footer(text=f"Case ID: {case}")
+            member_em = em.copy()
+            member_em.title = "Ban"
+            member_em.colour = discord.Color.brand_red()
             try:
-                member_em = em.copy()
-                member_em.title = "Ban"
-                member_em.colour = discord.Color.brand_red()
                 await member.send(
                     embed=member_em,
                     view=ButtonInfo("A copy of this was sent to the log channel and was stored in the database!"),
@@ -50,6 +64,9 @@ class Ban(commands.Cog):
             except discord.HTTPException or discord.Forbidden:
                 pass
             await member.ban(reason=reason)
+            setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
+            log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting, default=None)
+            await log_channel.send(embed=member_em)
             await ctx.followup.send(
                 embed=em,
                 view=ButtonInfo("A copy of this was sent to the banned member and the log channel!"),
