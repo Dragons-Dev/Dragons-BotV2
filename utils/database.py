@@ -4,7 +4,7 @@ from pathlib import Path
 import aiosqlite
 import discord
 
-from .enums import SettingsEnum
+from .enums import InfractionsEnum, SettingsEnum
 from .logger import CustomLogger
 
 
@@ -43,6 +43,11 @@ class ContentDB:
             await cursor.execute(
                 "CREATE TABLE IF NOT EXISTS join2create "
                 "(channel INTEGER, owner INTEGER, locked INTEGER, ghosted INTEGER)"
+            )
+            await cursor.execute(
+                "CREATE TABLE IF NOT EXISTS infractions "
+                "(case_id INTEGER PRIMARY KEY AUTOINCREMENT, user INTEGER, infraction TEXT, "
+                "reason TEXT, date DATETIME, guild INTEGER)"
             )
         self.logger.debug("ContentDB set up!")
 
@@ -108,6 +113,59 @@ class ContentDB:
         await self.db.execute("DELETE FROM join2create WHERE channel = ?", (channel.id,))
         await self.db.commit()
         self.logger.debug(f"Deleted {channel.name}|{channel.id} from the database")
+
+    async def create_infraction(
+        self, user: discord.User | discord.Member, infraction: InfractionsEnum, reason: str, guild: discord.Guild
+    ):
+        """Creates a new infraction entry for a user"""
+        cursor: aiosqlite.Cursor = await self.db.execute(
+            "INSERT INTO infractions (user, infraction, reason, date, guild) VALUES (?, ?, ?, ?, ?)",
+            (user.id, infraction.value, reason, datetime.now(), guild.id),
+        )
+        await self.db.commit()
+        self.logger.debug(f"Inserted {user.name}|{infraction.value}|{guild.name} to infractions.")
+        return cursor.lastrowid
+
+    async def modify_infraction(
+        self,
+        case_id: int,
+        *,
+        user: discord.User | discord.Member = None,
+        infraction: InfractionsEnum = None,
+        reason: str = None,
+        guild: discord.Guild = None,
+    ):
+        """Modifies a new infraction entry for a user"""
+        if user is not None:
+            await self.db.execute("UPDATE infractions SET user = ? WHERE case_id = ?", (user.id, case_id))
+        elif infraction is not None:
+            await self.db.execute(
+                "UPDATE infractions SET infraction = ? WHERE case_id = ?", (infraction.value, case_id)
+            )
+        elif reason is not None:
+            await self.db.execute("UPDATE infractions SET reason = ? WHERE case_id = ?", (reason, case_id))
+        elif guild is not None:
+            await self.db.execute("UPDATE infractions SET guild = ? WHERE case_id = ?", (guild.id, case_id))
+        else:
+            pass
+        await self.db.commit()
+
+    async def get_infraction(
+        self, case_id: int = None, user: discord.User | discord.Member = None
+    ) -> aiosqlite.Row | list[aiosqlite.Row]:
+        """Gets an infraction by id or all infractions from a user"""
+        if case_id is not None:
+            resp = await self.db.execute("SELECT * FROM infractions WHERE case_id = ?", (case_id,))
+            resp = await resp.fetchone()
+        else:
+            resp = await self.db.execute("SELECT * FROM infractions WHERE user = ?", (user.id,))
+            resp = await resp.fetchall()
+        return resp
+
+    async def delete_infraction(self, case_id: int):
+        """Gets an infraction by id"""
+        await self.db.execute("DELETE FROM infractions WHERE case_id = ?", (case_id,))
+        await self.db.commit()
 
 
 class ShortTermStorage:
