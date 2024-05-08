@@ -1,3 +1,20 @@
 {
-
+    "extensions.administration.settings": true,
+    "extensions.automation.join2create": true,
+    "extensions.automation.tagesschau_news": false,
+    "extensions.fun.nato_translate": true,
+    "extensions.internal.sts_clear": true,
+    "extensions.internal.webhooks": true,
+    "extensions.internal.error_handler": true,
+    "extensions.moderation.background": true,
+    "extensions.moderation.timeout": true,
+    "extensions.moderation.ban": true,
+    "extensions.moderation.kick": true,
+    "extensions.moderation.bad_urls": true,
+    "extensions.moderation.rem_user_msg": true,
+    "extensions.music.connect": true,
+    "extensions.music.events": true,
+    "extensions.moderation.channel_exporter": true,
+    "extensions.moderation.warn": true,
+    "extensions.internal.status": true
 }
