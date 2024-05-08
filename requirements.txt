@@ -1,4 +1,4 @@
-aiohttp~=3.9.4
+aiohttp~=3.9.5
 aiosqlite==0.20.0
 chat_exporter~=2.7.1
 colorama==0.4.6
