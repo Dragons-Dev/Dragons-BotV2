@@ -4,7 +4,6 @@ from datetime import datetime as dt
 from sys import exit as exit_
 
 import discord
-import wavelink
 from discord.ext import commands
 
 from config import DEBUG_GUILDS, DISCORD_API_KEY
