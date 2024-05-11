@@ -1,7 +1,5 @@
 from logging import CRITICAL, DEBUG, ERROR, INFO, WARNING
 
-from wavelink import Node
-
 DISCORD_API_KEY = ""
 # The token you get from discord for authorizing your bot. https://discord.com/developers/applications
 
