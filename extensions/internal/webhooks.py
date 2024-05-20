@@ -20,7 +20,11 @@ class InternalHooks(commands.Cog):
                 webhook = self.news_webhooks[f"{guild}"]
             except KeyError:
                 g = self.client.get_guild(guild)
+                if g is None:
+                    g = await self.client.fetch_guild(guild)
                 c: discord.TextChannel = g.get_channel(channel)
+                if c is None:
+                    c: discord.TextChannel = await self.client.fetch_channel(channel)  # type: ignore #type is inherited
                 webhooks = await c.webhooks()
                 for webhook in webhooks:
                     if webhook.name == "Tagesschau":

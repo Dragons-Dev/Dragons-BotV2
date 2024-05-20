@@ -1,6 +1,7 @@
 import re
 from datetime import datetime, timedelta
 
+import aiohttp
 import discord
 import feedparser
 from discord.ext import commands, tasks
@@ -55,17 +56,21 @@ class TagesschauFeed(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.url = "https://www.tagesschau.de/infoservices/alle-meldungen-100~rss2.xml"
+        self.session = aiohttp.ClientSession(headers={"User-Agent": f"Dragons BotV{self.client.client_version}"})
 
     @tasks.loop(minutes=1)
     async def gather_news(self):
+        """fetches news from tagesschau.de, parses them and checks for already sent news"""
         await self.client.wait_until_ready()
-        news = feedparser.parse(self.url)
-        self.logger.debug(f"Requested {self.url}")
+        request = await self.session.get(self.url)
+        data = await request.text()
+        news = feedparser.parse(data)
+        self.logger.debug(f"Requested {self.url}; {request.status}")
         new = []
         for entry in news["entries"]:
             ent = parse_tagesschau_feed(entry)
             resp = await self.client.sts.get_tagesschau_id(ent["id"])
-            if resp is not None:
+            if resp is not None:  # if the post id is not in the database
                 if resp["updated"] == ent["updated"]:
                     return
                 else:
