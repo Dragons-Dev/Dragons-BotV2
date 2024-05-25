@@ -13,7 +13,8 @@ class BotStatus(commands.Cog):
     async def start_status(self):
         while True:
             await self.client.change_presence(
-                activity=discord.Activity(type=discord.ActivityType.listening), status=discord.Status.online
+                activity=discord.Activity(type=discord.ActivityType.listening, name="feedback"),
+                status=discord.Status.online,
             )
 
 

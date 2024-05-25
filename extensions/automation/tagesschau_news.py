@@ -69,10 +69,12 @@ class TagesschauFeed(commands.Cog):
         new = []
         for entry in news["entries"]:
             ent = parse_tagesschau_feed(entry)
+            self.logger.debug(f"parsed {ent['id']} entry")
             resp = await self.client.sts.get_tagesschau_id(ent["id"])
+            em = None
             if resp is not None:  # if the post id is not in the database
                 if resp["updated"] == ent["updated"]:
-                    return
+                    pass
                 else:
                     em = discord.Embed(
                         title=ent["title"],
@@ -117,7 +119,10 @@ class TagesschauFeed(commands.Cog):
                 await self.client.sts.enter_tagesschau_id(
                     uuid=ent["id"], updated=ent["updated"], expires=datetime.now() + timedelta(5)
                 )
-            new.append(em)
+            if em is None:
+                pass
+            else:
+                new.append(em)
         self.logger.debug(f"Sent {len(new)} entries to `on_tagesschau_entry`")
         self.client.dispatch("tagesschau_entry", new)  # rest is handled by /extensions/internal/webhooks.py
 
