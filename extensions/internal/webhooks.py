@@ -44,12 +44,14 @@ class InternalHooks(commands.Cog):
                     avatar_url="https://www.ard.de/static/media/appIcon.ts.b846aebc4c4b299d0fbd.jpg",
                     embeds=sub,
                 )
+                self.logger.debug(f"Sent {len(sub)} news")
             else:
                 await webhook.send(
                     username="Tagesschau Feed",
                     avatar_url="https://www.ard.de/static/media/appIcon.ts.b846aebc4c4b299d0fbd.jpg",
                     embeds=self.news,
                 )
+                self.logger.debug(f"Sent {len(self.news)} news")
                 self.news.clear()
 
     @commands.Cog.listener("on_tagesschau_entry")
