@@ -1,6 +1,7 @@
 import re
 from datetime import datetime, timedelta
 
+import aiohttp
 import discord
 import feedparser
 from discord.ext import commands, tasks
@@ -55,19 +56,25 @@ class TagesschauFeed(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.url = "https://www.tagesschau.de/infoservices/alle-meldungen-100~rss2.xml"
+        self.session = aiohttp.ClientSession(headers={"User-Agent": f"Dragons BotV{self.client.client_version}"})
 
     @tasks.loop(minutes=1)
     async def gather_news(self):
+        """fetches news from tagesschau.de, parses them and checks for already sent news"""
         await self.client.wait_until_ready()
-        news = feedparser.parse(self.url)
-        self.logger.debug(f"Requested {self.url}")
+        request = await self.session.get(self.url)
+        data = await request.text()
+        news = feedparser.parse(data)
+        self.logger.debug(f"Requested {self.url}; {request.status}")
         new = []
         for entry in news["entries"]:
             ent = parse_tagesschau_feed(entry)
+            self.logger.debug(f"parsed {ent['id']} entry")
             resp = await self.client.sts.get_tagesschau_id(ent["id"])
-            if resp is not None:
+            em = None
+            if resp is not None:  # if the post id is not in the database
                 if resp["updated"] == ent["updated"]:
-                    return
+                    pass
                 else:
                     em = discord.Embed(
                         title=ent["title"],
@@ -112,7 +119,10 @@ class TagesschauFeed(commands.Cog):
                 await self.client.sts.enter_tagesschau_id(
                     uuid=ent["id"], updated=ent["updated"], expires=datetime.now() + timedelta(5)
                 )
-            new.append(em)
+            if em is None:
+                pass
+            else:
+                new.append(em)
         self.logger.debug(f"Sent {len(new)} entries to `on_tagesschau_entry`")
         self.client.dispatch("tagesschau_entry", new)  # rest is handled by /extensions/internal/webhooks.py
 

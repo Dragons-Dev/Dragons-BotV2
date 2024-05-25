@@ -20,7 +20,11 @@ class InternalHooks(commands.Cog):
                 webhook = self.news_webhooks[f"{guild}"]
             except KeyError:
                 g = self.client.get_guild(guild)
+                if g is None:
+                    g = await self.client.fetch_guild(guild)
                 c: discord.TextChannel = g.get_channel(channel)
+                if c is None:
+                    c: discord.TextChannel = await self.client.fetch_channel(channel)  # type: ignore #type is inherited
                 webhooks = await c.webhooks()
                 for webhook in webhooks:
                     if webhook.name == "Tagesschau":
@@ -52,6 +56,8 @@ class InternalHooks(commands.Cog):
     async def on_tagesschau_entry(self, entries: list[discord.Embed]):
         for entry in entries:
             self.news.append(entry)
+        self.logger.debug(f"{len(entries)} new tagesschau-entries to send")
+        self.logger.debug(f"{len(self.news)} tagesschau-entries to send")
 
     @commands.Cog.listener("on_start_done")
     async def start_done(self):

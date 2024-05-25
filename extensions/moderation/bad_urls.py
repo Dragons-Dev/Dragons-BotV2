@@ -24,7 +24,10 @@ class BadURL(commands.Cog):
             return False  # since no api key is given, we can't check for bad urls
         else:
             try:
-                headers = {"Content-type": "application/json"}
+                headers = {
+                    "Content-type": "application/json",
+                    "User-Agent": f"Dragons BotV{self.client.client_version}",
+                }
                 data = {
                     "client": {"clientId": "private", "clientVersion": self.client.client_version.__str__()},
                     "threatInfo": {
