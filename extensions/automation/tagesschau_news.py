@@ -65,14 +65,17 @@ class TagesschauFeed(commands.Cog):
         request = await self.session.get(self.url)
         data = await request.text()
         news = feedparser.parse(data)
-        self.logger.debug(f"Requested {self.url}; {request.status}")
+        if request.status == 200:
+            self.logger.debug(f"Requested {self.url}; {request.status}")
+        else:
+            self.logger.critical(f"Requested {self.url}; {request.status}")
         new = []
         for entry in news["entries"]:
             ent = parse_tagesschau_feed(entry)
             self.logger.debug(f"parsed {ent['id']} entry")
             resp = await self.client.sts.get_tagesschau_id(ent["id"])
             em = None
-            if resp is not None:  # if the post id is not in the database
+            if resp is not None:  # if the post id is in the database
                 if resp["updated"] == ent["updated"]:
                     pass
                 else:
@@ -95,6 +98,10 @@ class TagesschauFeed(commands.Cog):
                             url="https://www.tagesschau.de",
                             icon_url="https://www.ard.de/static/media/appIcon.ts.b846aebc4c4b299d0fbd.jpg",
                         ),
+                    )
+                    await self.client.sts.delete_tagesschau_id(ent["id"])
+                    await self.client.sts.enter_tagesschau_id(
+                        uuid=ent["id"], updated=ent["updated"], expires=datetime.now() + timedelta(5)
                     )
             else:
                 em = discord.Embed(
@@ -120,6 +127,8 @@ class TagesschauFeed(commands.Cog):
                     uuid=ent["id"], updated=ent["updated"], expires=datetime.now() + timedelta(5)
                 )
             if em is None:
+                pass
+            elif "Liveblog" in em.title:
                 pass
             else:
                 new.append(em)
