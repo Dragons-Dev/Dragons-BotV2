@@ -46,11 +46,11 @@ class NatoTranslator(commands.Cog):
     @commands.slash_command(
         name="nato-translator",
         description="Translates an input into the Nato alphabet",
-        contexts=(
-                discord.InteractionContextType.guild,
-                discord.InteractionContextType.bot_dm,
-                discord.InteractionContextType.private_channel
-        )
+        contexts={
+            discord.InteractionContextType.guild,
+            discord.InteractionContextType.bot_dm,
+            discord.InteractionContextType.private_channel,
+        },
     )
     async def nato_translator(
         self,

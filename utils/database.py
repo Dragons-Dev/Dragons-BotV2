@@ -49,6 +49,12 @@ class ContentDB:
                 "(case_id INTEGER PRIMARY KEY AUTOINCREMENT, user INTEGER, infraction TEXT, "
                 "reason TEXT, date DATETIME, guild INTEGER)"
             )
+            await cursor.execute(
+                """
+            CREATE TABLE IF NOT EXISTS modmail_link
+            (user_id INTEGER PRIMARY KEY, guild_id INTEGER)
+            """
+            )
         self.logger.debug("ContentDB set up!")
 
     async def _add_setting(self, setting: SettingsEnum, value: int, guild: discord.Guild) -> None:
@@ -165,6 +171,21 @@ class ContentDB:
     async def delete_infraction(self, case_id: int):
         """Gets an infraction by id"""
         await self.db.execute("DELETE FROM infractions WHERE case_id = ?", (case_id,))
+        await self.db.commit()
+
+    async def add_modmail_link(self, author: discord.User, guild: discord.Guild):
+        await self.db.execute("INSERT INTO modmail_link (user_id, guild_id) VALUES (?, ?)", (author.id, guild.id))
+        await self.db.commit()
+
+    async def get_modmail_link(self, author: discord.User):
+        resp = await self.db.execute("SELECT * FROM modmail_link WHERE user_id = ?", (author.id,))
+        resp = await resp.fetchone()
+        if resp is None:
+            return None, None
+        return resp
+
+    async def remove_modmail_link(self, author: discord.User):
+        await self.db.execute("DELETE FROM modmail_link WHERE user_id = ?", (author.id,))
         await self.db.commit()
 
 
