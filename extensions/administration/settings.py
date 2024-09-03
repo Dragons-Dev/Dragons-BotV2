@@ -52,7 +52,7 @@ class SettingsCog(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
-    @commands.slash_command(name="setting", description="Set settings for this guild.")
+    @commands.slash_command(name="setting", description="Set settings for this guild.", contexts={discord.InteractionContextType.guild})
     async def setting(
         self,
         ctx: discord.ApplicationContext,

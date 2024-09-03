@@ -21,7 +21,7 @@ class Ban(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
-    @pycog.subcommand("mod", independent=True)
+    @pycog.subcommand("mod")
     @commands.slash_command(name="ban", description="Bans a given member")
     @is_team()
     @discord.option("member", description="The member you want to ban", input_type=discord.Member, required=True)

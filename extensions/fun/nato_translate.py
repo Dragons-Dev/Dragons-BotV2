@@ -43,7 +43,15 @@ class NatoTranslator(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
-    @commands.slash_command(name="nato-translator", description="Translates an input into the Nato alphabet")
+    @commands.slash_command(
+        name="nato-translator",
+        description="Translates an input into the Nato alphabet",
+        contexts=(
+                discord.InteractionContextType.guild,
+                discord.InteractionContextType.bot_dm,
+                discord.InteractionContextType.private_channel
+        )
+    )
     async def nato_translator(
         self,
         ctx: discord.ApplicationContext,
