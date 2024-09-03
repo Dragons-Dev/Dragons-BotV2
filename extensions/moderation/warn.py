@@ -22,8 +22,7 @@ class Warn(commands.Cog):
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
     @pycog.subcommand("mod")
-    @commands.slash_command(
-        name="warn", description="Warns a given member")
+    @commands.slash_command(name="warn", description="Warns a given member")
     @is_team()
     @discord.option("member", description="The member you want to warn", input_type=discord.Member, required=True)
     @discord.option("reason", description="The reason for the warn", input_type=str, required=True)
