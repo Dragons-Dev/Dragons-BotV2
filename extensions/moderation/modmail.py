@@ -20,7 +20,7 @@ class EndModmailView(discord.ui.View):
         style=discord.ButtonStyle.blurple,
     )
     async def end_modmail(self, button: discord.ui.Button, interaction: discord.Interaction):
-        _, guild_id, _ = await self.client.db.get_modmail_link(self.author)
+        _, guild_id, _, _ = await self.client.db.get_modmail_link(self.author)
         guild = self.client.get_guild(guild_id)
         if guild is None:
             guild = await self.client.fetch_guild(guild_id)
