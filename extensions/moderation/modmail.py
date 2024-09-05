@@ -238,6 +238,14 @@ class ModMail(commands.Cog):
                     # convert all attachments to files to send them to the user
                     files = []
                     for attachment in msg.attachments:
+                        if attachment.size >= 25000000:  # 25 MB
+                            return await msg.channel.send(
+                                f"## Error\n"
+                                f"Your file ("
+                                f"{escape_markdown(attachment.filename)}"
+                                f") is to large to be send!\n"
+                                f"Maximum to be sent are 25MB"
+                            )
                         file = await attachment.to_file()
                         files.append(file)
 
@@ -284,6 +292,14 @@ class ModMail(commands.Cog):
         # convert all attachments to files to send them in the modmail channel
         files = []
         for attachment in msg.attachments:
+            if attachment.size >= 25000000:  # 25 MB
+                return await msg.channel.send(
+                    f"## Error\n"
+                    f"Your file ("
+                    f"{escape_markdown(attachment.filename)}"
+                    f") is to large to be send!\n"
+                    f"Maximum to be sent are 25MB"
+                )
             file = await attachment.to_file()
             files.append(file)
         # get the modmail channel for the guild the user wants to mail with
