@@ -261,7 +261,7 @@ class ModMail(commands.Cog):
                                 description=msg.content,
                                 footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
                                 timestamp=msg.created_at,
-                            ))
+                            ), files=(None if len(files) == 0 else files))
                     else:
                         recipient_id = footer.strip("Member ID:").strip()
                         recipient: discord.Member = await get_or_fetch(msg.guild, "member", int(recipient_id),
@@ -276,7 +276,7 @@ class ModMail(commands.Cog):
                                 description=msg.content,
                                 footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
                                 timestamp=msg.created_at,
-                            ))
+                            ), files=(None if len(files) == 0 else files))
 
         # at this point it's made sure it was a dm to the bot in a modmail context
         guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
