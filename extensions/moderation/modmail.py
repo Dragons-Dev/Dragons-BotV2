@@ -140,7 +140,7 @@ class ModMail(commands.Cog):
 
     @modmail_group.command(name="create", description="Start a new modmail chat.")
     @discord.commands.option(
-        name="anonymous", description="Do you want to be anonymous in this modmail?", input_type=bool
+        name="anonymous", description="Do you want to be anonymous in this modmail?", input_type=bool, default=False
     )
     async def create_modmail(self, ctx: discord.ApplicationContext, anonymous: bool):
         _, guild_id, _, _ = await self.client.db.get_modmail_link(ctx.author)
