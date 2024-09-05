@@ -234,7 +234,50 @@ class ModMail(commands.Cog):
         user_id, guild_id, uuid, anonymous = await self.client.db.get_modmail_link(msg.author)
         if msg.guild:
             if msg.channel.type == discord.ChannelType.public_thread:
-                return  # TODO: implement moderators chatting back!
+                if msg.channel.name.startswith("Thread for"):
+                    # convert all attachments to files to send them to the user
+                    files = []
+                    for attachment in msg.attachments:
+                        file = await attachment.to_file()
+                        files.append(file)
+
+                    user_name = msg.channel.name.strip("Thread for").strip()
+                    async for message in msg.channel.history():
+                        if message.author.id == self.client.user.id:
+                            if message.embeds:
+                                footer = message.embeds[0].footer.text
+                                break
+                    if user_name.startswith("Anon#"):
+                        recipient_uuid = footer.strip("UUID:").strip()
+                        recipient_id, _, _, _ = await self.client.db.get_modmail_link(uuid=recipient_uuid)
+                        recipient: discord.Member = await get_or_fetch(msg.guild, "member", recipient_id, default=None)
+                        if not recipient:
+                            return msg.channel.send("Member not found!")
+                        else:
+                            await recipient.send(embed=discord.Embed(
+                                author=discord.EmbedAuthor(name=msg.author.name,
+                                                           icon_url=msg.author.display_avatar.url),
+                                color=discord.Color.dark_magenta(),
+                                description=msg.content,
+                                footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
+                                timestamp=msg.created_at,
+                            ))
+                    else:
+                        recipient_id = footer.strip("Member ID:").strip()
+                        recipient: discord.Member = await get_or_fetch(msg.guild, "member", int(recipient_id),
+                                                                       default=None)
+                        if not recipient:
+                            return msg.channel.send("Member not found!")
+                        else:
+                            await recipient.send(embed=discord.Embed(
+                                author=discord.EmbedAuthor(name=msg.author.name,
+                                                           icon_url=msg.author.display_avatar.url),
+                                color=discord.Color.dark_magenta(),
+                                description=msg.content,
+                                footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
+                                timestamp=msg.created_at,
+                            ))
+
         # at this point it's made sure it was a dm to the bot in a modmail context
         guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
         embed = _to_embed(msg, uuid, anonymous)
