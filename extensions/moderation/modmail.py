@@ -1,10 +1,12 @@
+import datetime
+import uuid as _uuid
+
+import chat_exporter
 import discord
 from discord.ext import commands
-from discord.utils import get_or_fetch, escape_markdown
+from discord.utils import escape_markdown, get_or_fetch
 
-from utils import Bot, CustomLogger, ButtonConfirm, SettingsEnum
-
-import uuid as _uuid
+from utils import Bot, ButtonConfirm, CustomLogger, SettingsEnum
 
 
 class EndModmailView(discord.ui.View):
@@ -30,7 +32,7 @@ class EndModmailView(discord.ui.View):
         button.style = discord.ButtonStyle.success
         await interaction.edit(
             content=f"You've stopped mailing with **{escape_markdown(guild.name)}**!\n"
-                    f"## -# _Please note that the guild moderators can reopen modmails!_",
+            f"## -# _Please note that the guild moderators can reopen modmails!_",
             view=self,
         )
 
@@ -41,10 +43,7 @@ class GuildSelectDropdown(discord.ui.Select):
         self.client = client_
         self.author = author
         self.anon = anonymous
-        options = [
-            discord.SelectOption(label=escape_markdown(guild.name), value=str(guild.id))
-            for guild in author.mutual_guilds
-        ]
+        options = [discord.SelectOption(label=guild.name, value=str(guild.id)) for guild in author.mutual_guilds]
         super().__init__(
             placeholder="Choose the guild to modmail with!",
             min_values=1,
@@ -90,11 +89,11 @@ def _first_int(uuid: str):
     """
     for x in uuid:
         if x.isdigit():
-            x = int(x)
-            if x > 5:
-                return x // 2
+            num = int(x)
+            if num > 5:
+                return num // 2
             else:
-                return x
+                return num
 
 
 def _to_embed(msg: discord.Message, uuid: str, anonymous: bool):
@@ -173,10 +172,10 @@ class ModMail(commands.Cog):
                 )
 
         elif (
-                guild_id
+            guild_id
         ):  # if the command is run outside a guild but with an id in the database the user will be shown the `EndModmailView`
             view = EndModmailView(ctx.author, self.client)
-            guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
+            guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)  # type: ignore
             return await ctx.response.send_message(
                 f"You are still chatting with **{escape_markdown(guild.name)}**!", view=view, ephemeral=True
             )
@@ -212,15 +211,13 @@ class ModMail(commands.Cog):
             )
             for thread in modmail_channel.threads:
                 if (
-                        (f"Thread for {ctx.author.name}" == thread.name or f"Thread for Anon#{uuid[:7]}" == thread.name)
-                        and not thread.archived
-                        and not thread.locked
+                    (f"Thread for {ctx.author.name}" == thread.name or f"Thread for Anon#{uuid[:7]}" == thread.name)
+                    and not thread.archived
+                    and not thread.locked
                 ):
                     await thread.send(
-                        (
-                                (f"Anon#{uuid[:7]}" if anon else escape_markdown(ctx.author.name))
-                                + " has closed the conversation!"
-                        )
+                        (f"Anon#{uuid[:7]}" if anon else escape_markdown(ctx.author.name))
+                        + " has closed the conversation!"
                     )
                     await thread.edit(locked=True)
                     return
@@ -238,13 +235,13 @@ class ModMail(commands.Cog):
                     # convert all attachments to files to send them to the user
                     files = []
                     for attachment in msg.attachments:
-                        if attachment.size >= 25000000:  # 25 MB
+                        if attachment.size >= 10000000:  # 10 MB
                             return await msg.channel.send(
                                 f"## Error\n"
                                 f"Your file ("
                                 f"{escape_markdown(attachment.filename)}"
                                 f") is to large to be send!\n"
-                                f"Maximum to be sent are 25MB"
+                                f"Maximum to be sent are 10MB"
                             )
                         file = await attachment.to_file()
                         files.append(file)
@@ -262,29 +259,38 @@ class ModMail(commands.Cog):
                         if not recipient:
                             return msg.channel.send("Member not found!")
                         else:
-                            await recipient.send(embed=discord.Embed(
-                                author=discord.EmbedAuthor(name=msg.author.name,
-                                                           icon_url=msg.author.display_avatar.url),
-                                color=discord.Color.dark_magenta(),
-                                description=msg.content,
-                                footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
-                                timestamp=msg.created_at,
-                            ), files=(None if len(files) == 0 else files))
+                            await recipient.send(
+                                embed=discord.Embed(
+                                    author=discord.EmbedAuthor(
+                                        name=msg.author.name, icon_url=msg.author.display_avatar.url
+                                    ),
+                                    color=discord.Color.dark_magenta(),
+                                    description=msg.content,
+                                    footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
+                                    timestamp=msg.created_at,
+                                ),
+                                files=(None if len(files) == 0 else files),
+                            )
                     else:
                         recipient_id = footer.strip("Member ID:").strip()
-                        recipient: discord.Member = await get_or_fetch(msg.guild, "member", int(recipient_id),
-                                                                       default=None)
+                        recipient: discord.Member = await get_or_fetch(  # type: ignore
+                            msg.guild, "member", int(recipient_id), default=None
+                        )
                         if not recipient:
                             return msg.channel.send("Member not found!")
                         else:
-                            await recipient.send(embed=discord.Embed(
-                                author=discord.EmbedAuthor(name=msg.author.name,
-                                                           icon_url=msg.author.display_avatar.url),
-                                color=discord.Color.dark_magenta(),
-                                description=msg.content,
-                                footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
-                                timestamp=msg.created_at,
-                            ), files=(None if len(files) == 0 else files))
+                            await recipient.send(
+                                embed=discord.Embed(
+                                    author=discord.EmbedAuthor(
+                                        name=msg.author.name, icon_url=msg.author.display_avatar.url
+                                    ),
+                                    color=discord.Color.dark_magenta(),
+                                    description=msg.content,
+                                    footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
+                                    timestamp=msg.created_at,
+                                ),
+                                files=(None if len(files) == 0 else files),
+                            )
 
         # at this point it's made sure it was a dm to the bot in a modmail context
         guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
@@ -292,13 +298,13 @@ class ModMail(commands.Cog):
         # convert all attachments to files to send them in the modmail channel
         files = []
         for attachment in msg.attachments:
-            if attachment.size >= 25000000:  # 25 MB
+            if attachment.size >= 10000000:  # 10 MB
                 return await msg.channel.send(
                     f"## Error\n"
                     f"Your file ("
                     f"{escape_markdown(attachment.filename)}"
                     f") is to large to be send!\n"
-                    f"Maximum to be sent are 25MB"
+                    f"Maximum to be sent are 10MB"
                 )
             file = await attachment.to_file()
             files.append(file)
@@ -323,12 +329,16 @@ class ModMail(commands.Cog):
             )
             # iterate over all known threads if the user and the thread name match, if yes send the message and return
             for thread in modmail_channel.threads:
-                if (f"Thread for {embed.author.name}" == thread.name) and not thread.archived and not thread.locked:
+                if (
+                    (f"Thread for {escape_markdown(embed.author.name)}" == thread.name)
+                    and not thread.archived
+                    and not thread.locked
+                ):
                     await thread.send(embed=embed, files=(None if len(files) == 0 else files))
                     return
             # if no known thread matches, create a new thread and send the message
             else:
-                title = f"Thread for {embed.author.name}"
+                title = f"Thread for {escape_markdown(embed.author.name)}"
                 start_msg = await modmail_channel.send(f"Creating {escape_markdown(title)}")
                 new_thread = await start_msg.create_thread(name=title, auto_archive_duration=4320)
                 await new_thread.send(embed=embed, files=(None if len(files) == 0 else files))
