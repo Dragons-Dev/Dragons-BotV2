@@ -31,8 +31,7 @@ class EndModmailView(discord.ui.View):
         button.disabled = (True,)
         button.style = discord.ButtonStyle.success
         await interaction.edit(
-            content=f"You've stopped mailing with **{escape_markdown(guild.name)}**!\n"
-            f"## -# _Please note that the guild moderators can reopen modmails!_",
+            content=f"You've stopped mailing with **{escape_markdown(guild.name)}**!",
             view=self,
         )
 
@@ -173,7 +172,8 @@ class ModMail(commands.Cog):
 
         elif (
             guild_id
-        ):  # if the command is run outside a guild but with an id in the database the user will be shown the `EndModmailView`
+        ):  # if the command is run outside a guild but with an id in the database the user will be shown the
+            # `EndModmailView`
             view = EndModmailView(ctx.author, self.client)
             guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)  # type: ignore
             return await ctx.response.send_message(
@@ -189,6 +189,8 @@ class ModMail(commands.Cog):
     @modmail_group.command(name="end", description="Stop a modmail chat.")
     async def end_modmail(self, ctx: discord.ApplicationContext):
         user_id, guild_id, uuid, anon = await self.client.db.get_modmail_link(ctx.author)
+        if user_id is None:
+            return await ctx.response.send_message("You are not chatting with any guild!", ephemeral=True)
         guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
         view = ButtonConfirm(cancel_title=f"You continue to mail with **{escape_markdown(guild.name)}**!")
         msg = await ctx.response.send_message(
@@ -201,8 +203,7 @@ class ModMail(commands.Cog):
         else:
             await self.client.db.remove_modmail_link(ctx.author)
             await ctx.followup.send(
-                f"You've stopped mailing with **{escape_markdown(guild.name)}**!\n"
-                f"## -# _Please note that the guild moderators can reopen modmails!_",
+                f"You've stopped mailing with **{escape_markdown(guild.name)}**!",
                 ephemeral=True,
             )
             modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, guild)
