@@ -11,11 +11,10 @@ class BotStatus(commands.Cog):
 
     @commands.Cog.listener("on_start_done")
     async def start_status(self):
-        while True:
-            await self.client.change_presence(
-                activity=discord.Activity(type=discord.ActivityType.listening, name="feedback"),
-                status=discord.Status.online,
-            )
+        await self.client.change_presence(
+            activity=discord.Activity(type=discord.ActivityType.listening, name="feedback"),
+            status=discord.Status.online,
+        )
 
 
 def setup(client):

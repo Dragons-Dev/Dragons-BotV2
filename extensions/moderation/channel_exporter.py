@@ -14,7 +14,7 @@ class ChannelExporter(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
-    @pycog.subcommand("mod", independent=True)
+    @pycog.subcommand("mod")
     @is_team()
     @commands.slash_command(name="export", description="Exports a channel to a single html file to archive it.")
     async def export(self, ctx: discord.ApplicationContext):
