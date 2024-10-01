@@ -230,119 +230,142 @@ class ModMail(commands.Cog):
         if msg.author.bot:
             return
         user_id, guild_id, uuid, anonymous = await self.client.db.get_modmail_link(msg.author)
+        print(user_id, guild_id, uuid, anonymous)
         if msg.guild:
-            if msg.channel.type == discord.ChannelType.public_thread:
-                if msg.channel.name.startswith("Thread for"):
-                    # convert all attachments to files to send them to the user
-                    files = []
-                    for attachment in msg.attachments:
-                        if attachment.size >= 10000000:  # 10 MB
-                            return await msg.channel.send(
-                                f"## Error\n"
-                                f"Your file ("
-                                f"{escape_markdown(attachment.filename)}"
-                                f") is to large to be send!\n"
-                                f"Maximum to be sent are 10MB"
-                            )
-                        file = await attachment.to_file()
-                        files.append(file)
-
-                    user_name = msg.channel.name.strip("Thread for").strip()
-                    async for message in msg.channel.history():
-                        if message.author.id == self.client.user.id:
-                            if message.embeds:
-                                footer = message.embeds[0].footer.text
-                                break
-                    if user_name.startswith("Anon#"):
-                        recipient_uuid = footer.strip("UUID:").strip()
-                        recipient_id, _, _, _ = await self.client.db.get_modmail_link(uuid=recipient_uuid)
-                        recipient: discord.Member = await get_or_fetch(msg.guild, "member", recipient_id, default=None)
-                        if not recipient:
-                            return msg.channel.send("Member not found!")
-                        else:
-                            await recipient.send(
-                                embed=discord.Embed(
-                                    author=discord.EmbedAuthor(
-                                        name=msg.author.name, icon_url=msg.author.display_avatar.url
-                                    ),
-                                    color=discord.Color.dark_magenta(),
-                                    description=msg.content,
-                                    footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
-                                    timestamp=msg.created_at,
-                                ),
-                                files=(None if len(files) == 0 else files),
-                            )
-                    else:
-                        recipient_id = footer.strip("Member ID:").strip()
-                        recipient: discord.Member = await get_or_fetch(  # type: ignore
-                            msg.guild, "member", int(recipient_id), default=None
-                        )
-                        if not recipient:
-                            return msg.channel.send("Member not found!")
-                        else:
-                            await recipient.send(
-                                embed=discord.Embed(
-                                    author=discord.EmbedAuthor(
-                                        name=msg.author.name, icon_url=msg.author.display_avatar.url
-                                    ),
-                                    color=discord.Color.dark_magenta(),
-                                    description=msg.content,
-                                    footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
-                                    timestamp=msg.created_at,
-                                ),
-                                files=(None if len(files) == 0 else files),
-                            )
-
-        # at this point it's made sure it was a dm to the bot in a modmail context
-        guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
-        embed = _to_embed(msg, uuid, anonymous)
-        # convert all attachments to files to send them in the modmail channel
-        files = []
-        for attachment in msg.attachments:
-            if attachment.size >= 10000000:  # 10 MB
-                return await msg.channel.send(
-                    f"## Error\n"
-                    f"Your file ("
-                    f"{escape_markdown(attachment.filename)}"
-                    f") is to large to be send!\n"
-                    f"Maximum to be sent are 10MB"
+            print("guild")
+            mod_mail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)
+            print(mod_mail_channel_id)
+            if not mod_mail_channel_id:
+                await msg.guild.owner.send(
+                    "Hey, you've not set up all channel correctly. Please check your bot settings."
                 )
-            file = await attachment.to_file()
-            files.append(file)
-        # get the modmail channel for the guild the user wants to mail with
-        try:
-            modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, guild)
-        except AttributeError:
-            return await msg.author.send(
-                f"If you want to modmail with someone please use first {self.create_modmail.mention}"
-            )
-        # let the user know if the modmail channel is not set up
-        if not modmail_channel_id:
-            await msg.author.send(
-                "This feature is not set up in the guild you are trying to chat with.\n"
-                "-# You'll have to contact the mods or owner directly and let them enable this feature for you!",
-                delete_after=20,
-            )
-        else:
-            # get the channel object of the modmail channel
-            modmail_channel: discord.TextChannel = await get_or_fetch(
-                guild, "channel", modmail_channel_id, default=None
-            )
-            # iterate over all known threads if the user and the thread name match, if yes send the message and return
-            for thread in modmail_channel.threads:
-                if (
-                    (f"Thread for {escape_markdown(embed.author.name)}" == thread.name)
-                    and not thread.archived
-                    and not thread.locked
-                ):
-                    await thread.send(embed=embed, files=(None if len(files) == 0 else files))
-                    return
-            # if no known thread matches, create a new thread and send the message
+                return
+            mod_mail_channel = await get_or_fetch(msg.guild, "channel", mod_mail_channel_id, default=None)
+            print(mod_mail_channel)
+            if not mod_mail_channel:
+                await msg.guild.owner.send("Your modmail channel is not up to date, please update your settings.")
+                return
             else:
-                title = f"Thread for {escape_markdown(embed.author.name)}"
-                start_msg = await modmail_channel.send(f"Creating {escape_markdown(title)}")
-                new_thread = await start_msg.create_thread(name=title, auto_archive_duration=4320)
-                await new_thread.send(embed=embed, files=(None if len(files) == 0 else files))
+                for thread in mod_mail_channel.threads:
+                    print(thread)
+                    thread: discord.Thread = thread
+                    if thread.name.startswith("Thread for") and not thread.locked and not thread.archived:
+                        # convert all attachments to files to send them to the user
+                        files = []
+                        for attachment in msg.attachments:
+                            if attachment.size >= 10000000:  # 10 MB
+                                return await msg.channel.send(
+                                    f"## Error\n"
+                                    f"Your file ("
+                                    f"{escape_markdown(attachment.filename)}"
+                                    f") is to large to be send!\n"
+                                    f"Maximum to be sent are 10MB"
+                                )
+                            file = await attachment.to_file()
+                            files.append(file)
+
+                            user_name = msg.channel.name.strip("Thread for").strip()
+                            async for message in msg.channel.history():
+                                if message.author.id == self.client.user.id:
+                                    if message.embeds:
+                                        footer = message.embeds[0].footer.text
+                                        break
+                            if user_name.startswith("Anon#"):
+                                recipient_uuid = footer.strip("UUID:").strip()
+                                recipient_id, _, _, _ = await self.client.db.get_modmail_link(uuid=recipient_uuid)
+                                recipient: discord.Member = await get_or_fetch(msg.guild, "member", recipient_id,
+                                                                               default=None)
+                                if not recipient:
+                                    return await msg.channel.send("Member not found!")
+                                else:
+                                    await recipient.send(
+                                        embed=discord.Embed(
+                                            author=discord.EmbedAuthor(
+                                                name=msg.author.name, icon_url=msg.author.display_avatar.url
+                                            ),
+                                            color=discord.Color.dark_magenta(),
+                                            description=msg.content,
+                                            footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
+                                            timestamp=msg.created_at,
+                                        ),
+                                        files=(None if len(files) == 0 else files),
+                                    )
+                            else:
+                                recipient_id = footer.strip("Member ID:").strip()
+                                recipient: discord.Member = await get_or_fetch(  # type: ignore
+                                    msg.guild, "member", int(recipient_id), default=None
+                                )
+                                if not recipient:
+                                    return await msg.channel.send("Member not found!")
+                                else:
+                                    await recipient.send(
+                                        embed=discord.Embed(
+                                            author=discord.EmbedAuthor(
+                                                name=msg.author.name, icon_url=msg.author.display_avatar.url
+                                            ),
+                                            color=discord.Color.dark_magenta(),
+                                            description=msg.content,
+                                            footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
+                                            timestamp=msg.created_at,
+                                        ),
+                                        files=(None if len(files) == 0 else files),
+                                    )
+                    else:
+                        return
+        else:
+            print("not guild_context")
+            # at this point it's made sure it was a dm to the bot in a modmail context
+            guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
+            embed = _to_embed(msg, uuid, anonymous)
+            # convert all attachments to files to send them in the modmail channel
+            files = []
+            for attachment in msg.attachments:
+                if attachment.size >= 10000000:  # 10 MB
+                    return await msg.channel.send(
+                        f"## Error\n"
+                        f"Your file ("
+                        f"{escape_markdown(attachment.filename)}"
+                        f") is to large to be send!\n"
+                        f"Maximum to be sent are 10MB"
+                    )
+                file = await attachment.to_file()
+                files.append(file)
+            # get the modmail channel for the guild the user wants to mail with
+            try:
+                print("try")
+                modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, guild)
+            except AttributeError:
+                print("except")
+                return await msg.author.send(
+                    f"If you want to modmail with someone please use first {self.create_modmail.mention}"
+                )
+            # let the user know if the modmail channel is not set up
+            if not modmail_channel_id:
+                await msg.author.send(
+                    "This feature is not set up in the guild you are trying to chat with.\n"
+                    "-# You'll have to contact the mods or owner directly and let them enable this feature for you!",
+                    delete_after=20,
+                )
+            else:
+                # get the channel object of the modmail channel
+                modmail_channel: discord.TextChannel = await get_or_fetch(
+                    guild, "channel", modmail_channel_id, default=None
+                )
+                # iterate over all known threads if the user and the thread name match, if yes send the message and return
+                for thread in modmail_channel.threads:
+                    if (
+                            (f"Thread for {escape_markdown(embed.author.name)}" == thread.name)
+                            and not thread.archived
+                            and not thread.locked
+                    ):
+                        await thread.send(embed=embed, files=(None if len(files) == 0 else files))
+                        return
+                # if no known thread matches, create a new thread and send the message
+                else:
+                    title = f"Thread for {escape_markdown(embed.author.name)}"
+                    start_msg = await modmail_channel.send(f"Creating {escape_markdown(title)}")
+                    new_thread = await start_msg.create_thread(name=title, auto_archive_duration=4320)
+                    await new_thread.send(embed=embed, files=(None if len(files) == 0 else files))
 
 
 def setup(client: Bot):
