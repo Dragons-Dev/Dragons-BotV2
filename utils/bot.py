@@ -14,7 +14,7 @@ from .utils import VersionInfo
 class Bot(multicogBot, commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.client_version = VersionInfo(1, 2, 3, "")
+        self.client_version = VersionInfo(1, 3, 2, "")
         self.api = ClientSession(
             "https://discord.com",
             headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{self.client_version}"},
