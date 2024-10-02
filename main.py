@@ -3,6 +3,7 @@ import time
 from datetime import datetime as dt
 from sys import exit as exit_
 
+import aiohttp
 import discord
 from discord.ext import commands
 
@@ -26,6 +27,10 @@ async def on_boot():
     await bot.db.setup(bot.boot_time)
     bot.sts = ShortTermStorage(path="data/sts.sqlite")
     await bot.sts.setup(bot.boot_time)
+    bot.api = aiohttp.ClientSession(
+        "https://discord.com",
+        headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{bot.client_version}"},
+    )
     resp = await bot.api.get("/api/v10/gateway/bot")
     data = await resp.json()
     rem_log()
