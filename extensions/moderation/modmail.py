@@ -235,10 +235,7 @@ class ModMail(commands.Cog):
             if modmail_channel_id is None:
                 return
             modmail_channel: discord.TextChannel = await get_or_fetch(
-                msg.guild,
-                "channel",
-                modmail_channel_id,
-                default=None
+                msg.guild, "channel", modmail_channel_id, default=None
             )
             # getting modmail channel
             if modmail_channel is None:
@@ -274,9 +271,7 @@ class ModMail(commands.Cog):
                     files.append(file)
                 await user.send(
                     embed=discord.Embed(
-                        author=discord.EmbedAuthor(
-                            name=msg.author.name, icon_url=msg.author.display_avatar.url
-                        ),
+                        author=discord.EmbedAuthor(name=msg.author.name, icon_url=msg.author.display_avatar.url),
                         color=discord.Color.dark_magenta(),
                         description=msg.content,
                         footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
@@ -326,9 +321,9 @@ class ModMail(commands.Cog):
                 # iterate over all known threads if the user and the thread name match, if yes send the message and return
                 for thread in modmail_channel.threads:
                     if (
-                            (f"Thread for {escape_markdown(embed.author.name)}" == thread.name)
-                            and not thread.archived
-                            and not thread.locked
+                        (f"Thread for {escape_markdown(embed.author.name)}" == thread.name)
+                        and not thread.archived
+                        and not thread.locked
                     ):
                         await thread.send(embed=embed, files=(None if len(files) == 0 else files))
                         return
