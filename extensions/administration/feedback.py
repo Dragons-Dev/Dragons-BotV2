@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord.utils import get_or_fetch
 
-from utils import Bot, CustomLogger, ButtonInfo, SettingsEnum
+from utils import Bot, ButtonInfo, CustomLogger, SettingsEnum
 
 
 class FeedbackModal(discord.ui.Modal):
@@ -15,7 +15,7 @@ class FeedbackModal(discord.ui.Modal):
                 label="Ignore me",
                 style=discord.InputTextStyle.short,
                 value="Your feedback will be sent anonymous. This is useless if you share personal information.",
-                required=False
+                required=False,
             )
         )
         self.add_item(discord.ui.InputText(label="Feedback", style=discord.InputTextStyle.long))
@@ -27,9 +27,7 @@ class FeedbackModal(discord.ui.Modal):
             color=discord.Color.blurple(),
         )
         await interaction.response.send_message(
-            embeds=[embed],
-            ephemeral=True,
-            view=ButtonInfo("The embed you are seeing is sent to the administrators.")
+            embeds=[embed], ephemeral=True, view=ButtonInfo("The embed you are seeing is sent to the administrators.")
         )
         feedback_id = await self.client.db.get_setting(SettingsEnum.FeedbackChannel, interaction.guild)
         feedback_channel = await get_or_fetch(interaction.guild, "channel", feedback_id, default=None)
