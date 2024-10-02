@@ -14,7 +14,7 @@ from .utils import VersionInfo
 class Bot(multicogBot, commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.client_version = VersionInfo(1, 3, 2, "")
+        self.client_version = VersionInfo(1, 3, 3, "")
         self.api = None
         self.boot_time = datetime.now()  # Ignoring because it's dynamically allocated
         self.db: ContentDB = None  # type: ignore
