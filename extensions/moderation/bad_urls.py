@@ -16,7 +16,7 @@ class BadURL(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.bad_hashes = []
-        self.detect_session = None
+        self.detect_session: aiohttp.ClientSession = None  # type: ignore
         self.reg_url = r"(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+"
 
     async def bad_url(self, listed_urls: list) -> dict | bool:
