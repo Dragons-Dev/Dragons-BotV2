@@ -18,6 +18,7 @@ class SettingsEnum(Enum):
     Join2CreateChannel = "Join2Create Channel"
     AuditLogChannel = "Audit-Log Channel"
     TagesschauChannel = "Tagesschau Channel"
+    FeedbackChannel = "Feedback Channel"
 
 
 class InfractionsEnum(Enum):
