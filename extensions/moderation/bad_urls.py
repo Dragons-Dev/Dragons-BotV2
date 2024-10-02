@@ -16,7 +16,7 @@ class BadURL(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.bad_hashes = []
-        self.detect_session = aiohttp.ClientSession()
+        self.detect_session: aiohttp.ClientSession = None  # type: ignore
         self.reg_url = r"(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+"
 
     async def bad_url(self, listed_urls: list) -> dict | bool:
@@ -26,7 +26,6 @@ class BadURL(commands.Cog):
             try:
                 headers = {
                     "Content-type": "application/json",
-                    "User-Agent": f"Dragons BotV{self.client.client_version}",
                 }
                 data = {
                     "client": {"clientId": "private", "clientVersion": self.client.client_version.__str__()},
@@ -66,7 +65,6 @@ class BadURL(commands.Cog):
         if len(urls) == 0:
             return
         else:
-            self.client.dispatch("stat_counter", "URLs checked", len(urls), msg.guild)
             is_bad_store = await self.bad_url(urls)
             if is_bad_store:  # false wont get to the for loop
                 await msg.delete(reason="Detected as bad url")  # First delete the bad urls
@@ -84,6 +82,10 @@ class BadURL(commands.Cog):
                 setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=msg.guild)
                 log_channel: discord.TextChannel = await get_or_fetch(msg.guild, "channel", setting, default=None)
                 await log_channel.send(embed=em)
+
+    @commands.Cog.listener("on_start_done")
+    async def bad_urls_done(self):
+        self.detect_session = aiohttp.ClientSession(headers={"User-Agent": f"Dragons BotV{self.client.client_version}"})
 
 
 def setup(client):

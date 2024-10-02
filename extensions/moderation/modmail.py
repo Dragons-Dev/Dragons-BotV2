@@ -235,10 +235,7 @@ class ModMail(commands.Cog):
             if modmail_channel_id is None:
                 return
             modmail_channel: discord.TextChannel = await get_or_fetch(
-                msg.guild,
-                "channel",
-                modmail_channel_id,
-                default=None
+                msg.guild, "channel", modmail_channel_id, default=None
             )
             # getting modmail channel
             if modmail_channel is None:
@@ -274,9 +271,7 @@ class ModMail(commands.Cog):
                     files.append(file)
                 await user.send(
                     embed=discord.Embed(
-                        author=discord.EmbedAuthor(
-                            name=msg.author.name, icon_url=msg.author.display_avatar.url
-                        ),
+                        author=discord.EmbedAuthor(name=msg.author.name, icon_url=msg.author.display_avatar.url),
                         color=discord.Color.dark_magenta(),
                         description=msg.content,
                         footer=discord.EmbedFooter(text=f"Member ID: {msg.author.id}"),
@@ -320,22 +315,22 @@ class ModMail(commands.Cog):
                 )
             else:
                 # get the channel object of the modmail channel
-                modmail_channel: discord.TextChannel = await get_or_fetch(
+                modmail_channel_: discord.TextChannel = await get_or_fetch(
                     guild, "channel", modmail_channel_id, default=None
                 )
                 # iterate over all known threads if the user and the thread name match, if yes send the message and return
-                for thread in modmail_channel.threads:
+                for thread in modmail_channel_.threads:
                     if (
-                            (f"Thread for {escape_markdown(embed.author.name)}" == thread.name)
-                            and not thread.archived
-                            and not thread.locked
+                        (f"Thread for {escape_markdown(embed.author.name)}" == thread.name)
+                        and not thread.archived
+                        and not thread.locked
                     ):
                         await thread.send(embed=embed, files=(None if len(files) == 0 else files))
                         return
                 # if no known thread matches, create a new thread and send the message
                 else:
                     title = f"Thread for {escape_markdown(embed.author.name)}"
-                    start_msg = await modmail_channel.send(f"Creating {escape_markdown(title)}")
+                    start_msg = await modmail_channel_.send(f"Creating {escape_markdown(title)}")
                     new_thread = await start_msg.create_thread(name=title, auto_archive_duration=4320)
                     await new_thread.send(embed=embed, files=(None if len(files) == 0 else files))
 

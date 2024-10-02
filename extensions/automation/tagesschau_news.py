@@ -56,7 +56,7 @@ class TagesschauFeed(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.url = "https://www.tagesschau.de/infoservices/alle-meldungen-100~rss2.xml"
-        self.session = aiohttp.ClientSession(headers={"User-Agent": f"Dragons BotV{self.client.client_version}"})
+        self.session: aiohttp.ClientSession = None  # type: ignore
 
     @tasks.loop(minutes=1)
     async def gather_news(self):
@@ -137,6 +137,7 @@ class TagesschauFeed(commands.Cog):
 
     @commands.Cog.listener("on_start_done")
     async def on_start_done(self):
+        self.session = aiohttp.ClientSession(headers={"User-Agent": f"Dragons BotV{self.client.client_version}"})
         self.gather_news.start()
 
 

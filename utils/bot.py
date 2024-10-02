@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from aiohttp import ClientSession
+import aiohttp
 from discord.ext import commands, ipc
 from pycord.multicog import Bot as multicogBot
 
-from config import DISCORD_API_KEY, IPC_SECRET
+from config import IPC_SECRET
 
 from .database import ContentDB, ShortTermStorage
 from .logger import CustomLogger
@@ -14,11 +14,8 @@ from .utils import VersionInfo
 class Bot(multicogBot, commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.client_version = VersionInfo(1, 3, 2, "")
-        self.api = ClientSession(
-            "https://discord.com",
-            headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{self.client_version}"},
-        )
+        self.client_version = VersionInfo(1, 3, 3, "")
+        self.api: aiohttp.ClientSession = None  # type: ignore
         self.boot_time = datetime.now()  # Ignoring because it's dynamically allocated
         self.db: ContentDB = None  # type: ignore
         self.sts: ShortTermStorage = None  # type: ignore
