@@ -2,7 +2,6 @@ from datetime import datetime
 
 import aiohttp
 from discord.ext import commands, ipc
-from pycord.multicog import Bot as multicogBot
 
 from config import IPC_SECRET
 
