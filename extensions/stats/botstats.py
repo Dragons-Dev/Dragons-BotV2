@@ -16,11 +16,7 @@ class BotStats(commands.Cog):
         self.save_voice_to_db.start()
         self.commands_executed = 0
         self.messages_sent = 0
-        self.voice_seconds = {
-            "guild": {
-                "user_id": {"time": "datetime_object", "user": "user_object", "guild": "guild_object"},
-            }
-        }
+        self.voice_seconds = {}
 
     @tasks.loop(minutes=1)
     async def avg_ping(self):
