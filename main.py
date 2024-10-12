@@ -1,10 +1,13 @@
+import asyncio
 import json
+import os
 import time
 from datetime import datetime as dt
 from sys import exit as exit_
 
 import aiohttp
 import discord
+import psutil
 from discord.ext import commands
 
 from config import DEBUG_GUILDS, DISCORD_API_KEY
@@ -74,4 +77,11 @@ if __name__ == "__main__":
     if DEBUG_GUILDS is None or not DEBUG_GUILDS:
         bot.logger.warning("No Debug guild specified. Commands can take up to 1 hour to sync!")
 
-    bot.run(DISCORD_API_KEY)
+    pid = os.getpid()
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(bot.start(DISCORD_API_KEY))
+    except KeyboardInterrupt:
+        bot.logger.critical("Shutting down...")
+    finally:
+        psutil.Process(pid).terminate()

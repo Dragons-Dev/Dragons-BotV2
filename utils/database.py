@@ -4,7 +4,7 @@ from pathlib import Path
 import aiosqlite
 import discord
 
-from .enums import InfractionsEnum, SettingsEnum
+from .enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from .logger import CustomLogger
 
 
@@ -55,7 +55,16 @@ class ContentDB:
             (user_id INTEGER PRIMARY KEY, guild_id INTEGER, uuid TEXT, anon INTEGER)
             """
             )
+            await cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_stats
+                (user_id INTEGER, stat_type TEXT, value INTEGER, guild_id INTEGER)
+                """
+            )
         self.logger.debug("ContentDB set up!")
+
+    async def close(self):
+        await self.db.close()
 
     async def _add_setting(self, setting: SettingsEnum, value: int, guild: discord.Guild) -> None:
         await self.db.execute(
@@ -197,6 +206,82 @@ class ContentDB:
         await self.db.execute("DELETE FROM modmail_link WHERE user_id = ?", (author.id,))
         await self.db.commit()
 
+    async def _add_user_stat(self, user: discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild):
+        await self.db.execute(
+            "INSERT INTO user_stats (user_id, stat_type, value, guild_id) VALUES (?, ?, ?, ?)",
+            (user.id, stat_type.value, value, guild.id),
+        )
+        await self.db.commit()
+
+    async def update_user_stat(self, user: discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild):
+        """
+        Updates a user stat by the value that you input. The value can either be positive or negative.
+        Args:
+            user: ``discord.Member``
+            stat_type: ``utils.StatTypeEnum``
+            value: ``int``
+            guild: ``discord.Guild``
+
+        Returns:
+            ``None``
+        """
+        before_val = await self.get_user_stat(user, stat_type, guild)
+        if before_val is None:
+            await self._add_user_stat(user, stat_type, value, guild)
+            return
+        else:
+            after_val = sum([before_val[0][2], value])
+        cursor: aiosqlite.Cursor = await self.db.execute(
+            "UPDATE user_stats SET value = ? WHERE user_id = ? AND guild_id = ? AND stat_type = ?",
+            (after_val, user.id, guild.id, stat_type.value),
+        )
+        await self.db.commit()
+
+    async def get_user_stat(
+            self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None
+    ):
+        """
+        Gets the requested stat from the database
+        Args:
+            user: ``discord.Member`` or ``discord.User`` or ``None``
+            stat_type: ``utils.StatTypeEnum``
+            guild: ``discord.Guild``
+
+        Returns:
+            ``None`` if no entry is there else ``list[tuple[int,str,int,int]`` inside the tuple it's ordered as ``user_id``, ``stat_type``, ``value``, ``guild_id``
+        """
+        if user and guild:
+            resp = await self.db.execute(
+                "SELECT * FROM user_stats WHERE user_id = ? AND stat_type = ? AND guild_id = ?",
+                (user.id, stat_type.value, guild.id),
+            )
+        elif user:
+            resp = await self.db.execute(
+                "SELECT * FROM user_stats WHERE user_id = ? AND stat_type = ?", (user.id, stat_type.value)
+            )
+        elif guild:
+            resp = await self.db.execute(
+                "SELECT * FROM user_stats WHERE guild_id = ? AND stat_type = ?", (guild.id, stat_type.value)
+            )
+        else:
+            self.logger.critical("Neither User nor Guild specified!")
+            raise LookupError("Neither User nor Guild specified!")
+        resp = await resp.fetchall()
+        if len(resp) == 0:
+            return None
+        return resp
+
+    async def delete_user_stat(self, user: discord.User | None, guild: discord.Guild | None):
+        if user and guild:
+            await self.db.execute("DELETE FROM user_stats WHERE user_id = ? AND guild_id = ?", (user.id, guild.id))
+        elif user:
+            await self.db.execute("DELETE FROM user_stats WHERE user_id = ?", (user.id,))
+        elif guild:
+            await self.db.execute("DELETE FROM user_stats WHERE guild_id = ?", (guild.id,))
+        else:
+            self.logger.critical("Neither User nor Guild specified!")
+            raise LookupError("Neither User nor Guild specified!")
+
 
 class ShortTermStorage:
     def __init__(self, path: str | Path):
@@ -217,6 +302,9 @@ class ShortTermStorage:
         async with self.db.cursor() as cursor:
             await cursor.execute("CREATE TABLE IF NOT EXISTS tagesschau (id TEXT, updated DATETIME, expires DATETIME)")
         self.logger.debug("ShortTermStorage set up!")
+
+    async def close(self):
+        await self.db.close()
 
     async def enter_tagesschau_id(self, uuid: str, updated: datetime, expires: datetime):
         async with self.db.cursor() as cursor:

@@ -11,7 +11,7 @@ from .logger import CustomLogger
 from .utils import VersionInfo
 
 
-class Bot(multicogBot, commands.Bot):
+class Bot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client_version = VersionInfo(1, 3, 3, "")

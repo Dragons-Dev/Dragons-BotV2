@@ -8,6 +8,9 @@ class VersionInfo:
     def __str__(self) -> str:
         return f"{self.mayor}.{self.minor}.{self.patch}{self.release_level}"
 
+    def __hash__(self):
+        return hash((self.mayor, self.minor, self.patch, self.release_level))
+
 
 def sec_to_readable(time: float):
     hours, seconds = divmod(int(time), 60 * 60)
