@@ -272,6 +272,15 @@ class ContentDB:
         return resp
 
     async def delete_user_stat(self, user: discord.User | None, guild: discord.Guild | None):
+        """
+        Deletes all stats it finds filtered by either user and guild, only user or only guild.
+        Args:
+            user: ``discord.User`` or ``None``
+            guild: ``discord.Guild`` or ``None``
+
+        Returns:
+            ``None``
+        """
         if user and guild:
             await self.db.execute("DELETE FROM user_stats WHERE user_id = ? AND guild_id = ?", (user.id, guild.id))
         elif user:
