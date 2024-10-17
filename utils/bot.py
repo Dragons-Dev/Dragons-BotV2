@@ -2,6 +2,7 @@ from datetime import datetime
 
 import aiohttp
 from discord.ext import commands, ipc
+from pycord.multicog import Bot as MulticogBot
 
 from config import IPC_SECRET
 
@@ -10,10 +11,10 @@ from .logger import CustomLogger
 from .utils import VersionInfo
 
 
-class Bot(commands.Bot):
+class Bot(MulticogBot, commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.client_version = VersionInfo(1, 4, 0, "")
+        self.client_version = VersionInfo(1, 4, 1, "")
         self.api: aiohttp.ClientSession = None  # type: ignore
         self.boot_time = datetime.now()  # Ignoring because it's dynamically allocated
         self.db: ContentDB = None  # type: ignore
