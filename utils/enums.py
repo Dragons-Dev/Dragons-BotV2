@@ -26,3 +26,9 @@ class InfractionsEnum(Enum):
     Kick = "Kick"
     Ban = "Ban"
     Warn = "Warn"
+
+
+class StatTypeEnum(Enum):
+    MessagesSent = "MessagesSent"
+    CommandsUsed = "CommandsUsed"
+    VoiceTime = "VoiceTime"
