@@ -105,6 +105,11 @@ class ContentDB:
             await self.db.commit()
             self.logger.debug(f"{setting} was updated with {value} at {guild}")
 
+    async def delete_setting(self, setting: SettingsEnum, guild: discord.Guild) -> None:
+        """Deletes the currently set setting for the guild"""
+        async with self.db.cursor() as cursor:
+            await cursor.execute("DELETE FROM settings WHERE setting = ? AND guild = ?", (setting.value, guild.id))
+
     async def join2create(self, new_channel: discord.VoiceChannel, owner: discord.Member):
         """saves the channel id, member id into the db, sets locked and ghost to 0"""
         await self.db.execute(

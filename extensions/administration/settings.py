@@ -30,20 +30,24 @@ def value_choices(ctx: discord.AutocompleteContext) -> list[str]:
     """
     values = []
     entered = ctx.value
-    setting: str = ctx.options.items().mapping["setting"]
+    bot: Bot = ctx.bot
+    setting: str = ctx.options.items().mapping["setting"]  # access the setting
     if setting is None:
         return ["Please select a setting first"]
     elif setting.endswith("Role"):
+        values.append("❌ Remove Setting ❌")
         for role in ctx.interaction.guild.roles:
             if entered in role.name:
                 values.append(role.name)
         return values
     elif setting.endswith("Channel"):
+        values.append("❌ Remove Setting ❌")
         for channel in ctx.interaction.guild.channels:
             if entered in channel.name:
                 values.append(channel.name)
         return values
     else:
+        bot.logger.error(f"No value could be found for setting {setting}")
         return ["A super rare bug appeared and I don't know why!"]
 
 
@@ -72,6 +76,16 @@ class SettingsCog(commands.Cog):
         ),
     ):
         db_setting = SettingsEnum(setting)
+        if value == "❌ Remove Setting ❌":
+            await self.client.db.delete_setting(db_setting, ctx.guild)
+            return await ctx.response.send_message(
+                embed=discord.Embed(
+                    title="Success",
+                    description=f"Removed {setting}!",
+                    color=discord.Color.brand_green(),
+                ),
+                ephemeral=True,
+            )
         if db_setting.value.endswith("Role"):
             settings_value = discord.utils.find(lambda c: c.name == value, ctx.guild.roles)
         else:
