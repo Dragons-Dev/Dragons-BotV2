@@ -73,8 +73,6 @@ class BotStats(commands.Cog):
             if not update:
                 del self.voice_seconds[str(before_guild.id)][str(member.id)]
 
-    # E | [2024-11-02 00:11:18,565] | [BotStats] | [botstats:68] | User cache is none Guild: 578446945425555464 Member: 511219492332896266 | Voice Cache: {'578446945425555464': {}}
-    # E | [2024-11-02 15:57:59,886] | [BotStats] | [botstats:68] | User cache is none Guild: 578446945425555464 Member: 342059890187173888 | Voice Cache: {'578446945425555464': {'622130169657688074': {'time': datetime.datetime(2024, 11, 2, 15, 55, 19, 258301), 'user': <Member id=622130169657688074 name='dthedragonfire' global_name='DTheDragonFire' bot=False nick='[Nick] DTheDragonFire' guild=<Guild id=578446945425555464 name='Dragons' shard_id=0 chunked=True member_count=196>>, 'guild': <Guild id=578446945425555464 name='Dragons' shard_id=0 chunked=True member_count=196>}}}
 
     @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(
@@ -92,7 +90,7 @@ class BotStats(commands.Cog):
                         except KeyError:
                             self.voice_seconds[f"{after.channel.guild.id}"] = {}
                         self.voice_seconds[f"{after.channel.guild.id}"][f"{member.id}"] = {
-                            "time": datetime.now(),  # type: ignore
+                            "time": datetime.now(),
                             "user": member,
                             "guild": member.guild,
                         }
@@ -107,7 +105,7 @@ class BotStats(commands.Cog):
             except KeyError:
                 self.voice_seconds[f"{after.channel.guild.id}"] = {}
             self.voice_seconds[f"{after.channel.guild.id}"][f"{member.id}"] = {
-                "time": datetime.now(),  # type: ignore
+                "time": datetime.now(),
                 "user": member,
                 "guild": member.guild,
             }
