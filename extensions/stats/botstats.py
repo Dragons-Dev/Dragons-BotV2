@@ -14,8 +14,6 @@ class BotStats(commands.Cog):
         self.pings = []
         self.avg_ping.start()
         self.save_voice_to_db.start()
-        self.commands_executed = 0
-        self.messages_sent = 0
         self.voice_seconds = {}
 
     @tasks.loop(minutes=1)
@@ -50,11 +48,8 @@ class BotStats(commands.Cog):
         await self.client.wait_until_ready()
         for guild_id, users in self.voice_seconds.items():
             for user_id, data in users.items():
-                if data["time"] == "datetime_object":
-                    pass
-                else:
-                    await self._update_voice_seconds(data["user"], data["guild"], True)  # type: ignore
-                    self.voice_seconds[guild_id][user_id]["time"] = datetime.now()  # type: ignore
+                await self._update_voice_seconds(data["user"], data["guild"], True)
+                self.voice_seconds[guild_id][user_id]["time"] = datetime.now()
 
     async def _update_voice_seconds(self, member: discord.Member, before_guild: discord.Guild, update: bool = False):
         before_guild_cache = self.voice_seconds.get(str(before_guild.id))
@@ -78,6 +73,7 @@ class BotStats(commands.Cog):
             if not update:
                 del self.voice_seconds[str(before_guild.id)][str(member.id)]
 
+
     @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(
             self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
@@ -89,9 +85,12 @@ class BotStats(commands.Cog):
                         return  # don't care if it's still the same discord guild
                     else:
                         await self._update_voice_seconds(member, member.guild)
-                        self.voice_seconds[f"{after.channel.guild.id}"] = {}
+                        try:
+                            self.voice_seconds[f"{after.channel.guild.id}"]
+                        except KeyError:
+                            self.voice_seconds[f"{after.channel.guild.id}"] = {}
                         self.voice_seconds[f"{after.channel.guild.id}"][f"{member.id}"] = {
-                            "time": datetime.now(),  # type: ignore
+                            "time": datetime.now(),
                             "user": member,
                             "guild": member.guild,
                         }
@@ -101,9 +100,12 @@ class BotStats(commands.Cog):
                 await self._update_voice_seconds(member, member.guild)
 
         elif after.channel:
-            self.voice_seconds[f"{after.channel.guild.id}"] = {}
+            try:
+                self.voice_seconds[f"{after.channel.guild.id}"]
+            except KeyError:
+                self.voice_seconds[f"{after.channel.guild.id}"] = {}
             self.voice_seconds[f"{after.channel.guild.id}"][f"{member.id}"] = {
-                "time": datetime.now(),  # type: ignore
+                "time": datetime.now(),
                 "user": member,
                 "guild": member.guild,
             }
