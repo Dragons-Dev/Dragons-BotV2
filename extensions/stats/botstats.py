@@ -14,8 +14,6 @@ class BotStats(commands.Cog):
         self.pings = []
         self.avg_ping.start()
         self.save_voice_to_db.start()
-        self.commands_executed = 0
-        self.messages_sent = 0
         self.voice_seconds = {}
 
     @tasks.loop(minutes=1)
@@ -50,11 +48,8 @@ class BotStats(commands.Cog):
         await self.client.wait_until_ready()
         for guild_id, users in self.voice_seconds.items():
             for user_id, data in users.items():
-                if data["time"] == "datetime_object":
-                    pass
-                else:
-                    await self._update_voice_seconds(data["user"], data["guild"], True)  # type: ignore
-                    self.voice_seconds[guild_id][user_id]["time"] = datetime.now()  # type: ignore
+                await self._update_voice_seconds(data["user"], data["guild"], True)
+                self.voice_seconds[guild_id][user_id]["time"] = datetime.now()
 
     async def _update_voice_seconds(self, member: discord.Member, before_guild: discord.Guild, update: bool = False):
         before_guild_cache = self.voice_seconds.get(str(before_guild.id))
@@ -78,6 +73,9 @@ class BotStats(commands.Cog):
             if not update:
                 del self.voice_seconds[str(before_guild.id)][str(member.id)]
 
+    # E | [2024-11-02 00:11:18,565] | [BotStats] | [botstats:68] | User cache is none Guild: 578446945425555464 Member: 511219492332896266 | Voice Cache: {'578446945425555464': {}}
+    # E | [2024-11-02 15:57:59,886] | [BotStats] | [botstats:68] | User cache is none Guild: 578446945425555464 Member: 342059890187173888 | Voice Cache: {'578446945425555464': {'622130169657688074': {'time': datetime.datetime(2024, 11, 2, 15, 55, 19, 258301), 'user': <Member id=622130169657688074 name='dthedragonfire' global_name='DTheDragonFire' bot=False nick='[Nick] DTheDragonFire' guild=<Guild id=578446945425555464 name='Dragons' shard_id=0 chunked=True member_count=196>>, 'guild': <Guild id=578446945425555464 name='Dragons' shard_id=0 chunked=True member_count=196>}}}
+
     @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(
             self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
@@ -89,7 +87,10 @@ class BotStats(commands.Cog):
                         return  # don't care if it's still the same discord guild
                     else:
                         await self._update_voice_seconds(member, member.guild)
-                        self.voice_seconds[f"{after.channel.guild.id}"] = {}
+                        try:
+                            self.voice_seconds[f"{after.channel.guild.id}"]
+                        except KeyError:
+                            self.voice_seconds[f"{after.channel.guild.id}"] = {}
                         self.voice_seconds[f"{after.channel.guild.id}"][f"{member.id}"] = {
                             "time": datetime.now(),  # type: ignore
                             "user": member,
@@ -101,7 +102,10 @@ class BotStats(commands.Cog):
                 await self._update_voice_seconds(member, member.guild)
 
         elif after.channel:
-            self.voice_seconds[f"{after.channel.guild.id}"] = {}
+            try:
+                self.voice_seconds[f"{after.channel.guild.id}"]
+            except KeyError:
+                self.voice_seconds[f"{after.channel.guild.id}"] = {}
             self.voice_seconds[f"{after.channel.guild.id}"][f"{member.id}"] = {
                 "time": datetime.now(),  # type: ignore
                 "user": member,
