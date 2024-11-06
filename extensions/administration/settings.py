@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from utils import Bot, CustomLogger, SettingsEnum
+from utils import Bot, CustomLogger, SettingsEnum, checks
 
 
 def setting_choices(ctx: discord.AutocompleteContext) -> list[str]:
@@ -59,6 +59,7 @@ class SettingsCog(commands.Cog):
     @commands.slash_command(
         name="setting", description="Set settings for this guild.", contexts={discord.InteractionContextType.guild}
     )
+    @checks.is_team()
     async def setting(
         self,
         ctx: discord.ApplicationContext,
