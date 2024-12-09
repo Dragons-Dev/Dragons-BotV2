@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from utils import Bot, CustomLogger, SettingsEnum
+from utils import Bot, CustomLogger, SettingsEnum, checks, is_team
 
 
 def setting_choices(ctx: discord.AutocompleteContext) -> list[str]:
@@ -59,6 +59,7 @@ class SettingsCog(commands.Cog):
     @commands.slash_command(
         name="setting", description="Set settings for this guild.", contexts={discord.InteractionContextType.guild}
     )
+    @checks.is_team()
     async def setting(
         self,
         ctx: discord.ApplicationContext,
@@ -100,6 +101,25 @@ class SettingsCog(commands.Cog):
             ),
             ephemeral=True,
         )
+
+    @commands.slash_command(name="settings_show", description="show's the currently set settings")
+    @is_team()
+    async def settings_show(self, ctx: discord.ApplicationContext):
+        embed = discord.Embed(title="Guild Settings", color=discord.Color.dark_orange())
+        for enum_value in SettingsEnum:
+            enum = SettingsEnum(enum_value)
+            setting_value = await self.client.db.get_setting(setting=enum, guild=ctx.guild)
+            if setting_value is None:
+                pass
+            else:
+                embed.add_field(
+                    name=enum.value,
+                    value=f"<@&{setting_value}>" if enum.value.endswith("Role") else f"<#{setting_value}>",
+                    inline=True,
+                )
+        if len(embed.fields) == 0:
+            embed.description = f"No settings are set, use {self.setting.mention} to set some!"
+        await ctx.response.send_message(embed=embed, ephemeral=True)
 
 
 def setup(client):
