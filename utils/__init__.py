@@ -1,5 +1,6 @@
 from .bot import Bot
 from .checks import is_team
+from .classes import BotActivity
 from .database import ContentDB, ShortTermStorage
 from .enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from .logger import CustomLogger, rem_log

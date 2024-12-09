@@ -7,6 +7,16 @@ import utils
 from utils import Bot, CustomLogger
 
 
+class TimedUser:
+    def __init__(self, user: discord.Member, guild: discord.Guild):
+        self.user = user
+        self.guild = guild
+        self.time = datetime.now()
+
+    def __repr__(self):
+        return f"TimedUser(user={self.user}, guild={self.guild}, time={(datetime.now() - self.time).total_seconds()})"
+
+
 class BotStats(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
@@ -14,7 +24,28 @@ class BotStats(commands.Cog):
         self.pings = []
         self.avg_ping.start()
         self.save_voice_to_db.start()
-        self.voice_seconds = {}
+        self.voice_time_cache = {}  # structure: {guild_id: {user_id: TimedUser}}}
+
+    def _add_or_update_user(self, user: discord.Member, guild: discord.Guild):
+        if str(guild.id) not in self.voice_time_cache:
+            self.voice_time_cache[str(guild.id)] = {}
+        self.voice_time_cache[str(guild.id)][str(user.id)] = TimedUser(user, guild)
+
+    def _get_user(self, guild: int, user: int) -> TimedUser | None:
+        try:
+            return self.voice_time_cache[str(guild)][str(user)]
+        except KeyError:
+            return None
+
+    def _delete_user(self, guild: int, user: int):
+        try:
+            del self.voice_time_cache[str(guild)][str(user)]
+            if len(self.voice_time_cache[str(guild)]) == 0:
+                del self.voice_time_cache[str(guild)]
+        except KeyError:
+            return self.logger.error(
+                f"Couldn't get user: {user}, guild: {guild} | Voice Cache: {self.voice_time_cache}"
+            )
 
     @tasks.loop(minutes=1)
     async def avg_ping(self):
@@ -46,38 +77,26 @@ class BotStats(commands.Cog):
     @tasks.loop(minutes=5)
     async def save_voice_to_db(self):
         await self.client.wait_until_ready()
-        for guild_id, users in self.voice_seconds.items():
-            for user_id, data in users.items():
-                await self._update_voice_seconds(data["user"], data["guild"], True)
-                self.voice_seconds[guild_id][user_id]["time"] = datetime.now()
+        for guild_id, users in self.voice_time_cache.items():
+            for user in users:
+                await self._update_voice_seconds(user.user, user.guild, True)
+                self._add_or_update_user(user.user, user.guild)
 
     async def _update_voice_seconds(self, member: discord.Member, before_guild: discord.Guild, update: bool = False):
-        before_guild_cache = self.voice_seconds.get(str(before_guild.id))
-        if before_guild_cache is None:
-            return self.logger.error(
-                f"Before guild cache is none Guild: {before_guild.id} | Voice Cache: {self.voice_seconds}"
-            )
-        else:
-            user_id_cache: dict[str, datetime] = before_guild_cache.get(str(member.id))  # type: ignore
-            if user_id_cache is None:
-                return self.logger.error(
-                    f"User cache is none Guild: {before_guild.id} Member: {member.id} | Voice Cache: {self.voice_seconds}"
-                )
+        db_time = datetime.now() - self._get_user(before_guild.id, member.id).time  # type: ignore
+        db_time = int(db_time.total_seconds())
+        await self.client.db.update_user_stat(
+            member, utils.StatTypeEnum.VoiceTime, db_time, before_guild  # type: ignore
+        )
 
-            db_time = datetime.now() - user_id_cache["time"]
-            db_time = int(db_time.total_seconds())  # type: ignore
-            await self.client.db.update_user_stat(
-                member, utils.StatTypeEnum.VoiceTime, db_time, before_guild  # type: ignore
-            )
-
-            if not update:
-                del self.voice_seconds[str(before_guild.id)][str(member.id)]
-
+        if not update:
+            self._delete_user(before_guild.id, member.id)
 
     @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(
             self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ):
+        print(self.voice_time_cache)
         if before.channel:
             if after.channel:
                 if before.channel != after.channel:
@@ -85,30 +104,13 @@ class BotStats(commands.Cog):
                         return  # don't care if it's still the same discord guild
                     else:
                         await self._update_voice_seconds(member, member.guild)
-                        try:
-                            self.voice_seconds[f"{after.channel.guild.id}"]
-                        except KeyError:
-                            self.voice_seconds[f"{after.channel.guild.id}"] = {}
-                        self.voice_seconds[f"{after.channel.guild.id}"][f"{member.id}"] = {
-                            "time": datetime.now(),
-                            "user": member,
-                            "guild": member.guild,
-                        }
+                        self._add_or_update_user(member, member.guild)  # if they switched servers
                 else:
                     return  # this path is triggered if someone does something in a voice channel
             else:
-                await self._update_voice_seconds(member, member.guild)
-
+                await self._update_voice_seconds(member, member.guild)  # if they left a voice channel
         elif after.channel:
-            try:
-                self.voice_seconds[f"{after.channel.guild.id}"]
-            except KeyError:
-                self.voice_seconds[f"{after.channel.guild.id}"] = {}
-            self.voice_seconds[f"{after.channel.guild.id}"][f"{member.id}"] = {
-                "time": datetime.now(),
-                "user": member,
-                "guild": member.guild,
-            }
+            self._add_or_update_user(member, member.guild)  # if they joined a voice channel
         else:
             self.logger.error("Neither before nor after channel")
             return
