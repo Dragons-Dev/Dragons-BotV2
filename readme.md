@@ -34,7 +34,7 @@ DEBUG_GUILDS: list[int] = []
 # commands can take up to one hour to sync. most times it's taking ~2-3 minuets to sync and maybe a client restart.
 
 log_level = DEBUG
-# depending on the set value there are 
+# depending on the set value there are
 # logged   possible values are DEBUG; INFO; WARNING; ERROR; CRITICAL
 
 IPC_SECRET = ""
