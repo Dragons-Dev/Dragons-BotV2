@@ -15,8 +15,8 @@ It will have many different features, including a dashboard.
 - You can find future features and development progress in the Projects tab
 ## Prerequisites:
 ### API Keys
-- [Discord](https://discord.com/developers/applications)\
-- [Google Cloud Key](https://console.cloud.google.com/apis/api/safebrowsing.googleapis.com)
+- [Discord](https://discord.com/developers/applications)
+- [Google Cloud Key](https://console.cloud.google.com/apis/api/safebrowsing.googleapis.com)\
 Keys have to be added into the config.py
 ```py
 # config.py
