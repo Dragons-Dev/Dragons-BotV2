@@ -99,7 +99,6 @@ class BotStats(commands.Cog):
     async def on_voice_state_update(
             self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ):
-        print(self.voice_time_cache)
         if before.channel:
             if after.channel:
                 if before.channel != after.channel:
