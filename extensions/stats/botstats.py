@@ -99,6 +99,7 @@ class BotStats(commands.Cog):
     async def on_voice_state_update(
             self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ):
+        print(self.voice_time_cache)
         if before.channel:
             if after.channel:
                 if before.channel != after.channel:
@@ -108,6 +109,12 @@ class BotStats(commands.Cog):
                         await self._update_voice_seconds(member, member.guild)
                         self._add_or_update_user(member, member.guild)  # if they switched servers
                 else:
+                    if after.self_deaf:
+                        await self._update_voice_seconds(member, member.guild)
+                        # we don't want to count the members time if they are deafened
+                    if before.self_deaf and not after.self_deaf:
+                        self._add_or_update_user(member, member.guild)
+                        # but we want to start counting again if they've undeafen themselves
                     return  # this path is triggered if someone does something in a voice channel
             else:
                 await self._update_voice_seconds(member, member.guild)  # if they left a voice channel
@@ -122,7 +129,10 @@ class BotStats(commands.Cog):
         for guild in self.client.guilds:
             for channel in guild.voice_channels:
                 for member in channel.members:
-                    self._add_or_update_user(member, guild)
+                    if member.voice.self_deaf:
+                        pass
+                    else:
+                        self._add_or_update_user(member, guild)
 
 
 def setup(client):
