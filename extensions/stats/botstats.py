@@ -77,26 +77,28 @@ class BotStats(commands.Cog):
     @tasks.loop(minutes=5)
     async def save_voice_to_db(self):
         await self.client.wait_until_ready()
-        for guild_id, users in self.voice_time_cache.items():
-            for user in users:
-                await self._update_voice_seconds(user.user, user.guild, True)
+        for guild_id in self.voice_time_cache:
+            for user_id in self.voice_time_cache[guild_id]:
+                user: TimedUser = self.voice_time_cache[guild_id][user_id]
+                await self._update_voice_seconds(user.user, user.guild, update=True)
                 self._add_or_update_user(user.user, user.guild)
 
-    async def _update_voice_seconds(self, member: discord.Member, before_guild: discord.Guild, update: bool = False):
-        db_time = datetime.now() - self._get_user(before_guild.id, member.id).time  # type: ignore
+    async def _update_voice_seconds(self, member: discord.Member, guild: discord.Guild, update: bool = False):
+        db_time = datetime.now() - self._get_user(guild.id, member.id).time  # type: ignore
         db_time = int(db_time.total_seconds())
         await self.client.db.update_user_stat(
-            member, utils.StatTypeEnum.VoiceTime, db_time, before_guild  # type: ignore
+            user=member,
+            stat_type=utils.StatTypeEnum.VoiceTime,
+            value=db_time,
+            guild=guild
         )
-
         if not update:
-            self._delete_user(before_guild.id, member.id)
+            self._delete_user(guild.id, member.id)
 
     @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(
             self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ):
-        print(self.voice_time_cache)
         if before.channel:
             if after.channel:
                 if before.channel != after.channel:
@@ -114,6 +116,13 @@ class BotStats(commands.Cog):
         else:
             self.logger.error("Neither before nor after channel")
             return
+
+    @commands.Cog.listener("on_start_done")
+    async def on_start_done(self):
+        for guild in self.client.guilds:
+            for channel in guild.voice_channels:
+                for member in channel.members:
+                    self._add_or_update_user(member, guild)
 
 
 def setup(client):
