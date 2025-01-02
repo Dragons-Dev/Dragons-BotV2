@@ -72,7 +72,6 @@ class TagesschauFeed(commands.Cog):
         new = []
         for entry in news["entries"]:
             ent = parse_tagesschau_feed(entry)
-            self.logger.debug(f"parsed {ent['id']} entry")
             resp = await self.client.sts.get_tagesschau_id(ent["id"])
             em = None
             if resp is not None:  # if the post id is in the database
