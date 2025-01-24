@@ -171,14 +171,14 @@ class ContentDB:
         await self.db.commit()
 
     async def get_infraction(
-        self, case_id: int = None, user: discord.User | discord.Member = None
+            self, case_id: int | None = None, user: discord.User | discord.Member | None = None
     ) -> aiosqlite.Row | list[aiosqlite.Row]:
         """Gets an infraction by id or all infractions from a user"""
         if case_id is not None:
             resp = await self.db.execute("SELECT * FROM infractions WHERE case_id = ?", (case_id,))
             resp = await resp.fetchone()
         else:
-            resp = await self.db.execute("SELECT * FROM infractions WHERE user = ?", (user.id,))
+            resp = await self.db.execute("SELECT * FROM infractions WHERE user = ?", (user.id,))  # type: ignore
             resp = await resp.fetchall()
         return resp
 

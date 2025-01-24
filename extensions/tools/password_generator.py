@@ -50,7 +50,7 @@ class PasswordSelector(discord.ui.Select):
             choices.append(string.digits)
         if "punctuation" in self.values:
             choices.append(string.punctuation)
-        choices = ''.join(choices)
+        choices = ''.join(choices)  # type: ignore
         pw = ''.join(random.choice(choices) for _ in range(self.length))
         await interaction.response.send_message(escape_markdown(pw), ephemeral=True)
         await interaction.delete_original_response()
