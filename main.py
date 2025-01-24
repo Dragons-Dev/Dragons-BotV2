@@ -1,10 +1,10 @@
 import json
+import logging
 import os
-from sys import stdout
 import time
 from datetime import datetime as dt
 from sys import exit as exit_
-import logging
+from sys import stdout
 
 import aiohttp
 import discord
