@@ -1,17 +1,20 @@
-import asyncio
 import json
+import logging
 import os
 import time
 from datetime import datetime as dt
 from sys import exit as exit_
+from sys import stdout
 
 import aiohttp
 import discord
 import psutil
 from discord.ext import commands
 
+import config
 from config import DEBUG_GUILDS, DISCORD_API_KEY
 from utils import Bot, ContentDB, ShortTermStorage, rem_log
+from utils.logger import CustomFormatter
 
 bot = Bot(
     command_prefix=commands.when_mentioned,
@@ -28,8 +31,10 @@ bot = Bot(
 async def on_boot():
     bot.db = ContentDB(path="data/content.sqlite")
     await bot.db.setup(bot.boot_time)
+    bot.logger.debug("Initialized content db")
     bot.sts = ShortTermStorage(path="data/sts.sqlite")
     await bot.sts.setup(bot.boot_time)
+    bot.logger.debug("Initialized sts db")
     bot.api = aiohttp.ClientSession(
         "https://discord.com",
         headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{bot.client_version}"},
@@ -54,6 +59,12 @@ async def on_boot():
 
 
 if __name__ == "__main__":
+    dc_logger = logging.getLogger("discord")
+    dc_logger.setLevel(config.discord_log_level)
+    console_handle = logging.StreamHandler(stdout)
+    console_handle.setFormatter(CustomFormatter())
+    console_handle.setLevel(config.discord_log_level)
+    dc_logger.addHandler(console_handle)
     extensions = bot.load_extensions("extensions", recursive=True, store=True)  # load every extension
     with open("./assets/disabled.json") as f:
         extension_store = json.load(f)
@@ -79,8 +90,7 @@ if __name__ == "__main__":
 
     pid = os.getpid()
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(bot.start(DISCORD_API_KEY))
+        bot.run(DISCORD_API_KEY)
     except KeyboardInterrupt:
         bot.logger.critical("Shutting down...")
     finally:
