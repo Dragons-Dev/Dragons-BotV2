@@ -6,7 +6,7 @@ import discord
 import feedparser
 from discord.ext import commands, tasks
 
-from utils import Bot, CustomLogger
+from utils import Bot, CustomLogger, WebhookType
 
 regex = r"https://images.tagesschau.de/image/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-]*-[a-zA-Z0-9-]*/[a-zA-Z0-9-]*.jpg"
 
@@ -72,7 +72,6 @@ class TagesschauFeed(commands.Cog):
         new = []
         for entry in news["entries"]:
             ent = parse_tagesschau_feed(entry)
-            self.logger.debug(f"parsed {ent['id']} entry")
             resp = await self.client.sts.get_tagesschau_id(ent["id"])
             em = None
             if resp is not None:  # if the post id is in the database
@@ -131,9 +130,9 @@ class TagesschauFeed(commands.Cog):
             elif "Liveblog" in em.title:
                 pass
             else:
-                new.append(em)
-        self.logger.debug(f"Sent {len(new)} entries to `on_tagesschau_entry`")
-        self.client.dispatch("tagesschau_entry", new)  # rest is handled by /extensions/internal/webhooks.py
+                new.append((em, WebhookType.Tagesschau))
+        self.logger.debug(f"Sent {len(new)} entries to `on_webhook_entry`")
+        self.client.dispatch("webhook_entry", new)  # rest is handled by /extensions/internal/webhooks.py
 
     @commands.Cog.listener("on_start_done")
     async def on_start_done(self):

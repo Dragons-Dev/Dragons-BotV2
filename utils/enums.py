@@ -32,3 +32,8 @@ class StatTypeEnum(Enum):
     MessagesSent = "MessagesSent"
     CommandsUsed = "CommandsUsed"
     VoiceTime = "VoiceTime"
+
+
+class WebhookType(Enum):
+    Tagesschau = "Tagesschau"
+    Modmail = "Modmail"
