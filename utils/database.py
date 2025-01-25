@@ -123,7 +123,6 @@ class ContentDB:
         """Returns `True` if the channel id is in the database"""
         resp: aiosqlite.Cursor = await self.db.execute("SELECT * FROM join2create WHERE channel = ?", (channel.id,))
         resp = await resp.fetchone()  # type: ignore
-        self.logger.debug(f"join2get returned {resp}")  # ignored because first resp returns Cursor not Row
         if resp is not None:
             return True
         return False
