@@ -53,15 +53,14 @@ class PasswordSelector(discord.ui.Select):
         choices = ''.join(choices)  # type: ignore
         pw = ''.join(random.choice(choices) for _ in range(self.length))
         await interaction.response.send_message(escape_markdown(pw), ephemeral=True)
-        await interaction.delete_original_response()
 
 
 class PasswordView(discord.ui.View):
-    def __init__(self, length):
+    def __init__(self, length: int):
         self.length = length
         super().__init__()
         self.disable_on_timeout = True
-        self.timeout = 5
+        self.timeout = 30
         self.add_item(PasswordSelector(length=self.length))
 
 
@@ -80,12 +79,13 @@ class PasswordGenerator(commands.Cog):
         }
     )
     @discord.option(
-        name="password length",
+        name="length",
         default=16,
         required=False,
-        input_type=int,
+        type=discord.SlashCommandOptionType.integer,
         max_value=1024,
         description="The length of the generated password.",
+        parameter_name="length"
     )
     async def generate_password(self, ctx: discord.ApplicationContext, length: int):
         view = PasswordView(length=length)
