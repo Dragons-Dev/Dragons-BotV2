@@ -35,6 +35,7 @@ class BotStats(commands.Cog):
         try:
             return self.voice_time_cache[str(guild)][str(user)]
         except KeyError:
+            self.logger.warning(f"Couldn't get user: {user}, guild: {guild} | Voice Cache: {self.voice_time_cache}")
             return None
 
     def _delete_user(self, guild: int, user: int):
@@ -84,7 +85,10 @@ class BotStats(commands.Cog):
                 self._add_or_update_user(user.user, user.guild)
 
     async def _update_voice_seconds(self, member: discord.Member, guild: discord.Guild, update: bool = False):
-        db_time = datetime.now() - self._get_user(guild.id, member.id).time  # type: ignore
+        timed_user = self._get_user(guild.id, member.id)
+        if timed_user is None:
+            return
+        db_time = datetime.now() - timed_user.time
         db_time = int(db_time.total_seconds())
         await self.client.db.update_user_stat(
             user=member,
