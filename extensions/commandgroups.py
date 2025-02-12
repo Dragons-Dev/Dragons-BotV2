@@ -11,6 +11,10 @@ class CommandGroups(commands.Cog):
 
     mod = discord.SlashCommandGroup("mod", contexts={discord.InteractionContextType.guild})
     track = discord.SlashCommandGroup("track", contexts={discord.InteractionContextType.guild})
+    status = discord.SlashCommandGroup("status", contexts={
+        discord.InteractionContextType.guild, discord.InteractionContextType.bot_dm
+    })
+
 
 
 def setup(client):

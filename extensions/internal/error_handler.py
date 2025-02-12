@@ -33,7 +33,14 @@ class ErrorHandler(commands.Cog):
                     ),
                     ephemeral=True,
                 )
-
+            case commands.NotOwner:
+                await ctx.response.send_message(
+                    embed=error_embed(
+                        title="Not owner",
+                        description=f"You must be the owner of the bot to execute `{ctx.command.qualified_name}`.",
+                    ),
+                    ephemeral=True,
+                )
             case _:
                 raise exc
 
