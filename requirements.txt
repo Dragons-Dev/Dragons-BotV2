@@ -1,4 +1,4 @@
-aiohttp~=3.11.11
+aiohttp~=3.11.14
 aiosqlite==0.20.0
 better-ipc~=2.0.3
 chat_exporter~=2.8.1
