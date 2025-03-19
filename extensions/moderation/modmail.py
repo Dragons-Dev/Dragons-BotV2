@@ -1,7 +1,5 @@
-import datetime
 import uuid as _uuid
 
-import chat_exporter
 import discord
 from discord.ext import commands
 from discord.utils import escape_markdown, get_or_fetch
@@ -21,11 +19,11 @@ class EndModmailView(discord.ui.View):
         style=discord.ButtonStyle.blurple,
     )
     async def end_modmail(self, button: discord.ui.Button, interaction: discord.Interaction):
-        _, guild_id, _, _ = await self.client.db.get_modmail_link(self.author)
-        guild = self.client.get_guild(guild_id)
+        mail = await self.client.db.get_modmail(self.author, None)
+        guild = self.client.get_guild(mail.guild_id)
         if guild is None:
-            guild = await self.client.fetch_guild(guild_id)
-        await self.client.db.remove_modmail_link(self.author)
+            guild = await self.client.fetch_guild(mail.guild_id)
+        await self.client.db.delete_modmail(self.author)
 
         button.label = "Stopped Modmailing"
         button.disabled = (True,)
@@ -52,20 +50,20 @@ class GuildSelectDropdown(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         response = int(self.values[0])
-        _, guild_id, _, _ = await self.client.db.get_modmail_link(self.author)
-        if guild_id:
-            response = guild_id
+        mail = await self.client.db.get_modmail(self.author, None)
+        if mail:
+            response = mail.guild_id
         guild = self.client.get_guild(response)
         if guild is None:
             guild = await self.client.fetch_guild(response)
-        if guild_id:
+        if guild and mail and mail.guild_id == guild.id:
             view = EndModmailView(self.author, self.client)
             await interaction.response.send_message(
                 f"You are still chatting with **{escape_markdown(guild.name)}**", view=view
             )
         else:
             uuid = _uuid.uuid4()
-            await self.client.db.add_modmail_link(self.author, guild, str(uuid), self.anon)
+            await self.client.db.create_modmail(self.author, guild, str(uuid), self.anon)
             await interaction.response.send_message(
                 f"You are now chatting with **{escape_markdown(guild.name)}**!", ephemeral=True
             )
@@ -147,11 +145,11 @@ class ModMail(commands.Cog):
         name="anonymous", description="Do you want to be anonymous in this modmail?", input_type=bool, default=False
     )
     async def create_modmail(self, ctx: discord.ApplicationContext, anonymous: bool):
-        _, guild_id, _, _ = await self.client.db.get_modmail_link(ctx.author)
+        mail = await self.client.db.get_modmail(ctx.author, None)
         if ctx.guild:  # if the command is run inside a guild
-            if guild_id:  # if any guild id is in the database
-                guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
-                if ctx.guild.id == guild_id:  # if the guild id the command is run is the same as in the database
+            if mail.guild_id:  # if any guild id is in the database
+                guild: discord.Guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)
+                if ctx.guild.id == mail.guild_id:  # if the guild id the command is run is the same as in the database
                     view = EndModmailView(ctx.author, self.client)
                     return await ctx.response.send_message(
                         f"You are still chatting with this guild!", view=view, ephemeral=True
@@ -165,17 +163,17 @@ class ModMail(commands.Cog):
 
             else:  # if no id is in the database for this user, a modmail with this guild will be created
                 uuid = str(_uuid.uuid4())
-                await self.client.db.add_modmail_link(ctx.author, ctx.guild, uuid, anonymous)
+                await self.client.db.create_modmail(ctx.author, ctx.guild, uuid, anonymous)
                 return await ctx.response.send_message(
                     "A new modmail will be created. Please check your DM's", ephemeral=True
                 )
 
         elif (
-            guild_id
+                mail
         ):  # if the command is run outside a guild but with an id in the database the user will be shown the
             # `EndModmailView`
             view = EndModmailView(ctx.author, self.client)
-            guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)  # type: ignore
+            guild: discord.Guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)  # type: ignore
             return await ctx.response.send_message(
                 f"You are still chatting with **{escape_markdown(guild.name)}**!", view=view, ephemeral=True
             )
@@ -188,10 +186,10 @@ class ModMail(commands.Cog):
 
     @modmail_group.command(name="end", description="Stop a modmail chat.")
     async def end_modmail(self, ctx: discord.ApplicationContext):
-        user_id, guild_id, uuid, anon = await self.client.db.get_modmail_link(ctx.author)
-        if user_id is None:
+        mail = await self.client.db.get_modmail(ctx.author, None)
+        if mail.user_id is None:
             return await ctx.response.send_message("You are not chatting with any guild!", ephemeral=True)
-        guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
+        guild: discord.Guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)
         view = ButtonConfirm(cancel_title=f"You continue to mail with **{escape_markdown(guild.name)}**!")
         msg = await ctx.response.send_message(
             f"Do you really want to stop mailing with **{escape_markdown(guild.name)}**!", view=view, ephemeral=True
@@ -201,23 +199,24 @@ class ModMail(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
-            await self.client.db.remove_modmail_link(ctx.author)
+            await self.client.db.delete_modmail(ctx.author)
             await ctx.followup.send(
                 f"You've stopped mailing with **{escape_markdown(guild.name)}**!",
                 ephemeral=True,
             )
-            modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, guild)
+            modmail_channel_id = (await self.client.db.get_setting(SettingsEnum.ModmailChannel, guild)).value
             modmail_channel: discord.TextChannel = await get_or_fetch(
                 guild, "channel", modmail_channel_id, default=None
             )
             for thread in modmail_channel.threads:
                 if (
-                    (f"Thread for {ctx.author.name}" == thread.name or f"Thread for Anon#{uuid[:7]}" == thread.name)
+                        (
+                                f"Thread for {ctx.author.name}" == thread.name or f"Thread for Anon#{mail.uuid[:7]}" == thread.name)
                     and not thread.archived
                     and not thread.locked
                 ):
                     await thread.send(
-                        (f"Anon#{uuid[:7]}" if anon else escape_markdown(ctx.author.name))
+                        (f"Anon#{mail.uuid[:7]}" if mail.anon else escape_markdown(ctx.author.name))
                         + " has closed the conversation!"
                     )
                     await thread.edit(locked=True)
@@ -231,7 +230,7 @@ class ModMail(commands.Cog):
             return
         if msg.guild:
             # ensuring guild context
-            modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)
+            modmail_channel_id = (await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)).value
             if modmail_channel_id is None:
                 return
             modmail_channel: discord.TextChannel = await get_or_fetch(
@@ -255,7 +254,8 @@ class ModMail(commands.Cog):
                     async for message in thread.history():
                         if message.embeds:
                             unique_id = message.embeds[0].footer.text.strip("UUID: ")
-                    user_id, _, _, _ = await self.client.db.get_modmail_link(uuid=unique_id)
+                    mail = await self.client.db.get_modmail(user=None, uuid=unique_id)
+                    user_id = mail.user_id
 
                 else:
                     # not anonymous user
@@ -282,10 +282,10 @@ class ModMail(commands.Cog):
             else:
                 return
         else:
-            user_id, guild_id, uuid, anonymous = await self.client.db.get_modmail_link(msg.author)
+            mail = await self.client.db.get_modmail(msg.author, None)
             # at this point it's made sure it was a dm to the bot in a modmail context
-            guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
-            embed = _to_embed(msg, uuid, anonymous)
+            guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)
+            embed = _to_embed(msg, mail.uuid, mail.anon)
             # convert all attachments to files to send them in the modmail channel
             files = []
             for attachment in msg.attachments:
@@ -316,7 +316,7 @@ class ModMail(commands.Cog):
             else:
                 # get the channel object of the modmail channel
                 modmail_channel_: discord.TextChannel = await get_or_fetch(
-                    guild, "channel", modmail_channel_id, default=None
+                    guild, "channel", modmail_channel_id.value, default=None
                 )
                 # iterate over all known threads if the user and the thread name match, if yes send the message and return
                 for thread in modmail_channel_.threads:

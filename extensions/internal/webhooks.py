@@ -62,10 +62,10 @@ class InternalHooks(commands.Cog):
         [self.send_queue.remove(item) for item in rem_list]  # type: ignore
 
         if sub_lists[WebhookType.Tagesschau] is not None:
-            resp = await self.client.db.get_global_setting(
-                SettingsEnum.TagesschauChannel)  # get all guilds which want news
-            for channel_id, guild_id in resp:  # type: ignore
-                webhook = await self.get_or_fetch_webhook(guild_id, channel_id)
+            resp = await self.client.db.get_setting(SettingsEnum.TagesschauChannel,
+                                                    None)  # get all guilds which want news
+            for setting in resp:  # type: ignore
+                webhook = await self.get_or_fetch_webhook(setting.guild, setting.value)
                 await webhook.send(
                     embeds=sub_lists[WebhookType.Tagesschau],
                     username="Tagesschau",

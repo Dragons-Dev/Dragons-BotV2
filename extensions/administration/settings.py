@@ -59,7 +59,7 @@ class SettingsCog(commands.Cog):
     @commands.slash_command(
         name="setting", description="Set settings for this guild.", contexts={discord.InteractionContextType.guild}
     )
-    @checks.is_team()
+    @commands.check_any(checks.is_team(), commands.has_guild_permissions(administrator=True))
     async def setting(
         self,
         ctx: discord.ApplicationContext,

@@ -1,4 +1,4 @@
-from discord import Activity, Status
+from discord import Activity, ApplicationCommandError, Status
 
 
 class BotActivity:
@@ -9,6 +9,14 @@ class BotActivity:
     ):
         self.status = status
         self.activity = activity
+
+
+class CommandDisabledError(ApplicationCommandError):
+    pass
+
+
+class InsufficientPermission(ApplicationCommandError):
+    pass
 
     def __repr__(self):
         return f'BotActivity<{self.status}, {self.activity}>'

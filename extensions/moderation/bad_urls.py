@@ -68,9 +68,14 @@ class BadURL(commands.Cog):
             is_bad_store = await self.bad_url(urls)
             if is_bad_store:  # false wont get to the for loop
                 await msg.delete(reason="Detected as bad url")  # First delete the bad urls
-                case = await self.client.db.create_infraction(
-                    user=msg.author, infraction=InfractionsEnum.Ban, reason="Bad URL sent", guild=msg.guild
+                await self.client.db.create_infraction(
+                    user=msg.author, infraction=InfractionsEnum.Warn, reason="Bad URL sent", guild=msg.guild
                 )
+                infractions = await self.client.db.get_infraction(case_id=None, user=msg.author)
+                if len(infractions) == 1:
+                    case = infractions.case_id
+                else:
+                    case = infractions[-1].case_id
 
                 em = discord.Embed(title="Message delete", color=discord.Color.yellow())
                 em.add_field(name="User", value=msg.author.mention, inline=False)
@@ -80,8 +85,11 @@ class BadURL(commands.Cog):
                 em.set_footer(text=f"Case ID: {case}")
 
                 setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=msg.guild)
-                log_channel: discord.TextChannel = await get_or_fetch(msg.guild, "channel", setting, default=None)
-                await log_channel.send(embed=em)
+                if setting:
+                    log_channel: discord.TextChannel = await get_or_fetch(msg.guild, "channel", setting.value,
+                                                                          default=None)
+                    if log_channel:
+                        await log_channel.send(embed=em)
 
     @commands.Cog.listener("on_start_done")
     async def bad_urls_done(self):

@@ -73,9 +73,14 @@ class Timeout(commands.Cog):
                 until = timedelta(seconds=1)
                 self.logger.critical(f"Invalid duration provided: {length}")
             await member.timeout_for(duration=until, reason=reason)
-            case = await self.client.db.create_infraction(
+            await self.client.db.create_infraction(
                 user=member, infraction=InfractionsEnum.Timeout, reason=reason, guild=ctx.guild
             )
+            infractions = await self.client.db.get_infraction(case_id=None, user=member)
+            if len(infractions) == 1:
+                case = infractions.case_id
+            else:
+                case = infractions[-1].case_id
             em = discord.Embed(title="Timeout successful", color=discord.Color.brand_green())
             em.add_field(name="User", value=member.mention, inline=False)
             em.add_field(name="Moderator", value=ctx.author.mention, inline=False)
@@ -99,8 +104,10 @@ class Timeout(commands.Cog):
             except discord.HTTPException or discord.Forbidden:
                 pass
             setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
-            log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting, default=None)
-            await log_channel.send(embed=member_em)
+            if setting:
+                log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value, default=None)
+                if log_channel:
+                    await log_channel.send(embed=member_em)
         except discord.Forbidden or discord.HTTPException as e:
             raise e
 

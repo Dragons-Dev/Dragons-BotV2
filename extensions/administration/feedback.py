@@ -30,8 +30,9 @@ class FeedbackModal(discord.ui.Modal):
             embeds=[embed], ephemeral=True, view=ButtonInfo("The embed you are seeing is sent to the administrators.")
         )
         feedback_id = await self.client.db.get_setting(SettingsEnum.FeedbackChannel, interaction.guild)
-        feedback_channel = await get_or_fetch(interaction.guild, "channel", feedback_id, default=None)
-        await feedback_channel.send(embeds=[embed])
+        if feedback_id:
+            feedback_channel = await get_or_fetch(interaction.guild, "channel", feedback_id.value, default=None)
+            await feedback_channel.send(embeds=[embed])
 
 
 class Feedback(commands.Cog):
