@@ -1,9 +1,8 @@
 from asyncio import sleep
 
 import discord
-from discord.ext import commands, tasks
-
 import pycord.multicog as pycog
+from discord.ext import commands, tasks
 
 from utils import Bot, BotActivity, CustomLogger, checks
 
