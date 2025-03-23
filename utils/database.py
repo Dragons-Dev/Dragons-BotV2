@@ -3,6 +3,7 @@ from pathlib import Path
 
 import aiosqlite
 import discord
+from discord.utils import warn_deprecated
 
 from .enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from .logger import CustomLogger
@@ -24,6 +25,7 @@ aiosqlite.register_converter("DATETIME", db_to_datetime)
 
 class ContentDB:
     def __init__(self, path: str | Path):
+        warn_deprecated("ContentDB", "ORMDatabase", "1.6.0", "1.8.0")
         self.db: aiosqlite.Connection = None  # type: ignore
         self.logger: CustomLogger = None  # type: ignore
         if not isinstance(path, Path):
