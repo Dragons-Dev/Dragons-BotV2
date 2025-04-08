@@ -2,8 +2,6 @@ from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
-__all__ = ["Base", "Settings", "Infractions", "Join2Create", "Modmail", "UserStats"]
-
 
 class Base(AsyncAttrs, DeclarativeBase):
     pass
@@ -17,6 +15,9 @@ class Settings(Base):
 
     def __repr__(self):
         return f"<Settings(setting='{self.setting}', value={self.value}, guild={self.guild})>"
+
+    def __len__(self):
+        return 1
 
 
 class Infractions(Base):
@@ -62,4 +63,15 @@ class UserStats(Base):
     guild_id = Column(Integer, primary_key=True)
 
     def __repr__(self):
-        return f"<UserStats(user_id={self.user_id}, stat_type={self.stat_type}, value={self.value}, guild={self.guild})>"
+        return f"<UserStats(user_id={self.user_id}, stat_type={self.stat_type}, value={self.value}, guild={self.guild_id})>"
+
+
+class BotStatus(Base):
+    __tablename__ = "botstatus"
+    id = Column(Integer, autoincrement=True, primary_key=True)
+    status = Column(String, primary_key=True)
+    activity_type = Column(Integer, primary_key=True)
+    activity_name = Column(String, primary_key=True)
+
+    def __repr__(self):
+        return f"<BotStatus(status={self.status}, activity_type={self.activity_type}, activity_name={self.activity_name})>"

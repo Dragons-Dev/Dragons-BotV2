@@ -26,7 +26,7 @@ class ORMDataBase:
         """
         Initializes the ORMDataBase instance with an async engine and session maker.
         """
-        self.logger: CustomLogger | None = None  # type: ignore
+        self.logger: CustomLogger = None  # type: ignore
         self.engine: AsyncEngine = create_async_engine(DATABASE_URL)
         self.AsyncSessionLocal: AsyncSession = async_sessionmaker(self.engine, expire_on_commit=False)  # type: ignore
 
@@ -37,7 +37,7 @@ class ORMDataBase:
         Args:
             boot (datetime): The boot time of the application.
         """
-        self.logger = CustomLogger("database", boot)
+        self.logger = CustomLogger("database", boot)  # type: ignore
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             self.logger.info("ContentDB tables created and ready to use!")
@@ -289,3 +289,66 @@ class ORMDataBase:
                 else:
                     for userstat in userstats:
                         await session.delete(userstat)
+
+    async def create_bot_status(self, activity_type: discord.ActivityType, status: discord.Status, activity_name: str):
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                session.add(
+                    BotStatus(
+                        activity_type=int(activity_type),
+                        status=str(status),
+                        activity_name=activity_name
+                    )
+                )
+                await session.commit()
+
+    async def edit_bot_status(
+            self,
+            id_: int,
+            activity_type: discord.ActivityType = None,
+            status: discord.Status = None,
+            activity_name: str = None
+    ) -> None:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(BotStatus).where(BotStatus.id == id_)
+                result = (await session.execute(query)).scalar_one_or_none()
+                if result is None:
+                    return None
+                result.activity_type = (int(activity_type) if activity_type else result.activity_type)
+                result.status = (str(status) if status else result.status)
+                result.activity_name = (activity_name if activity_name else result.activity_name)
+                await session.commit()
+
+    async def get_bot_status(self, id_: int | None) -> BotStatus | Sequence[BotStatus] | None:
+        """
+        Gets the bot status from the database.
+        Args:
+            id_:
+
+        Returns:
+            A BotStatus object, a list of it or None. The BotStatus object uses py-cords enums for activity_type and
+            status. You will have to convert them to the correct type, to use them effectively.
+        """
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                if id_:
+                    query = select(BotStatus).where(BotStatus.id == id_)
+                else:
+                    query = select(BotStatus)
+                bot_status = (await session.execute(query)).scalars().all()
+        if len(bot_status) == 0:
+            return None
+        if len(bot_status) == 1:
+            return bot_status[0]
+        return bot_status
+
+    async def delete_bot_status(self, id_: int):
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(BotStatus).where(BotStatus.id == id_)
+                result = (await session.execute(query)).scalar_one_or_none()
+                if result is None:
+                    return
+                await session.delete(result)
+                await session.commit()
