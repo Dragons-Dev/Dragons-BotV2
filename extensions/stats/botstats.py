@@ -44,7 +44,7 @@ class BotStats(commands.Cog):
             if len(self.voice_time_cache[str(guild)]) == 0:
                 del self.voice_time_cache[str(guild)]
         except KeyError:
-            self.logger.error(
+            return self.logger.error(
                 f"Couldn't get user: {user}, guild: {guild} | Voice Cache: {self.voice_time_cache}"
             )
 
