@@ -2,9 +2,10 @@ from asyncio import sleep
 
 import discord
 import pycord.multicog as pycog
+from discord import ActivityType
 from discord.ext import commands, tasks
 
-from utils import Bot, BotActivity, CustomLogger, checks
+from utils import Bot, CustomLogger, checks
 
 status_emojis = {
     discord.Status.online: "🟢",
@@ -40,6 +41,7 @@ class StatusBuilder(discord.ui.View):
         self.activity_type = None
         self.status = None
         self.preview = None
+        self.persistent = True
 
     def _set_button_style(self, button: discord.ui.Button):
         self._unlock_submit()
@@ -51,7 +53,7 @@ class StatusBuilder(discord.ui.View):
 
     def _unlock_submit(self):
         if self.status and self.activity_name and self.activity_type:
-            for button in self.children:
+            for button in self.children:  # only unlock the submit button if all buttons are set
                 button.disabled = False
 
     def _generate_preview(self):
@@ -134,48 +136,52 @@ class StatusBuilder(discord.ui.View):
         self._generate_preview()
         await interaction.edit(content=self.preview, view=self)
 
+    @discord.ui.button(label="Persistence", style=discord.ButtonStyle.success, row=2, emoji="💾")
+    async def persistent(self, button: discord.ui.Button, interaction: discord.Interaction):
+        self.persistent = not self.persistent
+        button.style = discord.ButtonStyle.success if self.persistent else discord.ButtonStyle.primary
+        await interaction.edit(content=self.preview, view=self)
+
     @discord.ui.button(label="Set Status", style=discord.ButtonStyle.success, emoji="✅", row=3, disabled=True)
     async def submit(self, button: discord.ui.Button, interaction: discord.Interaction):
-        print(self.activity_name, self.activity_type, self.status)
         self._generate_preview()
         await interaction.edit(content=self.preview, view=None)
+        if self.persistent:
+            await self.client.db.create_bot_status(
+                activity_type=self.activity_type,
+                activity_name=self.activity_name,
+                status=self.status,
+            )
+
         if self.activity_type == discord.ActivityType.custom:
-            await self.client.change_presence(activity=discord.CustomActivity(
+            activity = discord.CustomActivity(
                 name=self.activity_name,
                 state=self.activity_name,
-            ), status=self.status)
+            )
         else:
-            await self.client.change_presence(activity=discord.Activity(
+            activity = discord.Activity(
                 name=self.activity_name,
                 type=self.activity_type,
-            ), status=self.status)
+            )
+        status = self.status
+        await self.client.change_presence(
+            activity=activity,
+            status=status,
+        )
+        self.client.dispatch("bot_status", activity, status)
 
 class BotStatus(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.statuses: list[BotActivity] = [
-            BotActivity(
-                activity=discord.Activity(
+        self.statuses: list[tuple[discord.Activity | ActivityType, discord.Status]] = [
+            (
+                discord.Activity(
                     type=discord.ActivityType.watching,
-                    name="you",
+                    name="you"
                 ),
-                status=discord.Status.idle,
-            ),
-            BotActivity(
-                activity=discord.Activity(
-                    type=discord.ActivityType.listening,
-                    name="your commands",
-                ),
-                status=discord.Status.do_not_disturb,
-            ),
-            BotActivity(
-                activity=discord.Activity(
-                    type=discord.ActivityType.playing,
-                    name="in a test environment!",
-                ),
-                status=discord.Status.online,
-            ),
+                discord.Status.online
+            )
         ]
 
 
@@ -189,8 +195,8 @@ class BotStatus(commands.Cog):
     async def start_status(self):
         for status in self.statuses:
             await self.client.change_presence(
-                activity=status.activity,
-                status=status.status,
+                activity=status[0],
+                status=status[1],
             )
             await sleep(30)
 
@@ -200,13 +206,12 @@ class BotStatus(commands.Cog):
     @commands.is_owner()
     async def set_status(self, ctx: discord.ApplicationContext):
         await ctx.response.send_message(
-            "This needs to be implemented...",
+            "Please select a status, activity type and enter the activity name.\n"
+            "You can also save this status to the database. It will then be available in the future.",
             ephemeral=True,
             view=StatusBuilder(self.client)
         )
-        # TODO: Add views to set a status until next reboot
-        # TODO: add database attachment to save persistent
-        # TODO: ^ this needs a new enum for db, maybe use discords...
+
 
     @pycog.subcommand("status")
     @commands.slash_command(name="cycle", description="[Bot Owner] Toggles if the bot should cycle through the statuses.")
@@ -222,6 +227,13 @@ class BotStatus(commands.Cog):
         else:
             self.start_status.start()
             await ctx.response.send_message("Started cycling through statuses.", ephemeral=True)
+
+    @commands.Cog.listener("on_bot_status")
+    async def on_bot_status(self, activity: discord.ActivityType | discord.CustomActivity, status: discord.Status):
+        self.statuses.append((activity, status))
+        if self.start_status.is_running():
+            self.start_status.stop()
+            self.start_status.start()
 
 
 def setup(client):

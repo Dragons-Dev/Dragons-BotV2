@@ -4,7 +4,7 @@ import discord
 
 
 class ButtonInfo(discord.ui.View):
-    def __init__(self, text):
+    def __init__(self, text: str):
         if len(text) > 80:
             raise discord.ValidationError("Buttons text is limited to 80 characters")
         self.text = text

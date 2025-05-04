@@ -102,7 +102,8 @@ class SettingsCog(commands.Cog):
             ephemeral=True,
         )
 
-    @commands.slash_command(name="settings_show", description="show's the currently set settings")
+    @commands.slash_command(name="settings_show", description="show's the currently set settings",
+                            contexts={discord.InteractionContextType.guild})
     @is_team()
     async def settings_show(self, ctx: discord.ApplicationContext):
         embed = discord.Embed(title="Guild Settings", color=discord.Color.dark_orange())

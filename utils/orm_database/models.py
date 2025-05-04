@@ -72,6 +72,7 @@ class BotStatus(Base):
     status = Column(String, primary_key=True)
     activity_type = Column(Integer, primary_key=True)
     activity_name = Column(String, primary_key=True)
+    is_active = Column(Boolean, primary_key=True)
 
     def __repr__(self):
         return f"<BotStatus(status={self.status}, activity_type={self.activity_type}, activity_name={self.activity_name})>"
