@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord.utils import get_or_fetch
 
-from utils import Bot, ButtonInfo, CustomLogger, SettingsEnum
+from utils import Bot, ButtonInfo, CustomLogger, Settings, SettingsEnum
 
 
 class FeedbackModal(discord.ui.Modal):
@@ -18,7 +18,13 @@ class FeedbackModal(discord.ui.Modal):
                 required=False,
             )
         )
-        self.add_item(discord.ui.InputText(label="Feedback", style=discord.InputTextStyle.long))
+        self.add_item(
+            discord.ui.InputText(
+                label="Feedback",
+                placeholder="Write your feedback here!",
+                style=discord.InputTextStyle.long
+            )
+        )
 
     async def callback(self, interaction: discord.Interaction):
         embed = discord.Embed(
