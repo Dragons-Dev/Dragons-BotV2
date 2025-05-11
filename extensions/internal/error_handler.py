@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from utils import Bot, CustomLogger
+from utils import Bot, CommandDisabledError, CustomLogger
 
 
 def error_embed(title: str, description: str) -> discord.Embed:
@@ -23,19 +23,26 @@ class ErrorHandler(commands.Cog):
         if ctx.command.has_error_handler():
             return
         self.logger.warning(f"Commandname: {ctx.command.name}   Exception: {exc}: {type(exc)}")
-        match type(exc):
-            case discord.CheckFailure:
-                await ctx.response.send_message(
-                    embed=error_embed(
-                        title="Check failure",
-                        description=f"A validation check failed. Most likely you do not have the correct permission to "
-                        f"execute `/{ctx.command.qualified_name}`.",
-                    ),
-                    ephemeral=True,
-                )
 
-            case _:
-                raise exc
+        if isinstance(exc, discord.CheckFailure):
+            await ctx.response.send_message(
+                embed=error_embed(
+                    title="Check failure",
+                    description=f"A validation check failed. Most likely you do not have the correct permission to "
+                                f"execute `/{ctx.command.qualified_name}`.",
+                ),
+                ephemeral=True,
+            )
+        elif isinstance(exc, CommandDisabledError):
+            await ctx.response.send_message(
+                embed=error_embed(
+                    title="Command disabled",
+                    description=f"The command `/{ctx.command.qualified_name}` is disabled in this guild.",
+                ),
+                ephemeral=True,
+            )
+        else:
+            raise exc
 
 
 def setup(client):

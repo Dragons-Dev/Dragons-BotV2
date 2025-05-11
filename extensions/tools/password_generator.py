@@ -41,16 +41,15 @@ class PasswordSelector(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        choices = []
+        choices = ""
         if "uppercase" in self.values:
-            choices.append(string.ascii_uppercase)
+            choices += string.ascii_uppercase
         if "lowercase" in self.values:
-            choices.append(string.ascii_lowercase)
+            choices += string.ascii_lowercase
         if "numbers" in self.values:
-            choices.append(string.digits)
+            choices += string.digits
         if "punctuation" in self.values:
-            choices.append(string.punctuation)
-        choices = ''.join(choices)  # type: ignore
+            choices += string.punctuation
         pw = ''.join(random.choice(choices) for _ in range(self.length))
         await interaction.response.send_message(escape_markdown(pw), ephemeral=True)
 

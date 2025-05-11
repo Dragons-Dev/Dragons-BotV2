@@ -13,7 +13,7 @@ from discord.ext import commands
 
 import config
 from config import DEBUG_GUILDS, DISCORD_API_KEY
-from utils import Bot, ContentDB, ShortTermStorage, rem_log
+from utils import Bot, ORMDataBase, ShortTermStorage, rem_log
 from utils.logger import CustomFormatter
 
 bot = Bot(
@@ -29,7 +29,7 @@ bot = Bot(
 
 @bot.listen("on_ready", once=True)
 async def on_boot():
-    bot.db = ContentDB(path="data/content.sqlite")
+    bot.db = ORMDataBase()
     await bot.db.setup(bot.boot_time)
     bot.logger.debug("Initialized content db")
     bot.sts = ShortTermStorage(path="data/sts.sqlite")
@@ -59,12 +59,17 @@ async def on_boot():
 
 
 if __name__ == "__main__":
+    # get all relevant loggers and set their levels
     dc_logger = logging.getLogger("discord")
     dc_logger.setLevel(config.discord_log_level)
     console_handle = logging.StreamHandler(stdout)
     console_handle.setFormatter(CustomFormatter())
     console_handle.setLevel(config.discord_log_level)
     dc_logger.addHandler(console_handle)
+    sqlalchemy_logger = logging.getLogger("sqlalchemy.engine")
+    sqlalchemy_logger.setLevel(logging.WARNING)
+    sqlalchemy_logger.addHandler(console_handle)
+
     extensions = bot.load_extensions("extensions", recursive=True, store=True)  # load every extension
     with open("./assets/disabled.json") as f:
         extension_store = json.load(f)

@@ -12,7 +12,7 @@ class InternalHooks(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.send_queue: list[tuple[discord.Embed, WebhookType]] = []
+        self.send_queue: list[tuple[discord.Embed, WebhookType]] = []  # tuple consists of our msg and a custom enum
         self.webhooks = {}
 
     async def get_or_fetch_webhook(self, guild_id: int, channel_id: int) -> discord.Webhook:
@@ -29,16 +29,16 @@ class InternalHooks(commands.Cog):
         guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
         channel: discord.TextChannel = await get_or_fetch(guild, "channel", channel_id, default=None)
         if str(guild_id) not in self.webhooks:
-            self.webhooks[str(guild_id)] = {}
+            self.webhooks[str(guild_id)] = {}  # creating a new dict for the guild
         if self.webhooks[str(guild_id)].get(str(channel_id)):
-            return self.webhooks[str(guild_id)][(str(channel_id))]
-        hooks = await channel.webhooks()
-        if f"{self.client.user.name} Webhook" in [hook.name for hook in hooks]:
+            return self.webhooks[str(guild_id)][(str(channel_id))]  # if the webhook is cached, return it
+        hooks = await channel.webhooks()  # else fetch all webhooks from our setting channel
+        if f"{self.client.user.name} Webhook" in [hook.name for hook in hooks]:  # check if we have a webhook
             webhook = [hook for hook in hooks if hook.name == f"{self.client.user.name} Webhook"][0]
-            self.webhooks[str(guild_id)][str(channel_id)] = webhook
+            self.webhooks[str(guild_id)][str(channel_id)] = webhook  # select the webhook and save it to the cache
         else:
             webhook = await channel.create_webhook(name=f"{self.client.user.name} Webhook")
-            self.webhooks[str(guild_id)][str(channel_id)] = webhook
+            self.webhooks[str(guild_id)][str(channel_id)] = webhook  # else create the webhook and save it to the cache
         return webhook
 
     @tasks.loop(minutes=1)
@@ -62,10 +62,20 @@ class InternalHooks(commands.Cog):
         [self.send_queue.remove(item) for item in rem_list]  # type: ignore
 
         if sub_lists[WebhookType.Tagesschau] is not None:
-            resp = await self.client.db.get_global_setting(
-                SettingsEnum.TagesschauChannel)  # get all guilds which want news
-            for channel_id, guild_id in resp:  # type: ignore
-                webhook = await self.get_or_fetch_webhook(guild_id, channel_id)
+            resp = await self.client.db.get_setting(SettingsEnum.TagesschauChannel, None)
+            # get all guilds which want news
+            if resp is None:
+                return  # if no guild wants news, return
+            if len(resp) == 1:
+                webhook = await self.get_or_fetch_webhook(resp.guild, resp.value)  # type: ignore
+                await webhook.send(
+                    embeds=sub_lists[WebhookType.Tagesschau],
+                    username="Tagesschau",
+                    avatar_url=TAGESSCHAU_IMAGE
+                )
+                return
+            for setting in resp:  # type: ignore
+                webhook = await self.get_or_fetch_webhook(setting.guild, setting.value)
                 await webhook.send(
                     embeds=sub_lists[WebhookType.Tagesschau],
                     username="Tagesschau",

@@ -1,7 +1,10 @@
-from logging import CRITICAL, DEBUG, ERROR, INFO, WARNING
+from logging import DEBUG, INFO
 
 DISCORD_API_KEY = ""
 # The token you get from discord for authorizing your bot. https://discord.com/developers/applications
+
+DATABASE_URL = "sqlite+aiosqlite:///data/content.sqlite"
+# The database you want to utilize. Check out https://www.sqlalchemy.org/ for more information
 
 GOOGLE_API_KEY = ""
 # An api key from Google, this is required in order to scan for harmful urls

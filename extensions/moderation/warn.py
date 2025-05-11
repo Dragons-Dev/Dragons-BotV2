@@ -49,9 +49,14 @@ class Warn(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
-            case = await self.client.db.create_infraction(
+            await self.client.db.create_infraction(
                 user=member, infraction=InfractionsEnum.Warn, reason=reason, guild=ctx.guild
             )
+            infractions = await self.client.db.get_infraction(case_id=None, user=member)
+            if len(infractions) == 1:
+                case = infractions.case_id
+            else:
+                case = infractions[-1].case_id
             em.set_footer(text=f"Case ID: {case}")
             member_em = em.copy()
             member_em.title = "Warn"
@@ -64,8 +69,10 @@ class Warn(commands.Cog):
             except discord.HTTPException or discord.Forbidden:
                 pass
             setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
-            log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting, default=None)
-            await log_channel.send(embed=member_em)
+            if setting:
+                log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value, default=None)
+                if log_channel:
+                    await log_channel.send(embed=member_em)
             await ctx.followup.send(
                 embed=em,
                 view=ButtonInfo("A copy of this was sent to the warned member and the log channel!"),
