@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 from pycord.multicog import subcommand
 
-from utils import Bot, CustomLogger, SettingsEnum
+from utils import Bot, CustomLogger, Settings, SettingsEnum
 
 
 class Join2Create(commands.Cog):
@@ -26,12 +26,18 @@ class Join2Create(commands.Cog):
             after (discord.VoiceState): members voice state after
         """
         if after.channel is not None:
-            if after.channel.id == (await self.client.db.get_setting(
-                setting=SettingsEnum.Join2CreateChannel, guild=member.guild
-            )).value:
+            join2create_setting = await self.client.db.get_setting(setting=SettingsEnum.Join2CreateChannel,
+                                                                   guild=member.guild)
+            if join2create_setting is None:
+                return
+            if type(join2create_setting) is not Settings:
+                return
+            if after.channel.id == join2create_setting.value:
                 verified_role = await self.client.db.get_setting(setting=SettingsEnum.VerifiedRole, guild=member.guild)
                 if verified_role is None:
                     role = member.guild.default_role
+                elif type(verified_role) is not Settings:
+                    role = member.guild.default_role  # I don't like you mypy this overhead is only for you!
                 else:
                     role = member.guild.get_role(verified_role.value)
                 perms = {
