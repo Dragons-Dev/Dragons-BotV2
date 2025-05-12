@@ -12,7 +12,7 @@ import psutil
 from discord.ext import commands
 
 import config
-from config import DEBUG_GUILDS, DISCORD_API_KEY
+from config import DISCORD_API_KEY
 from utils import Bot, ORMDataBase, ShortTermStorage, rem_log
 from utils.logger import CustomFormatter
 
@@ -21,7 +21,6 @@ bot = Bot(
     case_insensitive=True,
     strip_after_prefix=True,
     intents=discord.Intents.all(),
-    debug_guilds=DEBUG_GUILDS,
     activity=discord.CustomActivity(name="Booting...", state="Booting..."),
     status=discord.Status.dnd,
 )
@@ -90,8 +89,6 @@ if __name__ == "__main__":
     if DISCORD_API_KEY == "":
         bot.logger.critical(f"No token has been passed to the bot.")
         exit_(1)
-    if DEBUG_GUILDS is None or not DEBUG_GUILDS:
-        bot.logger.warning("No Debug guild specified. Commands can take up to 1 hour to sync!")
 
     pid = os.getpid()
     try:
