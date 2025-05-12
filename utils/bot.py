@@ -15,7 +15,7 @@ from .utils import VersionInfo
 class Bot(MulticogBot, commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.client_version = VersionInfo(2, 0, 1, "")
+        self.client_version = VersionInfo(2, 0, 2, "")
         self.api: aiohttp.ClientSession = None  # type: ignore
         self.boot_time = datetime.now()
         self.db: ORMDataBase = None  # type: ignore
