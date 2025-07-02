@@ -13,7 +13,7 @@ from discord.ext import commands
 
 import config
 from config import DISCORD_API_KEY
-from utils import Bot, ORMDataBase, ShortTermStorage, rem_log
+from utils import Bot, ORMDataBase, ShortTermStorage, VersionInfo, rem_log
 from utils.logger import CustomFormatter
 
 bot = Bot(
@@ -23,6 +23,7 @@ bot = Bot(
     intents=discord.Intents.all(),
     activity=discord.CustomActivity(name="Booting...", state="Booting..."),
     status=discord.Status.dnd,
+    version=VersionInfo(2, 0, 3, "")
 )
 
 

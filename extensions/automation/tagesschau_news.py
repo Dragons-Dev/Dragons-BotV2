@@ -51,6 +51,8 @@ def parse_tagesschau_feed(entry: dict) -> dict:
     }
 
 
+# TODO Rework this to use the rest api
+
 class TagesschauFeed(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client

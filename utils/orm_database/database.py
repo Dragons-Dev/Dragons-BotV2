@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 import discord
-from sqlalchemy import Row, select
+from sqlalchemy import Row, and_, select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -154,26 +154,55 @@ class ORMDataBase:
 
     async def create_infraction(
             self, user: discord.User | discord.Member, infraction: InfractionsEnum, reason: str, guild: discord.Guild
-    ):
+    ) -> int:
+        """
+        Creates a new infraction record in the database.
+
+        Args:
+            user (discord.User | discord.Member): The user who received the infraction.
+            infraction (InfractionsEnum): The type of infraction.
+            reason (str): The reason for the infraction.
+            guild (discord.Guild): The guild where the infraction occurred.
+
+        Returns:
+            int: The case ID of the created infraction.
+        """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                session.add(
-                    Infractions(
+                infraction = Infractions(
                         user_id=user.id,
                         infraction=infraction.value,
                         reason=reason,
                         date=datetime.now(),
                         guild=guild.id
                     )
+                session.add(
+                    infraction
                 )
                 await session.commit()
+                return infraction.case_id
 
     async def update_infraction(self):
         raise NotImplementedError("In the past this had no use!")
 
     async def get_infraction(
-            self, case_id: int | None, user: discord.Member | discord.User
+            self, case_id: int | None, user: discord.Member | discord.User | None, guild: discord.Guild | None = None
     ) -> None | Infractions | Sequence[Infractions]:
+        """
+        Retrieves infraction(s) from the database based on case ID or user.
+
+        Args:
+            case_id (int | None): The case ID of the infraction to retrieve. If None, retrieves by user.
+            user (discord.Member | discord.User | None): The user whose infractions to retrieve. Used if case_id is None.
+            guild (discord.Guild | None): The guild associated with the infraction. Not used in this method.
+
+        Returns:
+            None | Infractions | Sequence[Infractions]: Returns None if no infractions are found,
+            a single Infractions object if one is found, or a sequence of Infractions if multiple are found.
+
+        Raises:
+            LookupError: If both case_id and user are None.
+        """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 if case_id:

@@ -9,10 +9,10 @@ class VersionInfo:
         return f"{self.mayor}.{self.minor}.{self.patch}{self.release_level}"
 
     def __hash__(self):
-        return hash((self.mayor, self.minor, self.patch, self.release_level))
+        return hash(str(self))
 
 
-def sec_to_readable(time: float) -> str:
+def sec_to_readable(time: int | float) -> str:
     """
     Takes a time in seconds as float.
     Args:

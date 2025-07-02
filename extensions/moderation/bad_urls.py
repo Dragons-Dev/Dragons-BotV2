@@ -1,5 +1,6 @@
 import json
 import re
+import typing as t
 from datetime import datetime
 
 import aiohttp
@@ -66,28 +67,28 @@ class BadURL(commands.Cog):
             return
         else:
             is_bad_store = await self.bad_url(urls)
-            if is_bad_store:  # false wont get to the for loop
+            if is_bad_store:  # false won't get to the for loop
                 await msg.delete(reason="Detected as bad url")  # First delete the bad urls
-                await self.client.db.create_infraction(
+                case_id = await self.client.db.create_infraction(
                     user=msg.author, infraction=InfractionsEnum.Warn, reason="Bad URL sent", guild=msg.guild
                 )
-                infractions = await self.client.db.get_infraction(case_id=None, user=msg.author)
-                if len(infractions) == 1:
-                    case = infractions.case_id
-                else:
-                    case = infractions[-1].case_id
 
                 em = discord.Embed(title="Message delete", color=discord.Color.yellow())
                 em.add_field(name="User", value=msg.author.mention, inline=False)
                 em.add_field(name="Moderator", value=self.client.user.mention, inline=False)
                 em.add_field(name="Reason", value="Sending a malicious link", inline=False)
                 em.add_field(name="Date", value=format_dt(datetime.now(), "F"), inline=False)
-                em.set_footer(text=f"Case ID: {case}")
+                em.set_footer(text=f"Case ID: {case_id}")
 
                 setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=msg.guild)
                 if setting:
-                    log_channel: discord.TextChannel = await get_or_fetch(msg.guild, "channel", setting.value,
-                                                                          default=None)
+                    if isinstance(setting, (tuple, list, t.Sequence)):
+                        log_channel: discord.TextChannel = await get_or_fetch(
+                            msg.guild, "channel", setting[0].value, default=None
+                        )
+                    else:
+                        log_channel: discord.TextChannel = await get_or_fetch(msg.guild, "channel", setting.value,
+                                                                              default=None)
                     if log_channel:
                         await log_channel.send(embed=em)
 
