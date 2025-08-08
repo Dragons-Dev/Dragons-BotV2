@@ -1,45 +1,40 @@
-import re
+import html
 from datetime import datetime, timedelta
 
 import aiohttp
 import discord
 import feedparser
+from bs4 import BeautifulSoup
 from discord.ext import commands, tasks
 
 from utils import Bot, CustomLogger, WebhookType
 
-regex = r"https://images.tagesschau.de/image/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-_]*/[a-zA-Z0-9-]*-[a-zA-Z0-9-]*/[a-zA-Z0-9-]*.jpg"
-
+regex = r"https://images\.tagesschau\.de/image/(?:[A-Za-z0-9_-]+/)+[A-Za-z0-9_-]+\.jpg(?:\?width=\d+)?"
 
 def parse_tagesschau_feed(entry: dict) -> dict:
-    """Parses an entry from feedparser to values that are important
+    """Parses an entry from feedparser to values that are important"""
 
-    Args:
-        entry (dict): feedparser.entry
+    published = datetime(*entry["published_parsed"][:6])
+    updated = datetime(*entry["updated_parsed"][:6])
 
-    Returns:
-        dict: Python standart dict
-    """
-    published = datetime(
-        entry["published_parsed"][0],
-        entry["published_parsed"][1],
-        entry["published_parsed"][2],
-        entry["published_parsed"][3],
-        entry["published_parsed"][4],
-        entry["published_parsed"][5],
-    )
-    updated = datetime(
-        entry["updated_parsed"][0],
-        entry["updated_parsed"][1],
-        entry["updated_parsed"][2],
-        entry["updated_parsed"][3],
-        entry["updated_parsed"][4],
-        entry["updated_parsed"][5],
-    )
-    image_link = re.finditer(regex, str(entry), re.MULTILINE)
+    # HTML aus content:encoded holen
+    html_content = ""
+    if "content" in entry:
+        for c in entry["content"]:
+            if "value" in c:
+                html_content = c["value"]
+                break
+
+    # HTML-Entities dekodieren
+    html_content = html.unescape(html_content)
+
+    # Bild-URL extrahieren
     image = None
-    for match in image_link:
-        image = match.group()
+    soup = BeautifulSoup(html_content, "html.parser")
+    img_tag = soup.find("img")
+    if img_tag and img_tag.has_attr("src"):
+        image = img_tag["src"]
+
     return {
         "title": entry["title_detail"]["value"],
         "summary": entry["summary_detail"]["value"],
@@ -50,9 +45,6 @@ def parse_tagesschau_feed(entry: dict) -> dict:
         "image": image,
     }
 
-
-# TODO Rework this to use the rest api
-
 class TagesschauFeed(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
@@ -60,7 +52,7 @@ class TagesschauFeed(commands.Cog):
         self.url = "https://www.tagesschau.de/infoservices/alle-meldungen-100~rss2.xml"
         self.session: aiohttp.ClientSession = None  # type: ignore
 
-    @tasks.loop(minutes=1)
+    @tasks.loop(seconds=90)
     async def gather_news(self):
         """fetches news from tagesschau.de, parses them and checks for already sent news"""
         await self.client.wait_until_ready()
