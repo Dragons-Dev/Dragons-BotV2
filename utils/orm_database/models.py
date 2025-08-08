@@ -30,7 +30,10 @@ class Infractions(Base):
     guild = Column(Integer)
 
     def __repr__(self):
-        return f"<Infractions(id={self.id}, user_id={self.user_id}, infraction={self.infraction}, reason={self.reason}, date={self.date}, guild={self.guild})>"
+        return f"<Infractions(id={self.case_id}, user_id={self.user_id}, infraction={self.infraction}, reason={self.reason}, date={self.date}, guild={self.guild})>"
+
+    def __len__(self):
+        return 1
 
 
 class Join2Create(Base):

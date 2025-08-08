@@ -26,12 +26,30 @@ class BotStats(commands.Cog):
         self.save_voice_to_db.start()
         self.voice_time_cache = {}  # structure: {guild_id: {user_id: TimedUser}}}
 
-    def _add_or_update_user(self, user: discord.Member, guild: discord.Guild):
+    def _add_or_update_user(self, user: discord.Member, guild: discord.Guild) -> None:
+        """
+        Adds a user to the voice_time_cache or updates their time if they already exist.
+        Args:
+            user: The user to add or update.
+            guild: The guild the voice time is counted in.
+
+        Returns:
+
+        """
         if str(guild.id) not in self.voice_time_cache:
             self.voice_time_cache[str(guild.id)] = {}
         self.voice_time_cache[str(guild.id)][str(user.id)] = TimedUser(user, guild)
 
     def _get_user(self, guild: int, user: int) -> TimedUser | None:
+        """
+        Gets a user from the voice_time_cache.
+        Args:
+            guild: the guild id to get the user from.
+            user: the user id to get the user from.
+
+        Returns: TimedUser | None
+
+        """
         try:
             return self.voice_time_cache[str(guild)][str(user)]
         except KeyError:
@@ -39,6 +57,15 @@ class BotStats(commands.Cog):
             return None
 
     def _delete_user(self, guild: int, user: int):
+        """
+        Deletes a user from the voice_time_cache.
+        Args:
+            guild: The guild id to delete the user from.
+            user: The user id to delete.
+
+        Returns:
+
+        """
         try:
             del self.voice_time_cache[str(guild)][str(user)]
             if len(self.voice_time_cache[str(guild)]) == 0:
@@ -49,7 +76,7 @@ class BotStats(commands.Cog):
             )
 
     @tasks.loop(minutes=1)
-    async def avg_ping(self):
+    async def avg_ping(self) -> None:
         await self.client.wait_until_ready()
         if len(self.pings) >= 10:
             del self.pings[0]
@@ -62,13 +89,29 @@ class BotStats(commands.Cog):
         return (sum(self.pings) / len(self.pings)) * 1000
 
     @commands.Cog.listener("on_application_command")
-    async def on_application_command(self, cmd: discord.ApplicationContext):
+    async def on_application_command(self, cmd: discord.ApplicationContext) -> None:
+        """
+        Keeps track how many commands a user has used per guild.
+        Args:
+            cmd: The ApplicationContext of the command that was invoked.
+
+        Returns: None
+
+        """
         if not cmd.guild:
             return
         await self.client.db.update_user_stat(cmd.author, utils.StatTypeEnum.CommandsUsed, 1, cmd.guild)
 
     @commands.Cog.listener("on_message")
-    async def on_msg(self, msg: discord.Message):
+    async def on_msg(self, msg: discord.Message) -> None:
+        """
+        Keeps track how many messages a user has sent per guild.
+        Args:
+            msg: The message context.
+
+        Returns: None
+
+        """
         if msg.author.bot:
             return
         if not msg.guild:
@@ -76,7 +119,12 @@ class BotStats(commands.Cog):
         await self.client.db.update_user_stat(msg.author, utils.StatTypeEnum.MessagesSent, 1, msg.guild)
 
     @tasks.loop(minutes=5)
-    async def save_voice_to_db(self):
+    async def save_voice_to_db(self) -> None:
+        """
+        Saves the voice time of all users in the voice_time_cache to the database. And resets their time in the cache.
+        Returns: None
+
+        """
         await self.client.wait_until_ready()
         for guild_id in self.voice_time_cache:
             for user_id in self.voice_time_cache[guild_id]:
@@ -84,12 +132,21 @@ class BotStats(commands.Cog):
                 await self._update_voice_seconds(user.user, user.guild, update=True)
                 self._add_or_update_user(user.user, user.guild)
 
-    async def _update_voice_seconds(self, member: discord.Member, guild: discord.Guild, update: bool = False):
+    async def _update_voice_seconds(self, member: discord.Member, guild: discord.Guild, update: bool = False) -> None:
+        """
+        Updates the voice time of a member in the database. If `update` is False, it will delete the user from the cache.
+        Args:
+            member: The discord member to update the voice time for.
+            guild: The guild to update the voice time in.
+            update: The boolean to determine if the user should be deleted from the cache after updating.
+
+        Returns: None
+
+        """
         timed_user = self._get_user(guild.id, member.id)
         if timed_user is None:
             return
-        db_time = datetime.now() - timed_user.time
-        db_time = int(db_time.total_seconds())
+        db_time = int((datetime.now() - timed_user.time).total_seconds())
         await self.client.db.update_user_stat(
             user=member,
             stat_type=utils.StatTypeEnum.VoiceTime,
@@ -103,6 +160,16 @@ class BotStats(commands.Cog):
     async def on_voice_state_update(
             self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ):
+        """
+        Listens to voice state updates and updates the voice time of the member accordingly.
+        Args:
+            member: The member whose voice state has changed.
+            before: The voice state before the change.
+            after: The voice state after the change.
+
+        Returns: None
+
+        """
         if before.channel:
             if after.channel:
                 if before.channel != after.channel:
@@ -129,6 +196,12 @@ class BotStats(commands.Cog):
 
     @commands.Cog.listener("on_start_done")
     async def on_start_done(self):
+        """
+        A helper function that is called when the bot is ready.\n
+        It discovers all voice channels and adds all users to the voice_time_cache.
+        Returns: None
+
+        """
         for guild in self.client.guilds:
             for channel in guild.voice_channels:
                 for member in channel.members:

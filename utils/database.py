@@ -2,10 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 import aiosqlite
-import discord
-from discord.utils import warn_deprecated
 
-from .enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from .logger import CustomLogger
 
 

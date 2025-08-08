@@ -10,6 +10,8 @@ class BotActivity:
         self.status = status
         self.activity = activity
 
+    def __repr__(self):
+        return f'BotActivity<{self.status}, {self.activity}>'
 
 class CommandDisabledError(ApplicationCommandError):
     pass
@@ -17,6 +19,3 @@ class CommandDisabledError(ApplicationCommandError):
 
 class InsufficientPermission(ApplicationCommandError):
     pass
-
-    def __repr__(self):
-        return f'BotActivity<{self.status}, {self.activity}>'

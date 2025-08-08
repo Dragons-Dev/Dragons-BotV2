@@ -29,4 +29,4 @@ def is_team():
                 if role in ctx.author.roles:
                     return True
 
-    return commands.check(predicate)
+    return commands.check(predicate)  # type: ignore
