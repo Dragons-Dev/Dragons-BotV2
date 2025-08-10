@@ -20,6 +20,10 @@ class EndModmailView(discord.ui.View):
     )
     async def end_modmail(self, button: discord.ui.Button, interaction: discord.Interaction):
         mail = await self.client.db.get_modmail(self.author, None)
+        if mail is None:
+            return await interaction.response.send_message(
+                "You are not chatting with any guild!", ephemeral=True
+            )
         guild = self.client.get_guild(mail.guild_id)
         if guild is None:
             guild = await self.client.fetch_guild(mail.guild_id)
@@ -230,11 +234,11 @@ class ModMail(commands.Cog):
             return
         if msg.guild:
             # ensuring guild context
-            modmail_channel_id = (await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)).value
+            modmail_channel_id = (await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild))
             if modmail_channel_id is None:
                 return
             modmail_channel: discord.TextChannel = await get_or_fetch(
-                msg.guild, "channel", modmail_channel_id, default=None
+                msg.guild, "channel", modmail_channel_id.value, default=None
             )
             # getting modmail channel
             if modmail_channel is None:

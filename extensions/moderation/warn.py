@@ -1,3 +1,4 @@
+import typing as t
 from datetime import datetime
 
 import discord
@@ -24,18 +25,28 @@ class Warn(commands.Cog):
     @pycog.subcommand("mod")
     @commands.slash_command(name="warn", description="Warns a given member")
     @is_team()
-    @discord.option("member", description="The member you want to warn", input_type=discord.Member, required=True)
+    @discord.option(
+        "member",
+        description="The member you want to warn",
+        input_type=discord.SlashCommandOptionType.user,
+        required=True
+    )
     @discord.option("reason", description="The reason for the warn", input_type=str, required=True)
     async def warn(
         self,
         ctx: discord.ApplicationContext,
-        member: discord.Member,
+            member: discord.Member | discord.User,
         reason: str,
     ):
-        if member.top_role >= ctx.guild.me.top_role:
-            return await ctx.response.send_message(
-                "I can't warn that member since his top role is higher or even to mine", ephemeral=True
-            )
+        try:
+
+            if member.top_role >= ctx.guild.me.top_role:
+                return await ctx.response.send_message(
+                    "I can't warn that member since his top role is higher or even to mine", ephemeral=True
+                )
+        except AttributeError:
+            # if the member is not in the guild, we cannot check roles
+            pass
         em = discord.Embed(title="Warn successful", color=discord.Color.brand_green())
         em.add_field(name="User", value=member.mention, inline=False)
         em.add_field(name="Moderator", value=ctx.author.mention, inline=False)
@@ -49,15 +60,10 @@ class Warn(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
-            await self.client.db.create_infraction(
+            case_id = await self.client.db.create_infraction(
                 user=member, infraction=InfractionsEnum.Warn, reason=reason, guild=ctx.guild
             )
-            infractions = await self.client.db.get_infraction(case_id=None, user=member)
-            if len(infractions) == 1:
-                case = infractions.case_id
-            else:
-                case = infractions[-1].case_id
-            em.set_footer(text=f"Case ID: {case}")
+            em.set_footer(text=f"Case ID: {case_id}")
             member_em = em.copy()
             member_em.title = "Warn"
             member_em.colour = discord.Color.yellow()
@@ -70,7 +76,13 @@ class Warn(commands.Cog):
                 pass
             setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
             if setting:
-                log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value, default=None)
+                if isinstance(setting, (tuple, list, t.Sequence)):
+                    log_channel: discord.TextChannel = await get_or_fetch(
+                        ctx.guild, "channel", setting[0].value, default=None
+                    )
+                else:
+                    log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value,
+                                                                          default=None)
                 if log_channel:
                     await log_channel.send(embed=member_em)
             await ctx.followup.send(
@@ -80,14 +92,36 @@ class Warn(commands.Cog):
             )
 
     @warn.error
-    async def kick_error_handler(self, ctx: discord.ApplicationContext, exc: discord.DiscordException):
+    async def warn_error_handler(self, ctx: discord.ApplicationContext, exc: discord.DiscordException):
         if isinstance(exc, discord.ApplicationCommandInvokeError):
-            return await ctx.response.send_message(
-                embed=discord.Embed(
-                    title="Error", description=f"This user is no member of this guild.", color=discord.Color.brand_red()
-                ),
-                ephemeral=True,
-            )
+            try:  # this most likely fails if we try to invoke the warn command with a user_id
+                member_id = ctx.selected_options[0].get(
+                    "value")  # this is heavily dependent on the order returned by Discord
+                reason = ctx.selected_options[1].get("value")  # this might be the first point of failure
+                member = await ctx.bot.get_or_fetch_user(member_id)
+                await ctx.invoke(self.warn, member=member, reason=reason)
+            except Exception as e:  # we can't invoke the warn command or can't fetch/get the user
+                try:
+                    self.logger.error(
+                        f"Failed to invoke the warn command with "
+                        f"the following parameters: "
+                        f"CTX: {ctx.selected_options}, "
+                        f"Member ID: {member_id}, "
+                        f"Reason: {reason}",
+                        exc_info=e
+                    )
+                except Exception as f:  # we can't get the parameters for the warn command
+                    self.logger.critical(f"Failed to get the parameters for the warn command: {f}", exc_info=f)
+            finally:
+                await ctx.response.send_message(
+                    embed=discord.Embed(
+                        title="Error",
+                        description=f"An unexpected error occurred. Please try again later or contact the developer on "
+                                    f"[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
+                        color=discord.Color.brand_red()
+                    ),
+                    ephemeral=True,
+                )
         else:
             raise exc
 

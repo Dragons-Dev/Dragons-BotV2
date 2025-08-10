@@ -1,3 +1,4 @@
+import typing as t
 from datetime import datetime
 
 import discord
@@ -49,15 +50,10 @@ class Kick(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
-            await self.client.db.create_infraction(
+            case_id = await self.client.db.create_infraction(
                 user=member, infraction=InfractionsEnum.Kick, reason=reason, guild=ctx.guild
             )
-            infractions = await self.client.db.get_infraction(case_id=None, user=member)
-            if len(infractions) == 1:
-                case = infractions.case_id
-            else:
-                case = infractions[-1].case_id
-            em.set_footer(text=f"Case ID: {case}")
+            em.set_footer(text=f"Case ID: {case_id}")
             member_em = em.copy()
             member_em.title = "Kick"
             member_em.colour = discord.Color.brand_red()
@@ -71,9 +67,13 @@ class Kick(commands.Cog):
             await member.kick(reason=reason)
             setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
             if setting:
-                log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value, default=None)
-                if log_channel:
-                    await log_channel.send(embed=member_em)
+                if isinstance(setting, (tuple, list, t.Sequence)):
+                    log_channel: discord.TextChannel = await get_or_fetch(
+                        ctx.guild, "channel", setting[0].value, default=None
+                    )
+                else:
+                    log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value,
+                                                                          default=None)
             await ctx.followup.send(
                 embed=em,
                 view=ButtonInfo("A copy of this was sent to the kicked member and the log channel!"),
