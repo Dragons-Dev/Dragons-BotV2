@@ -1,5 +1,6 @@
 aiohttp~=3.12.13
 aiosqlite==0.21.0
+beautifulsoup4~=4.13.4
 better-ipc~=2.0.3
 chat_exporter~=2.8.4
 colorama==0.4.6
