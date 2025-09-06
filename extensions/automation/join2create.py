@@ -211,8 +211,13 @@ class Join2Create(commands.Cog):
                     reason="Join2Create",
                     overwrites=perms,
                 )
+                # Add status after channel was created
+                
+                # Add check if channel is rly created
+                # Add check if db entry is created
                 await self.client.db.create_temp_voice(channel, member)
                 self.logger.debug(f"{member.name} created {channel.name} in {member.guild}")
+                # Move only if channel is created
                 await member.move_to(channel)
                 await channel.send(view=VoiceBoard())
 
