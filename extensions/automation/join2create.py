@@ -212,7 +212,7 @@ class Join2Create(commands.Cog):
                     overwrites=perms,
                 )
                 # Add status after channel was created
-                
+
                 # Add check if channel is rly created
                 # Add check if db entry is created
                 await self.client.db.create_temp_voice(channel, member)
