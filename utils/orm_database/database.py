@@ -113,18 +113,19 @@ class ORMDataBase:
                     await session.delete(db_setting)
                 await session.commit()
 
-    async def create_temp_voice(self, channel: discord.VoiceChannel, owner: discord.Member):
+    async def create_temp_voice(self, channel: discord.VoiceChannel, owner: discord.Member) -> Join2Create | None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                session.add(
-                    Join2Create(
-                        channel=channel.id,
-                        owner_id=owner.id,
-                        locked=False,
-                        ghosted=False
-                    )
+                new_entry = Join2Create(
+                    channel=channel.id,
+                    owner_id=owner.id,
+                    locked=False,
+                    ghosted=False
                 )
-                await session.commit()
+                session.add(new_entry)
+            await session.refresh(new_entry)
+            result = await session.get(Join2Create, channel.id)
+            return result
 
     async def update_temp_voice(self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool,
                                 ghosted: bool):

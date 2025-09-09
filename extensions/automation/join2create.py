@@ -192,8 +192,6 @@ class Join2Create(commands.Cog):
                 else:
                     role = member.guild.get_role(verified_role.value)
                 perms = {
-                    member.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                    member.guild.premium_subscriber_role: discord.PermissionOverwrite(move_members=True),
                     role: discord.PermissionOverwrite(
                         stream=True,
                         connect=True,
@@ -205,21 +203,42 @@ class Join2Create(commands.Cog):
                     ),
                     member: discord.PermissionOverwrite(move_members=True),
                 }
-                channel = await after.channel.category.create_voice_channel(
-                    name=f"{member.display_name} {choice(self.suffixes)}",
-                    user_limit=25,
-                    reason="Join2Create",
-                    overwrites=perms,
-                )
-                # Add status after channel was created
+                if member.guild.premium_subscriber_role:
+                    perms[member.guild.premium_subscriber_role] = discord.PermissionOverwrite(move_members=True)
+                if member.guild.default_role != role:
+                    perms[member.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+                else:
+                    perms[member.guild.default_role] = discord.PermissionOverwrite(view_channel=True)
 
-                # Add check if channel is rly created
-                # Add check if db entry is created
-                await self.client.db.create_temp_voice(channel, member)
+                try:
+                    channel = await after.channel.category.create_voice_channel(
+                        name=f"{member.display_name} {choice(self.suffixes)}",
+                        user_limit=25,
+                        reason="Join2Create",
+                        overwrites=perms,
+                    )
+                except (discord.Forbidden, discord.HTTPException, discord.InvalidArgument) as e:
+                    self.logger.error(e)
+                    return
+                # Add status after channel was created
+                # TODO: @Käsus can work on this
+
+                check = await self.client.db.create_temp_voice(channel, member)
+                if not check:
+                    await channel.delete(reason="Join2Create-Failed")
+                    self.logger.error("Database entry for temp voice channel could not be created")
+                    return
                 self.logger.debug(f"{member.name} created {channel.name} in {member.guild}")
-                # Move only if channel is created
-                await member.move_to(channel)
-                await channel.send(view=VoiceBoard())
+                try:
+                    await member.move_to(channel)
+                except (discord.Forbidden, discord.HTTPException) as e:
+                    self.logger.error(f"Couldn't move member | {e}")
+                    return
+                try:
+                    await channel.send(view=VoiceBoard())
+                except (discord.Forbidden, discord.HTTPException) as e:
+                    self.logger.error(f"Couldn't create VoiceBoard{e}")
+                    return
 
         if before.channel is not None:
             if await self.client.db.get_temp_voice(before.channel):
