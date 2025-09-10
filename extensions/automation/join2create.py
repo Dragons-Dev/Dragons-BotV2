@@ -1,4 +1,5 @@
 from random import choice
+import json
 
 import discord
 from discord import ui
@@ -162,8 +163,9 @@ class Join2Create(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        with open("assets/suffix.txt") as f:
-            self.suffixes = f.readlines()  # with many lines this could be a performance issue, but we only have a few
+        with open("assets/suffix.json") as f:
+            self.statuse = json.load(f)
+            self.suffixes = [*self.statuse]
 
     @commands.Cog.listener("on_voice_state_update")
     async def on_join2create(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
@@ -209,10 +211,10 @@ class Join2Create(commands.Cog):
                     perms[member.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
                 else:
                     perms[member.guild.default_role] = discord.PermissionOverwrite(view_channel=True)
-
+                channel_name = choice(self.suffixes)
                 try:
                     channel = await after.channel.category.create_voice_channel(
-                        name=f"{member.display_name} {choice(self.suffixes)}",
+                        name=f"{member.display_name} {channel_name}",
                         user_limit=25,
                         reason="Join2Create",
                         overwrites=perms,
@@ -220,8 +222,15 @@ class Join2Create(commands.Cog):
                 except (discord.Forbidden, discord.HTTPException, discord.InvalidArgument) as e:
                     self.logger.error(e)
                     return
-                # Add status after channel was created
-                # TODO: @Käsus can work on this
+                
+                if self.statuse[channel_name]:
+                    status = choice(self.statuse[channel_name])
+                    await channel.set_status(
+                        status= status,
+                        reason="Join2Create"
+                    )
+
+
 
                 check = await self.client.db.create_temp_voice(channel, member)
                 if not check:
