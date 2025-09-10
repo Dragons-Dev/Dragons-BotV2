@@ -29,12 +29,12 @@ bot = Bot(
 
 @bot.listen("on_ready", once=True)
 async def on_boot():
-    bot.db = ORMDataBase()
-    await bot.db.setup(bot.boot_time)
-    bot.logger.debug("Initialized content db")
     bot.sts = ShortTermStorage(path="data/sts.sqlite")
     await bot.sts.setup(bot.boot_time)
     bot.logger.debug("Initialized sts db")
+    bot.db = ORMDataBase()
+    await bot.db.setup(bot.boot_time)
+    bot.logger.debug("Initialized content db")
     bot.api = aiohttp.ClientSession(
         "https://discord.com",
         headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{bot.client_version}"},
