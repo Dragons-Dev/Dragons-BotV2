@@ -1,5 +1,5 @@
-from random import choice
 import json
+from random import choice
 
 import discord
 from discord import ui
@@ -222,7 +222,7 @@ class Join2Create(commands.Cog):
                 except (discord.Forbidden, discord.HTTPException, discord.InvalidArgument) as e:
                     self.logger.error(e)
                     return
-                
+
                 if self.statuse[channel_name]:
                     status = choice(self.statuse[channel_name])
                     await channel.set_status(
