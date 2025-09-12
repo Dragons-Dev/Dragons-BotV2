@@ -212,9 +212,14 @@ class Join2Create(commands.Cog):
                 else:
                     perms[member.guild.default_role] = discord.PermissionOverwrite(view_channel=True)
                 channel_name = choice(self.suffixes)
+                member_name = member.display_name
+                if member_name[-1].lower() != "s":
+                    if channel_name not in ["says 'YIPPIE'",".exe","has ADHD","is broke","went insane"]:
+                        member_name += "s"
+                    
                 try:
                     channel = await after.channel.category.create_voice_channel(
-                        name=f"{member.display_name} {channel_name}",
+                        name=f"{member_name} {channel_name}",
                         user_limit=25,
                         reason="Join2Create",
                         overwrites=perms,
@@ -229,7 +234,6 @@ class Join2Create(commands.Cog):
                         status= status,
                         reason="Join2Create"
                     )
-
 
 
                 check = await self.client.db.create_temp_voice(channel, member)
