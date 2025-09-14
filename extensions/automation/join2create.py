@@ -164,8 +164,8 @@ class Join2Create(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         with open("assets/suffix.json") as f:
-            self.statuse = json.load(f)
-            self.suffixes = [*self.statuse]
+            self.status = json.load(f)
+            self.suffixes = [*self.status]
 
     @commands.Cog.listener("on_voice_state_update")
     async def on_join2create(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
@@ -214,8 +214,10 @@ class Join2Create(commands.Cog):
                 channel_name = choice(self.suffixes)
                 member_name = member.display_name
                 if member_name[-1].lower() != "s":
-                    if channel_name not in ["says 'YIPPIE'",".exe","has ADHD","is broke","went insane"]:
+                    if self.status[channel_name]["s_flag"]:
                         member_name += "s"
+                    #if channel_name not in ["says 'YIPPIE'",".exe","has ADHD","is broke","went insane"]:
+                        #member_name += "s"
                     
                 try:
                     channel = await after.channel.category.create_voice_channel(
@@ -228,8 +230,8 @@ class Join2Create(commands.Cog):
                     self.logger.error(e)
                     return
 
-                if self.statuse[channel_name]:
-                    status = choice(self.statuse[channel_name])
+                if self.status[channel_name]:
+                    status = choice(self.status[channel_name]["status"])
                     await channel.set_status(
                         status= status,
                         reason="Join2Create"
