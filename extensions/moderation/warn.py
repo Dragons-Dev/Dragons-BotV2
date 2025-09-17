@@ -35,7 +35,7 @@ class Warn(commands.Cog):
     async def warn(
         self,
         ctx: discord.ApplicationContext,
-            member: discord.Member | discord.User,
+        member: discord.Member | discord.User,
         reason: str,
     ):
         try:
@@ -118,7 +118,7 @@ class Warn(commands.Cog):
                     embed=discord.Embed(
                         title="Error",
                         description="An unexpected error occurred. Please try again later or contact the developer on "
-                                    "[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
+                        "[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
                         color=discord.Color.brand_red(),
                     ),
                     ephemeral=True,

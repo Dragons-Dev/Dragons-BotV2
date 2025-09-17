@@ -210,10 +210,10 @@ class ModMail(commands.Cog):
             )
             for thread in modmail_channel.threads:
                 if (
-                        (
-                                f"Thread for {ctx.author.name}" == thread.name
-                                or f"Thread for Anon#{mail.uuid[:7]}" == thread.name
-                        )
+                    (
+                        f"Thread for {ctx.author.name}" == thread.name
+                        or f"Thread for Anon#{mail.uuid[:7]}" == thread.name
+                    )
                     and not thread.archived
                     and not thread.locked
                 ):
@@ -232,7 +232,7 @@ class ModMail(commands.Cog):
             return
         if msg.guild:
             # ensuring guild context
-            modmail_channel_id = (await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild))
+            modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)
             if modmail_channel_id is None:
                 return
             modmail_channel: discord.TextChannel = await get_or_fetch(

@@ -87,13 +87,13 @@ class BadURL(commands.Cog):
                             msg.guild, "channel", setting[0].value, default=None
                         )
                     else:
-
                         log_channel: discord.TextChannel = await get_or_fetch(
                             msg.guild, "channel", setting.value, default=None
                         )
 
-                        log_channel: discord.TextChannel = await get_or_fetch(msg.guild, "channel", setting.value,
-                                                                              default=None)
+                        log_channel: discord.TextChannel = await get_or_fetch(
+                            msg.guild, "channel", setting.value, default=None
+                        )
 
                     if log_channel:
                         await log_channel.send(embed=em)

@@ -48,9 +48,9 @@ async def on_boot():
     )
     bot.logger.info(
         f"""Session start limit {data["session_start_limit"]["remaining"]} | Resets at {
-        dt.fromtimestamp(time.time() + (int(data["session_start_limit"]["reset_after"]) / 1000)).strftime(
-            "%d.%m.%Y %H:%M:%S"
-        )
+            dt.fromtimestamp(time.time() + (int(data["session_start_limit"]["reset_after"]) / 1000)).strftime(
+                "%d.%m.%Y %H:%M:%S"
+            )
         }"""
     )
     bot.logger.info(

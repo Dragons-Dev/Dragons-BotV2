@@ -50,7 +50,7 @@ class ORMDataBase:
         await self.engine.dispose()
 
     async def get_setting(
-            self, setting: SettingsEnum, guild: discord.Guild | None
+        self, setting: SettingsEnum, guild: discord.Guild | None
     ) -> None | Settings | Sequence[Settings]:
         """
         Retrieves a setting from the database.
@@ -124,7 +124,7 @@ class ORMDataBase:
             return result
 
     async def update_temp_voice(
-            self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool, ghosted: bool
+        self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool, ghosted: bool
     ):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -151,7 +151,7 @@ class ORMDataBase:
                 await session.commit()
 
     async def create_infraction(
-            self, user: discord.User | discord.Member, infraction: InfractionsEnum, reason: str, guild: discord.Guild
+        self, user: discord.User | discord.Member, infraction: InfractionsEnum, reason: str, guild: discord.Guild
     ) -> int:
         """
         Creates a new infraction record in the database.
@@ -178,7 +178,7 @@ class ORMDataBase:
         raise NotImplementedError("In the past this had no use!")
 
     async def get_infraction(
-            self, case_id: int | None, user: discord.Member | discord.User | None, guild: discord.Guild | None = None
+        self, case_id: int | None, user: discord.Member | discord.User | None, guild: discord.Guild | None = None
     ) -> None | Infractions | Sequence[Infractions]:
         """
         Retrieves infraction(s) from the database based on case ID or user.
@@ -211,7 +211,7 @@ class ORMDataBase:
         return infractions
 
     async def create_modmail(
-            self, user: discord.User | discord.Member, guild: discord.Guild, uuid: str, anonymous: bool
+        self, user: discord.User | discord.Member, guild: discord.Guild, uuid: str, anonymous: bool
     ):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -260,7 +260,7 @@ class ORMDataBase:
                 await session.commit()
 
     async def get_user_stat(
-            self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None
+        self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None
     ) -> None | UserStats | Sequence[UserStats]:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -316,11 +316,11 @@ class ORMDataBase:
                 await session.commit()
 
     async def edit_bot_status(
-            self,
-            id_: int,
-            activity_type: discord.ActivityType = None,
-            status: discord.Status = None,
-            activity_name: str = None,
+        self,
+        id_: int,
+        activity_type: discord.ActivityType = None,
+        status: discord.Status = None,
+        activity_name: str = None,
     ) -> None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():

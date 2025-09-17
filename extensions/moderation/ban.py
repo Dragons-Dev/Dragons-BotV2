@@ -80,8 +80,9 @@ class Ban(commands.Cog):
                         ctx.guild, "channel", setting.value, default=None
                     )
 
-                    log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value,
-                                                                          default=None)
+                    log_channel: discord.TextChannel = await get_or_fetch(
+                        ctx.guild, "channel", setting.value, default=None
+                    )
 
                 if log_channel:
                     await log_channel.send(embed=member_em)
@@ -118,7 +119,7 @@ class Ban(commands.Cog):
                     embed=discord.Embed(
                         title="Error",
                         description="An unexpected error occurred. Please try again later or contact the developer on "
-                                    "[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
+                        "[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
                         color=discord.Color.brand_red(),
                     ),
                     ephemeral=True,

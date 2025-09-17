@@ -29,7 +29,7 @@ class ErrorHandler(commands.Cog):
                 embed=error_embed(
                     title="Check failure",
                     description=f"A validation check failed. Most likely you do not have the correct permission to "
-                                f"execute `/{ctx.command.qualified_name}`.",
+                    f"execute `/{ctx.command.qualified_name}`.",
                 ),
                 ephemeral=True,
             )

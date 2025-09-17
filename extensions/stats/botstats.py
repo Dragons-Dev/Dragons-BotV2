@@ -155,7 +155,7 @@ class BotStats(commands.Cog):
 
     @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(
-            self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
+        self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ):
         """
         Listens to voice state updates and updates the voice time of the member accordingly.
