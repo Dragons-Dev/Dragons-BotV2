@@ -11,7 +11,6 @@ from utils import Bot, CustomLogger, WebhookType
 
 regex = r"https://images\.tagesschau\.de/image/(?:[A-Za-z0-9_-]+/)+[A-Za-z0-9_-]+\.jpg(?:\?width=\d+)?"
 
-
 def parse_tagesschau_feed(entry: dict) -> dict:
     """Parses an entry from feedparser to values that are important"""
 
@@ -45,7 +44,6 @@ def parse_tagesschau_feed(entry: dict) -> dict:
         "id": entry["id"][-36:],
         "image": image,
     }
-
 
 class TagesschauFeed(commands.Cog):
     def __init__(self, client):

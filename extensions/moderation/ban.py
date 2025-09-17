@@ -79,6 +79,10 @@ class Ban(commands.Cog):
                     log_channel: discord.TextChannel = await get_or_fetch(
                         ctx.guild, "channel", setting.value, default=None
                     )
+
+                    log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value,
+                                                                          default=None)
+
                 if log_channel:
                     await log_channel.send(embed=member_em)
             await ctx.followup.send(

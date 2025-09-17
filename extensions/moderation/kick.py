@@ -77,6 +77,8 @@ class Kick(commands.Cog):
                     )
                 if log_channel:
                     await log_channel.send(embed=member_em)
+                    log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value,
+                                                                          default=None)
             await ctx.followup.send(
                 embed=em,
                 view=ButtonInfo("A copy of this was sent to the kicked member and the log channel!"),

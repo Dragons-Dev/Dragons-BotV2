@@ -27,6 +27,7 @@ class MessagePurge(commands.Cog):
     async def purge(
             self, ctx: discord.ApplicationContext, which: discord.User | discord.Role | None = None, amount: int = 100
     ):
+
         """
         Purges messages from a channel
 

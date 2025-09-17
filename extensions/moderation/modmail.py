@@ -232,7 +232,7 @@ class ModMail(commands.Cog):
             return
         if msg.guild:
             # ensuring guild context
-            modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)
+            modmail_channel_id = (await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild))
             if modmail_channel_id is None:
                 return
             modmail_channel: discord.TextChannel = await get_or_fetch(
