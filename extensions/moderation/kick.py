@@ -72,8 +72,11 @@ class Kick(commands.Cog):
                         ctx.guild, "channel", setting[0].value, default=None
                     )
                 else:
-                    log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value,
-                                                                          default=None)
+                    log_channel: discord.TextChannel = await get_or_fetch(
+                        ctx.guild, "channel", setting.value, default=None
+                    )
+                if log_channel:
+                    await log_channel.send(embed=member_em)
             await ctx.followup.send(
                 embed=em,
                 view=ButtonInfo("A copy of this was sent to the kicked member and the log channel!"),
@@ -85,7 +88,7 @@ class Kick(commands.Cog):
         if isinstance(exc, discord.ApplicationCommandInvokeError):
             return await ctx.response.send_message(
                 embed=discord.Embed(
-                    title="Error", description=f"This user is no member of this guild.", color=discord.Color.brand_red()
+                    title="Error", description="This user is no member of this guild.", color=discord.Color.brand_red()
                 ),
                 ephemeral=True,
             )

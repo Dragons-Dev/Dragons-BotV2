@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 import discord
-from sqlalchemy import Row, and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -14,7 +14,7 @@ from config import DATABASE_URL
 
 from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from ..logger import CustomLogger
-from .models import *
+from .models import Base, BotStatus, Infractions, Join2Create, Modmail, Settings, UserStats
 
 
 class ORMDataBase:
@@ -49,8 +49,9 @@ class ORMDataBase:
         self.logger.warning("Closing database connection")
         await self.engine.dispose()
 
-    async def get_setting(self, setting: SettingsEnum, guild: discord.Guild | None) -> None | Settings | Sequence[
-        Settings]:
+    async def get_setting(
+            self, setting: SettingsEnum, guild: discord.Guild | None
+    ) -> None | Settings | Sequence[Settings]:
         """
         Retrieves a setting from the database.
 
@@ -116,19 +117,15 @@ class ORMDataBase:
     async def create_temp_voice(self, channel: discord.VoiceChannel, owner: discord.Member) -> Join2Create | None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                new_entry = Join2Create(
-                    channel=channel.id,
-                    owner_id=owner.id,
-                    locked=False,
-                    ghosted=False
-                )
+                new_entry = Join2Create(channel=channel.id, owner_id=owner.id, locked=False, ghosted=False)
                 session.add(new_entry)
             await session.refresh(new_entry)
             result = await session.get(Join2Create, channel.id)
             return result
 
-    async def update_temp_voice(self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool,
-                                ghosted: bool):
+    async def update_temp_voice(
+            self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool, ghosted: bool
+    ):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(Join2Create).where(Join2Create.channel == channel.id)
@@ -171,15 +168,9 @@ class ORMDataBase:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 infraction = Infractions(
-                        user_id=user.id,
-                        infraction=infraction.value,
-                        reason=reason,
-                        date=datetime.now(),
-                        guild=guild.id
-                    )
-                session.add(
-                    infraction
+                    user_id=user.id, infraction=infraction.value, reason=reason, date=datetime.now(), guild=guild.id
                 )
+                session.add(infraction)
                 await session.commit()
                 return infraction.case_id
 
@@ -219,8 +210,9 @@ class ORMDataBase:
             return infractions[0]
         return infractions
 
-    async def create_modmail(self, user: discord.User | discord.Member, guild: discord.Guild, uuid: str,
-                             anonymous: bool):
+    async def create_modmail(
+            self, user: discord.User | discord.Member, guild: discord.Guild, uuid: str, anonymous: bool
+    ):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 session.add(
@@ -257,40 +249,35 @@ class ORMDataBase:
     async def update_user_stat(self, user: discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                query = select(UserStats).where(UserStats.user_id == user.id, UserStats.stat_type == stat_type.value,
-                                                UserStats.guild_id == guild.id)
+                query = select(UserStats).where(
+                    UserStats.user_id == user.id, UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id
+                )
                 result = (await session.execute(query)).scalar_one_or_none()
                 if result is None:
-                    session.add(
-                        UserStats(
-                            user_id=user.id,
-                            stat_type=stat_type.value,
-                            value=value,
-                            guild_id=guild.id
-                        )
-                    )
+                    session.add(UserStats(user_id=user.id, stat_type=stat_type.value, value=value, guild_id=guild.id))
                 else:
                     result.value += value
                 await session.commit()
 
     async def get_user_stat(
-            self,
-            user: discord.User | discord.Member | None,
-            stat_type: StatTypeEnum,
-            guild: discord.Guild | None
+            self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None
     ) -> None | UserStats | Sequence[UserStats]:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 if user and guild:
-                    query = select(UserStats).where(UserStats.user_id == user.id,
-                                                    UserStats.stat_type == stat_type.value,
-                                                    UserStats.guild_id == guild.id)
+                    query = select(UserStats).where(
+                        UserStats.user_id == user.id,
+                        UserStats.stat_type == stat_type.value,
+                        UserStats.guild_id == guild.id,
+                    )
                 elif user:
-                    query = select(UserStats).where(UserStats.user_id == user.id,
-                                                    UserStats.stat_type == stat_type.value)
+                    query = select(UserStats).where(
+                        UserStats.user_id == user.id, UserStats.stat_type == stat_type.value
+                    )
                 elif guild:
-                    query = select(UserStats).where(UserStats.stat_type == stat_type.value,
-                                                    UserStats.guild_id == guild.id)
+                    query = select(UserStats).where(
+                        UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id
+                    )
                 else:
                     raise LookupError("'User' and 'Guild' arguments are 'None'. At least one must have a value!")
                 userstats = (await session.execute(query)).scalars().all()
@@ -324,11 +311,7 @@ class ORMDataBase:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 session.add(
-                    BotStatus(
-                        activity_type=int(activity_type),
-                        status=str(status),
-                        activity_name=activity_name
-                    )
+                    BotStatus(activity_type=int(activity_type), status=str(status), activity_name=activity_name)
                 )
                 await session.commit()
 
@@ -337,7 +320,7 @@ class ORMDataBase:
             id_: int,
             activity_type: discord.ActivityType = None,
             status: discord.Status = None,
-            activity_name: str = None
+            activity_name: str = None,
     ) -> None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -345,9 +328,9 @@ class ORMDataBase:
                 result = (await session.execute(query)).scalar_one_or_none()
                 if result is None:
                     return None
-                result.activity_type = (int(activity_type) if activity_type else result.activity_type)
-                result.status = (str(status) if status else result.status)
-                result.activity_name = (activity_name if activity_name else result.activity_name)
+                result.activity_type = int(activity_type) if activity_type else result.activity_type
+                result.status = str(status) if status else result.status
+                result.activity_name = activity_name if activity_name else result.activity_name
                 await session.commit()
 
     async def get_bot_status(self, id_: int | None) -> BotStatus | Sequence[BotStatus] | None:

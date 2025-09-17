@@ -11,11 +11,8 @@ class CommandGroups(commands.Cog):
 
     mod = discord.SlashCommandGroup("mod", contexts={discord.InteractionContextType.guild})
     track = discord.SlashCommandGroup("track", contexts={discord.InteractionContextType.guild})
-    status = discord.SlashCommandGroup("status", contexts={
-        discord.InteractionContextType.guild, discord.InteractionContextType.bot_dm
-    })
-
     join2create = discord.SlashCommandGroup("join2create", contexts={discord.InteractionContextType.guild})
+
 
 def setup(client):
     client.add_cog(CommandGroups(client))

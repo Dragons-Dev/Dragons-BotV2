@@ -29,7 +29,7 @@ class ChannelExporter(commands.Cog):
 
         temp = io.StringIO(transscript)
         file = discord.File(
-            fp=temp, filename=f"{datetime.now().strftime('%Y-%m-%d')}-{ctx.channel.name}-" f"{ctx.author.name}.html"
+            fp=temp, filename=f"{datetime.now().strftime('%Y-%m-%d')}-{ctx.channel.name}-{ctx.author.name}.html"
         )
         await ctx.followup.send(f"{ctx.channel.name} export", file=file)
 

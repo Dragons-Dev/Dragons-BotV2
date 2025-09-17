@@ -11,7 +11,8 @@ class BotActivity:
         self.activity = activity
 
     def __repr__(self):
-        return f'BotActivity<{self.status}, {self.activity}>'
+        return f"BotActivity<{self.status}, {self.activity}>"
+
 
 class CommandDisabledError(ApplicationCommandError):
     pass

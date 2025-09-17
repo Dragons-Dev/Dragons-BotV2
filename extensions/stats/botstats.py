@@ -148,10 +148,7 @@ class BotStats(commands.Cog):
             return
         db_time = int((datetime.now() - timed_user.time).total_seconds())
         await self.client.db.update_user_stat(
-            user=member,
-            stat_type=utils.StatTypeEnum.VoiceTime,
-            value=db_time,
-            guild=guild
+            user=member, stat_type=utils.StatTypeEnum.VoiceTime, value=db_time, guild=guild
         )
         if not update:
             self._delete_user(guild.id, member.id)

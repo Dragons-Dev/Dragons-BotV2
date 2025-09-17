@@ -34,7 +34,6 @@ class Ban(commands.Cog):
         reason: str,
     ):
         try:
-
             if member.top_role >= ctx.guild.me.top_role:
                 return await ctx.response.send_message(
                     "I can't ban that member since his top role is higher or even to mine", ephemeral=True
@@ -77,8 +76,9 @@ class Ban(commands.Cog):
                         ctx.guild, "channel", setting[0].value, default=None
                     )
                 else:
-                    log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value,
-                                                                          default=None)
+                    log_channel: discord.TextChannel = await get_or_fetch(
+                        ctx.guild, "channel", setting.value, default=None
+                    )
                 if log_channel:
                     await log_channel.send(embed=member_em)
             await ctx.followup.send(
@@ -92,7 +92,8 @@ class Ban(commands.Cog):
         if isinstance(exc, discord.ApplicationCommandInvokeError):
             try:  # this most likely fails if we try to invoke the warn command with a user_id
                 member_id = ctx.selected_options[0].get(
-                    "value")  # this is heavily dependent on the order returned by Discord
+                    "value"
+                )  # this is heavily dependent on the order returned by Discord
                 reason = ctx.selected_options[1].get("value")  # this might be the first point of failure
                 member = await ctx.bot.get_or_fetch_user(member_id)
                 await ctx.invoke(self.ban, member=member, reason=reason)
@@ -104,7 +105,7 @@ class Ban(commands.Cog):
                         f"CTX: {ctx.selected_options}, "
                         f"Member ID: {member_id}, "
                         f"Reason: {reason}",
-                        exc_info=e
+                        exc_info=e,
                     )
                 except Exception as f:  # we can't get the parameters for the warn command
                     self.logger.critical(f"Failed to get the parameters for the ban command: {f}", exc_info=f)
@@ -112,9 +113,9 @@ class Ban(commands.Cog):
                 await ctx.response.send_message(
                     embed=discord.Embed(
                         title="Error",
-                        description=f"An unexpected error occurred. Please try again later or contact the developer on "
-                                    f"[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
-                        color=discord.Color.brand_red()
+                        description="An unexpected error occurred. Please try again later or contact the developer on "
+                                    "[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
+                        color=discord.Color.brand_red(),
                     ),
                     ephemeral=True,
                 )

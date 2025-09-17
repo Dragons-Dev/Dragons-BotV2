@@ -23,7 +23,7 @@ bot = Bot(
     intents=discord.Intents.all(),
     activity=discord.CustomActivity(name="Booting...", state="Booting..."),
     status=discord.Status.dnd,
-    version=VersionInfo(2, 0, 4, "")
+    version=VersionInfo(2, 0, 4, ""),
 )
 
 
@@ -47,8 +47,11 @@ async def on_boot():
         f"Bot started at {bot.boot_time.strftime('%H:%M:%S')} Boot took ~{(dt.now() - bot.boot_time).seconds}s"
     )
     bot.logger.info(
-        f"""Session start limit {data['session_start_limit']['remaining']} | Resets at {dt.fromtimestamp(
-            time.time() + (int(data['session_start_limit']['reset_after']) / 1000)).strftime('%d.%m.%Y %H:%M:%S')}"""
+        f"""Session start limit {data["session_start_limit"]["remaining"]} | Resets at {
+        dt.fromtimestamp(time.time() + (int(data["session_start_limit"]["reset_after"]) / 1000)).strftime(
+            "%d.%m.%Y %H:%M:%S"
+        )
+        }"""
     )
     bot.logger.info(
         f"Name: {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency * 1000)}ms | "
@@ -88,7 +91,7 @@ if __name__ == "__main__":
     with open("./assets/disabled.json", "w") as f:
         json.dump(extension_store, f, indent=4)
     if DISCORD_API_KEY == "":
-        bot.logger.critical(f"No token has been passed to the bot.")
+        bot.logger.critical("No token has been passed to the bot.")
         exit_(1)
 
     pid = os.getpid()

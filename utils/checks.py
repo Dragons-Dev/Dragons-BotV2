@@ -19,7 +19,8 @@ def is_team():
                 return True
             else:
                 raise InsufficientPermission(
-                    "You need to be an administrator or have the manage_guild permission to execute this command.")
+                    "You need to be an administrator or have the manage_guild permission to execute this command."
+                )
 
         else:
             role = await get_or_fetch(ctx.guild, "role", team_role.value, default=None)
