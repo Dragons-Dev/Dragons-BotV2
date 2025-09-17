@@ -11,8 +11,7 @@ from utils import Bot, CustomLogger, Settings, SettingsEnum
 
 class InputModal(ui.Modal):
     def __init__(self, title: str, channel_ctx: discord.VoiceChannel):
-        self.title = title  # .split("-")[1].strip()
-        print(self.title)
+        self.title = title
         self.channel = channel_ctx
         if self.title == "Set User Limit":
             items = [
@@ -22,14 +21,26 @@ class InputModal(ui.Modal):
             ]
         elif self.title == "Reset permissions":
             items = [ui.TextDisplay(content="This feature is not implemented yet")]
-        elif self.title == "Blacklist roles":
+        elif self.title == "Unban roles":
             items = [ui.TextDisplay(content="This feature is not implemented yet")]
-        elif self.title == "Whitelist roles":
+        elif self.title == "Ban roles":
             items = [ui.TextDisplay(content="This feature is not implemented yet")]
-        elif self.title == "Invite a user":
+        elif self.title == "Unban a user":
             items = [ui.TextDisplay(content="This feature is not implemented yet")]
         elif self.title == "Ban a user":
-            items = [ui.TextDisplay(content="This feature is not implemented yet")]
+            items = [
+                ui.TextDisplay(
+                    content="This will ban a user from this channel.\n"
+                    "Banning them does hide the channel from them, and kicks them if they are in it."
+                ),
+                ui.Select(
+                    label="User to ban from this channel",
+                    placeholder="Select a user to ban",
+                    select_type=discord.ComponentType.user_select,
+                    min_values=1,
+                    max_values=25,
+                ),
+            ]
         elif self.title == "Change bitrate":
             voice_quality_options = [
                 discord.SelectOption(label="8 kbps", value="8000"),
@@ -79,14 +90,38 @@ class InputModal(ui.Modal):
                     )
                 elif self.title == "Reset permissions":
                     ...
-                elif self.title == "Blacklist roles":
+                elif self.title == "Unban roles":
                     ...
-                elif self.title == "Whitelist roles":
+                elif self.title == "Ban roles":
                     ...
-                elif self.title == "Invite a user":
+                elif self.title == "Unban a user":
                     ...
                 elif self.title == "Ban a user":
-                    ...
+                    members = self.children[1].values
+                    channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
+                        client, "channel", voice_channel.channel, default=None
+                    )
+                    if channel_obj is None:
+                        await interaction.respond("This channel does not exist anymore", ephemeral=True)
+                        return
+                    overwrite = {}
+                    for member in members:
+                        if member.id == interaction.user.id:
+                            continue
+                        overwrite[member] = discord.PermissionOverwrite(view_channel=False, connect=False)
+                        if member in channel_obj.members:
+                            try:
+                                await member.move_to(
+                                    None, reason=f"Banned from {channel_obj.name} by {interaction.user}"
+                                )
+                            except (discord.Forbidden, discord.HTTPException):
+                                pass
+                    await channel_obj.edit(overwrites=overwrite)
+                    await interaction.respond(
+                        f"Banned {', '.join([f'`{m.display_name}`' for m in members if m.id != interaction.user.id])} from this channel",
+                        ephemeral=True,
+                    )
+
                 elif self.title == "Change bitrate":
                     try:
                         bitrate = int(self.children[0].values[0])
@@ -115,9 +150,9 @@ class VoiceBoard(ui.View):
         self.button_names = {
             "j2c__user_limit_button": "Set User Limit",
             "j2c__claim_ownership_button": "Claim Ownership",
-            "j2c__blacklist_button": "Blacklist roles",
-            "j2c__whitelist_button": "Whitelist roles",
-            "j2c__invite_button": "Invite a user",
+            "j2c__role_unban_button": "Unban roles",
+            "j2c__role_ban_button": "Ban roles",
+            "j2c__unban_button": "Unban a user",
             "j2c__ban_button": "Ban a user",
             "j2c__bitrate_button": "Change bitrate",
         }
@@ -140,20 +175,20 @@ class VoiceBoard(ui.View):
         )
         blacklist_button = discord.ui.Button(
             style=discord.ButtonStyle.primary,
-            label="Blacklist Roles",
-            emoji="🚫",
-            custom_id="j2c__blacklist_button",
+            label="Unban Roles",
+            emoji="🎫",
+            custom_id="j2c__role_unban_button",
             id=103,
         )
         whitelist_button = discord.ui.Button(
             style=discord.ButtonStyle.primary,
-            label="Whitelist Roles",
-            emoji="🎫",
-            custom_id="j2c__whitelist_button",
+            label="Ban Roles",
+            emoji="🚫",
+            custom_id="j2c__role_ban_button",
             id=104,
         )
-        invite_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, label="Invite a user", emoji="💌", custom_id="j2c__invite_button", id=105
+        unban_button = discord.ui.Button(
+            style=discord.ButtonStyle.primary, label="Unban a user", emoji="💌", custom_id="j2c__unban_button", id=105
         )
         ban_button = discord.ui.Button(
             style=discord.ButtonStyle.primary, label="Ban a user", emoji="🔨", custom_id="j2c__ban_button", id=106
@@ -170,7 +205,7 @@ class VoiceBoard(ui.View):
             claim_ownership_button,
             blacklist_button,
             whitelist_button,
-            invite_button,
+            unban_button,
             ban_button,
             bitrate_button,
         ]
@@ -216,7 +251,7 @@ class VoiceBoard(ui.View):
                 InputModal(f"{self.button_names[interaction.custom_id]}", self.channel)
             )
         else:
-            await interaction.respond("Not Workie", ephemeral=True)
+            await interaction.respond("This button is not yet keyed to an interaction.", ephemeral=True)
 
 
 class Join2Create(commands.Cog):
@@ -275,7 +310,7 @@ class Join2Create(commands.Cog):
                 channel_name = choice(self.suffixes)
                 member_name = member.display_name
                 if member_name[-1].lower() != "s":
-                    if channel_name not in ["says 'YIPPIE'", ".exe", "has ADHD", "is broke", "went insane"]:
+                    if self.status[channel_name]["s_flag"]:
                         member_name += "s"
 
                 try:
@@ -290,7 +325,7 @@ class Join2Create(commands.Cog):
                     return
 
                 if self.status[channel_name]:
-                    status = choice(self.status[channel_name])
+                    status = choice(self.status[channel_name]["status"])
                     await channel.set_status(status=status, reason="Join2Create")
 
                 check = await self.client.db.create_temp_voice(channel, member)
@@ -323,6 +358,11 @@ class Join2Create(commands.Cog):
             view=VoiceBoard(channel=ctx.author.voice.channel if ctx.author.voice else ctx.channel), ephemeral=True
         )
 
+    @commands.Cog.listener("on_ready", once=True)
+    async def on_ready(self):
+        self.client.add_view(VoiceBoard())
+        self.logger.info("Added persistent view for VoiceBoard")
 
-def setup(client):
+
+def setup(client: Bot):
     client.add_cog(Join2Create(client))
