@@ -216,7 +216,7 @@ class Join2Create(commands.Cog):
                 if member_name[-1].lower() != "s":
                     if self.status[channel_name]["s_flag"]:
                         member_name += "s"
-                    
+
                 try:
                     channel = await after.channel.category.create_voice_channel(
                         name=f"{member_name} {channel_name}",
