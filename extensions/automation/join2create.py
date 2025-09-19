@@ -33,13 +33,9 @@ class InputModal(ui.Modal):
                     permission = channel_overwrites[overwrite_key]
                     if not permission.view_channel and permission.view_channel is not None:
                         options.append(discord.SelectOption(label=overwrite_key.name, value=str(overwrite_key.id)))
-            
+
             if len(options) == 0:
-                items = [
-                    ui.TextDisplay(
-                        content="No user has been banned"
-                    )
-                ]
+                items = [ui.TextDisplay(content="No user has been banned")]
             else:
                 items = [
                     ui.TextDisplay(
@@ -52,7 +48,7 @@ class InputModal(ui.Modal):
                         options=options,
                         select_type=discord.ComponentType.string_select,
                         min_values=1,
-                        max_values=len(options)
+                        max_values=len(options),
                     ),
                 ]
         elif self.title == "Ban a user":
@@ -135,7 +131,7 @@ class InputModal(ui.Modal):
                     for option in unbanSelect:
                         unbanUser = await client.get_or_fetch_user(int(option))
                         unbanUserList.append(unbanUser)
-                    
+
                         overwrite[unbanUser] = discord.PermissionOverwrite(view_channel=None, connect=None)
                     await channel_obj.edit(overwrites=overwrite)
                     await interaction.respond(
@@ -235,18 +231,10 @@ class VoiceBoard(ui.View):
             id=104,
         )
         unban_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, 
-            label="Unban a user", 
-            emoji="💌", 
-            custom_id="j2c__unban_button", 
-            id=105
+            style=discord.ButtonStyle.primary, label="Unban a user", emoji="💌", custom_id="j2c__unban_button", id=105
         )
         ban_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, 
-            label="Ban a user", 
-            emoji="🔨", 
-            custom_id="j2c__ban_button",
-            id=106
+            style=discord.ButtonStyle.primary, label="Ban a user", emoji="🔨", custom_id="j2c__ban_button", id=106
         )
         bitrate_button = discord.ui.Button(
             style=discord.ButtonStyle.primary,
