@@ -26,7 +26,35 @@ class InputModal(ui.Modal):
         elif self.title == "Ban roles":
             items = [ui.TextDisplay(content="This feature is not implemented yet")]
         elif self.title == "Unban a user":
-            items = [ui.TextDisplay(content="This feature is not implemented yet")]
+            channel_overwrites = self.channel.overwrites
+            options = []
+            for overwrite_key in [*channel_overwrites.keys()]:
+                if not isinstance(overwrite_key, discord.Role):
+                    permission = channel_overwrites[overwrite_key]
+                    if not permission.view_channel and permission.view_channel is not None:
+                        options.append(discord.SelectOption(label=overwrite_key.name, value=str(overwrite_key.id)))
+            
+            if len(options) == 0:
+                items = [
+                    ui.TextDisplay(
+                        content="No user has been banned"
+                    )
+                ]
+            else:
+                items = [
+                    ui.TextDisplay(
+                        content="This will unban a user from this channel.\n"
+                        "Unbanning them does show the channel to them."
+                    ),
+                    ui.Select(
+                        label="User to unban fron this channel",
+                        placeholder="Seelct user to unban",
+                        options=options,
+                        select_type=discord.ComponentType.string_select,
+                        min_values=1,
+                        max_values=len(options)
+                    ),
+                ]
         elif self.title == "Ban a user":
             items = [
                 ui.TextDisplay(
@@ -95,7 +123,26 @@ class InputModal(ui.Modal):
                 elif self.title == "Ban roles":
                     ...
                 elif self.title == "Unban a user":
-                    ...
+                    unbanSelect = self.children[1].values
+                    channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
+                        client, "channel", voice_channel.channel, default=None
+                    )
+                    if channel_obj is None:
+                        await interaction.respond("This channel does not exist anymore", ephemeral=True)
+                        return
+                    overwrite = {}
+                    unbanUserList = []
+                    for option in unbanSelect:
+                        unbanUser = await client.get_or_fetch_user(int(option))
+                        unbanUserList.append(unbanUser)
+                    
+                        overwrite[unbanUser] = discord.PermissionOverwrite(view_channel=None, connect=None)
+                    await channel_obj.edit(overwrites=overwrite)
+                    await interaction.respond(
+                        f"Unbanned {', '.join([f'`{m.name}`' for m in unbanUserList if m.id != interaction.user.id])} from this channel",
+                        ephemeral=True,
+                    )
+
                 elif self.title == "Ban a user":
                     members = self.children[1].values
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
@@ -188,10 +235,18 @@ class VoiceBoard(ui.View):
             id=104,
         )
         unban_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, label="Unban a user", emoji="💌", custom_id="j2c__unban_button", id=105
+            style=discord.ButtonStyle.primary, 
+            label="Unban a user", 
+            emoji="💌", 
+            custom_id="j2c__unban_button", 
+            id=105
         )
         ban_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, label="Ban a user", emoji="🔨", custom_id="j2c__ban_button", id=106
+            style=discord.ButtonStyle.primary, 
+            label="Ban a user", 
+            emoji="🔨", 
+            custom_id="j2c__ban_button",
+            id=106
         )
         bitrate_button = discord.ui.Button(
             style=discord.ButtonStyle.primary,
@@ -340,7 +395,7 @@ class Join2Create(commands.Cog):
                     self.logger.error(f"Couldn't move member | {e}")
                     return
                 try:
-                    await channel.send(view=VoiceBoard())
+                    await channel.send(view=VoiceBoard(channel=channel))
                 except (discord.Forbidden, discord.HTTPException) as e:
                     self.logger.error(f"Couldn't create VoiceBoard{e}")
                     return
