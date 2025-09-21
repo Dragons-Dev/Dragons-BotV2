@@ -29,13 +29,9 @@ class InputModal(ui.Modal):
                     permission = channel_overwrites[overwrite_key]
                     if not permission.view_channel and permission.view_channel is not None:
                         options.append(discord.SelectOption(label=overwrite_key.name, value=str(overwrite_key.id)))
-            
+
             if len(options) == 0:
-                items = [
-                    ui.TextDisplay(
-                        content="No role has been banned"
-                    )
-                ]
+                items = [ui.TextDisplay(content="No role has been banned")]
             else:
                 items = [
                     ui.TextDisplay(
@@ -48,7 +44,7 @@ class InputModal(ui.Modal):
                         options=options,
                         select_type=discord.ComponentType.string_select,
                         min_values=1,
-                        max_values=len(options)
+                        max_values=len(options),
                     ),
                 ]
         elif self.title == "Ban roles":
@@ -63,7 +59,7 @@ class InputModal(ui.Modal):
                     select_type=discord.ComponentType.role_select,
                     min_values=1,
                     max_values=25,
-                )
+                ),
             ]
         elif self.title == "Unban a user":
             channel_overwrites = self.channel.overwrites
@@ -73,13 +69,9 @@ class InputModal(ui.Modal):
                     permission = channel_overwrites[overwrite_key]
                     if not permission.view_channel and permission.view_channel is not None:
                         options.append(discord.SelectOption(label=overwrite_key.name, value=str(overwrite_key.id)))
-            
+
             if len(options) == 0:
-                items = [
-                    ui.TextDisplay(
-                        content="No user has been banned"
-                    )
-                ]
+                items = [ui.TextDisplay(content="No user has been banned")]
             else:
                 items = [
                     ui.TextDisplay(
@@ -156,8 +148,10 @@ class InputModal(ui.Modal):
                     await interaction.user.voice.channel.edit(
                         user_limit=user_limit, reason=f"Changed by {interaction.user.display_name} via VoiceBoard"
                     )
-                    await interaction.respond(f"User Limit changed to {user_limit} by {interaction.user.display_name}", ephemeral=True)
-                
+                    await interaction.respond(
+                        f"User Limit changed to {user_limit} by {interaction.user.display_name}", ephemeral=True
+                    )
+
                 elif self.title == "Reset permissions":
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
                         client, "channel", voice_channel.channel, default=None
@@ -172,10 +166,10 @@ class InputModal(ui.Modal):
                         overwrite.connect = None
                         await self.channel.set_permissions(overwrite_key, overwrite=overwrite)
                     await interaction.respond(
-                        f"Permissions reseted",
+                        "Permissions reseted",
                         ephemeral=True,
                     )
-                
+
                 elif self.title == "Unban roles":
                     unbanSelect = self.children[1].values
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
@@ -184,7 +178,7 @@ class InputModal(ui.Modal):
                     if channel_obj is None:
                         await interaction.respond("This channel does not exist anymore", ephemeral=True)
                         return
-                    
+
                     unbanRoleList = []
                     for option in unbanSelect:
                         unbanRole = interaction.guild.get_role(int(option))
@@ -198,7 +192,7 @@ class InputModal(ui.Modal):
                         f"Unbanned {', '.join([f'`{r.name}`' for r in unbanRoleList if r.id != interaction.user.id])} from this channel",
                         ephemeral=True,
                     )
-                
+
                 elif self.title == "Ban roles":
                     roles = self.children[1].values
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
@@ -218,7 +212,7 @@ class InputModal(ui.Modal):
                         f"Banned {', '.join([f'`{r.name}`' for r in roles if r.id != interaction.user.id])} from this channel",
                         ephemeral=True,
                     )
-                
+
                 elif self.title == "Unban a user":
                     unbanSelect = self.children[1].values
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
@@ -236,12 +230,12 @@ class InputModal(ui.Modal):
                         overwrite.view_channel = None
                         overwrite.connect = None
                         await self.channel.set_permissions(unbanUser, overwrite=overwrite)
-                    
+
                     await interaction.respond(
                         f"Unbanned {', '.join([f'`{m.name}`' for m in unbanUserList if m.id != interaction.user.id])} from this channel",
                         ephemeral=True,
                     )
-                
+
                 elif self.title == "Ban a user":
                     roles = self.children[1].values
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
@@ -260,16 +254,14 @@ class InputModal(ui.Modal):
                         await self.channel.set_permissions(role, overwrite=overwrite)
                         if role in channel_obj.members:
                             try:
-                                await role.move_to(
-                                    None, reason=f"Banned from {channel_obj.name} by {interaction.user}"
-                                )
+                                await role.move_to(None, reason=f"Banned from {channel_obj.name} by {interaction.user}")
                             except (discord.Forbidden, discord.HTTPException):
                                 pass
                     await interaction.respond(
                         f"Banned {', '.join([f'`{m.display_name}`' for m in roles if m.id != interaction.user.id])} from this channel",
                         ephemeral=True,
                     )
-                
+
                 elif self.title == "Change bitrate":
                     try:
                         bitrate = int(self.children[0].values[0])
@@ -337,18 +329,10 @@ class VoiceBoard(ui.View):
             id=104,
         )
         unban_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, 
-            label="Unban a user", 
-            emoji="💌", 
-            custom_id="j2c__unban_button", 
-            id=105
+            style=discord.ButtonStyle.primary, label="Unban a user", emoji="💌", custom_id="j2c__unban_button", id=105
         )
         ban_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, 
-            label="Ban a user", 
-            emoji="🔨", 
-            custom_id="j2c__ban_button",
-            id=106
+            style=discord.ButtonStyle.primary, label="Ban a user", emoji="🔨", custom_id="j2c__ban_button", id=106
         )
         bitrate_button = discord.ui.Button(
             style=discord.ButtonStyle.primary,
@@ -364,7 +348,7 @@ class VoiceBoard(ui.View):
             custom_id="j2c__reset_permission_button",
             id=108,
         )
-        
+
         buttons = [
             user_limit_button,
             claim_ownership_button,
