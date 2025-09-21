@@ -92,7 +92,7 @@ class InputModal(ui.Modal):
                         options=options,
                         select_type=discord.ComponentType.string_select,
                         min_values=1,
-                        max_values=len(options)
+                        max_values=len(options),
                     ),
                 ]
         elif self.title == "Ban a user":
