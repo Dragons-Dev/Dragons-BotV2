@@ -156,6 +156,7 @@ class InputModal(ui.Modal):
                     await interaction.user.voice.channel.edit(
                         user_limit=user_limit, reason=f"Changed by {interaction.user.display_name} via VoiceBoard"
                     )
+                
                 elif self.title == "Reset permissions":
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
                         client, "channel", voice_channel.channel, default=None
@@ -173,6 +174,7 @@ class InputModal(ui.Modal):
                         f"Permissions reseted",
                         ephemeral=True,
                     )
+                
                 elif self.title == "Unban roles":
                     unbanSelect = self.children[1].values
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
