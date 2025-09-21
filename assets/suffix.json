@@ -1,5 +1,5 @@
 {
-    "Gummizelle": {
+    " Gummizelle": {
         "s_flag": true,
         "status": [
             "Ich muss hier raus",
@@ -7,7 +7,7 @@
             "Therapie l\u00e4uft"
         ]
     },
-    "Schokoparadies": {
+    " Schokoparadies": {
         "s_flag": true,
         "status": [
             "Willy Wonkas Schokofabrik",
@@ -15,64 +15,64 @@
             "Bitte danach sp\u00fclen"
         ]
     },
-    "Porzelanladen": {
+    " Porzelanladen": {
         "s_flag": true,
         "status": [
             "Elefant incoming"
         ]
     },
-    "Sd.Kfz. 234/4 mit 7,5-cm-PaK 40 L/46": {
+    " Sd.Kfz. 234/4 mit 7,5-cm-PaK 40 L/46": {
         "s_flag": true,
         "status": [
             "Blitzkrieg"
         ]
     },
-    "Feuerwehr": {
+    " Feuerwehr": {
         "s_flag": true,
         "status": [
             "112 - was ist Ihr Notfall?",
             "dem ist nicht mehr zu helfen"
         ]
     },
-    "Berufsgenossenschaft": {
+    " Berufsgenossenschaft": {
         "s_flag": true,
         "status": [
             "Versichert seit 1952",
             "Formular A38 fehlt"
         ]
     },
-    "Streichholzfabrik": {
+    " Streichholzfabrik": {
         "s_flag": true,
         "status": [
             "Bitte nicht rauchen"
         ]
     },
-    "Kleiderschrank": {
+    " Kleiderschrank": {
         "s_flag": true,
         "status": [
             "Narnia inside"
         ]
     },
-    "Poolstream": {
+    " Poolstream": {
         "s_flag": true,
         "status": [
             "Naughty",
             "Twitch Ban Inc"
         ]
     },
-    "Hardware Shop": {
+    " Hardware Shop": {
         "s_flag": true,
         "status": [
             "RGB = mehr FPS"
         ]
     },
-    "Mitternachtssnack": {
+    " Mitternachtssnack": {
         "s_flag": true,
         "status": [
             "Alles ist besser mit K\u00e4se"
         ]
     },
-    "Urkundendrucker": {
+    " Urkundendrucker": {
         "s_flag": true,
         "status": [
             "mad printer noise",
@@ -81,14 +81,14 @@
             "Zeugnis F\u00e4lscher 3000"
         ]
     },
-    "Snackbox": {
+    " Snackbox": {
         "s_flag": true,
         "status": [
             "hmm cracker",
             "Di\u00e4t gescheitert"
         ]
     },
-    "says 'YIPPIE'": {
+    " says 'YIPPIE'": {
         "s_flag": false,
         "status": [
             "is happy but dead inside",
@@ -103,14 +103,14 @@
             "hat aufgeh\u00f6rt zu funktionieren"
         ]
     },
-    "has ADHD": {
+    " has ADHD": {
         "s_flag": false,
         "status": [
             "probably true",
             "Focus? Never heard of it"
         ]
     },
-    "is broke": {
+    " is broke": {
         "s_flag": false,
         "status": [
             "probably true",
@@ -118,7 +118,7 @@
             "PayPal -0,01\u20ac"
         ]
     },
-    "went insane": {
+    " went insane": {
         "s_flag": false,
         "status": [
             "definetly yes",
