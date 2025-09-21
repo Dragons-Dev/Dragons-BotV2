@@ -156,6 +156,7 @@ class InputModal(ui.Modal):
                     await interaction.user.voice.channel.edit(
                         user_limit=user_limit, reason=f"Changed by {interaction.user.display_name} via VoiceBoard"
                     )
+                    await interaction.respond(f"User Limit changed to {user_limit} by {interaction.user.display_name}", ephemeral=True)
                 
                 elif self.title == "Reset permissions":
                     channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
