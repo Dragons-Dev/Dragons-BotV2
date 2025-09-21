@@ -1,0 +1,128 @@
+{
+    " Gummizelle": {
+        "s_flag": true,
+        "status": [
+            "Ich muss hier raus",
+            "Bitte nicht f\u00fcttern",
+            "Therapie l\u00e4uft"
+        ]
+    },
+    " Schokoparadies": {
+        "s_flag": true,
+        "status": [
+            "Willy Wonkas Schokofabrik",
+            "Willy's Secret lab",
+            "Bitte danach sp\u00fclen"
+        ]
+    },
+    " Porzelanladen": {
+        "s_flag": true,
+        "status": [
+            "Elefant incoming"
+        ]
+    },
+    " Sd.Kfz. 234/4 mit 7,5-cm-PaK 40 L/46": {
+        "s_flag": true,
+        "status": [
+            "Blitzkrieg"
+        ]
+    },
+    " Feuerwehr": {
+        "s_flag": true,
+        "status": [
+            "112 - was ist Ihr Notfall?",
+            "dem ist nicht mehr zu helfen"
+        ]
+    },
+    " Berufsgenossenschaft": {
+        "s_flag": true,
+        "status": [
+            "Versichert seit 1952",
+            "Formular A38 fehlt"
+        ]
+    },
+    " Streichholzfabrik": {
+        "s_flag": true,
+        "status": [
+            "Bitte nicht rauchen"
+        ]
+    },
+    " Kleiderschrank": {
+        "s_flag": true,
+        "status": [
+            "Narnia inside"
+        ]
+    },
+    " Poolstream": {
+        "s_flag": true,
+        "status": [
+            "Naughty",
+            "Twitch Ban Inc"
+        ]
+    },
+    " Hardware Shop": {
+        "s_flag": true,
+        "status": [
+            "RGB = mehr FPS"
+        ]
+    },
+    " Mitternachtssnack": {
+        "s_flag": true,
+        "status": [
+            "Alles ist besser mit K\u00e4se"
+        ]
+    },
+    " Urkundendrucker": {
+        "s_flag": true,
+        "status": [
+            "mad printer noise",
+            "Papierstau detected",
+            "Farbe leer",
+            "Zeugnis F\u00e4lscher 3000"
+        ]
+    },
+    " Snackbox": {
+        "s_flag": true,
+        "status": [
+            "hmm cracker",
+            "Di\u00e4t gescheitert"
+        ]
+    },
+    " says 'YIPPIE'": {
+        "s_flag": false,
+        "status": [
+            "is happy but dead inside",
+            "cries in silence",
+            "ironisch gemeint"
+        ]
+    },
+    ".exe": {
+        "s_flag": false,
+        "status": [
+            "stopped running",
+            "hat aufgeh\u00f6rt zu funktionieren"
+        ]
+    },
+    " has ADHD": {
+        "s_flag": false,
+        "status": [
+            "probably true",
+            "Focus? Never heard of it"
+        ]
+    },
+    " is broke": {
+        "s_flag": false,
+        "status": [
+            "probably true",
+            "Studentenleben",
+            "PayPal -0,01\u20ac"
+        ]
+    },
+    " went insane": {
+        "s_flag": false,
+        "status": [
+            "definetly yes",
+            "Realit\u00e4t unsubscribed"
+        ]
+    }
+}

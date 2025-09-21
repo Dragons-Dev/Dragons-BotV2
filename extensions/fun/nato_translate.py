@@ -72,7 +72,7 @@ class NatoTranslator(commands.Cog):
                     output.append("|")
                 else:
                     output.append(nato_alphabet[letter.lower()])
-            except:
+            except KeyError:
                 self.logger.warning(f"{letter} is not supported in NATO ALPHABET")
         out = " ".join(output)
         em = discord.Embed(description=out)

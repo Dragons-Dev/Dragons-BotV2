@@ -21,9 +21,7 @@ class EndModmailView(discord.ui.View):
     async def end_modmail(self, button: discord.ui.Button, interaction: discord.Interaction):
         mail = await self.client.db.get_modmail(self.author, None)
         if mail is None:
-            return await interaction.response.send_message(
-                "You are not chatting with any guild!", ephemeral=True
-            )
+            return await interaction.response.send_message("You are not chatting with any guild!", ephemeral=True)
         guild = self.client.get_guild(mail.guild_id)
         if guild is None:
             guild = await self.client.fetch_guild(mail.guild_id)
@@ -151,12 +149,12 @@ class ModMail(commands.Cog):
     async def create_modmail(self, ctx: discord.ApplicationContext, anonymous: bool):
         mail = await self.client.db.get_modmail(ctx.author, None)
         if ctx.guild:  # if the command is run inside a guild
-            if mail.guild_id:  # if any guild id is in the database
+            if mail:  # if any guild id is in the database
                 guild: discord.Guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)
                 if ctx.guild.id == mail.guild_id:  # if the guild id the command is run is the same as in the database
                     view = EndModmailView(ctx.author, self.client)
                     return await ctx.response.send_message(
-                        f"You are still chatting with this guild!", view=view, ephemeral=True
+                        "You are still chatting with this guild!", view=view, ephemeral=True
                     )
 
                 else:
@@ -172,9 +170,7 @@ class ModMail(commands.Cog):
                     "A new modmail will be created. Please check your DM's", ephemeral=True
                 )
 
-        elif (
-                mail
-        ):  # if the command is run outside a guild but with an id in the database the user will be shown the
+        elif mail:  # if the command is run outside a guild but with an id in the database the user will be shown the
             # `EndModmailView`
             view = EndModmailView(ctx.author, self.client)
             guild: discord.Guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)  # type: ignore
@@ -214,8 +210,10 @@ class ModMail(commands.Cog):
             )
             for thread in modmail_channel.threads:
                 if (
-                        (
-                                f"Thread for {ctx.author.name}" == thread.name or f"Thread for Anon#{mail.uuid[:7]}" == thread.name)
+                    (
+                        f"Thread for {ctx.author.name}" == thread.name
+                        or f"Thread for Anon#{mail.uuid[:7]}" == thread.name
+                    )
                     and not thread.archived
                     and not thread.locked
                 ):
@@ -234,7 +232,7 @@ class ModMail(commands.Cog):
             return
         if msg.guild:
             # ensuring guild context
-            modmail_channel_id = (await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild))
+            modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)
             if modmail_channel_id is None:
                 return
             modmail_channel: discord.TextChannel = await get_or_fetch(
@@ -259,6 +257,8 @@ class ModMail(commands.Cog):
                         if message.embeds:
                             unique_id = message.embeds[0].footer.text.strip("UUID: ")
                     mail = await self.client.db.get_modmail(user=None, uuid=unique_id)
+                    if mail is None:
+                        return await msg.reply("This thread is closed, no user found!")
                     user_id = mail.user_id
 
                 else:
@@ -288,6 +288,10 @@ class ModMail(commands.Cog):
         else:
             mail = await self.client.db.get_modmail(msg.author, None)
             # at this point it's made sure it was a dm to the bot in a modmail context
+            if mail is None:
+                return await msg.author.send(
+                    f"If you want to modmail with someone please use first {self.create_modmail.mention}"
+                )
             guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)
             embed = _to_embed(msg, mail.uuid, mail.anon)
             # convert all attachments to files to send them in the modmail channel
@@ -341,3 +345,5 @@ class ModMail(commands.Cog):
 
 def setup(client: Bot):
     client.add_cog(ModMail(client))
+    client.logger.warning(f"Cog {ModMail.__name__} is about to be rewritten in a future version!")
+    client.logger.warning("For more information visit https://github.com/Dragons-Dev/Dragons-BotV2/issues/123")

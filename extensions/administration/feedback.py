@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord.utils import get_or_fetch
 
-from utils import Bot, ButtonInfo, CustomLogger, Settings, SettingsEnum
+from utils import Bot, ButtonInfo, CustomLogger, SettingsEnum
 
 
 class FeedbackModal(discord.ui.Modal):
@@ -20,9 +20,7 @@ class FeedbackModal(discord.ui.Modal):
         )
         self.add_item(
             discord.ui.InputText(
-                label="Feedback",
-                placeholder="Write your feedback here!",
-                style=discord.InputTextStyle.long
+                label="Feedback", placeholder="Write your feedback here!", style=discord.InputTextStyle.long
             )
         )
 

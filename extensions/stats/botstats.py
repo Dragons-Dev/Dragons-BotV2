@@ -148,17 +148,14 @@ class BotStats(commands.Cog):
             return
         db_time = int((datetime.now() - timed_user.time).total_seconds())
         await self.client.db.update_user_stat(
-            user=member,
-            stat_type=utils.StatTypeEnum.VoiceTime,
-            value=db_time,
-            guild=guild
+            user=member, stat_type=utils.StatTypeEnum.VoiceTime, value=db_time, guild=guild
         )
         if not update:
             self._delete_user(guild.id, member.id)
 
     @commands.Cog.listener("on_voice_state_update")
     async def on_voice_state_update(
-            self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
+        self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ):
         """
         Listens to voice state updates and updates the voice time of the member accordingly.
