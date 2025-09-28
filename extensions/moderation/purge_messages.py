@@ -21,11 +21,12 @@ class MessagePurge(commands.Cog):
         "which",
         description="Which messages to delete",
         required=False,
-        input_type=discord.SlashCommandOptionType.mentionable
+        input_type=discord.SlashCommandOptionType.mentionable,
     )
     @is_team()
-    async def purge(self, ctx: discord.ApplicationContext, which: discord.User | discord.Role | None = None,
-                    amount: int = 100):
+    async def purge(
+        self, ctx: discord.ApplicationContext, which: discord.User | discord.Role | None = None, amount: int = 100
+    ):
         """
         Purges messages from a channel
 
@@ -40,20 +41,19 @@ class MessagePurge(commands.Cog):
         await ctx.defer(ephemeral=True)
         if which is None:
             deleted_messages = await ctx.channel.purge(
-                limit=amount,
-                reason=f"{ctx.author.name} purged {ctx.channel.name}"
+                limit=amount, reason=f"{ctx.author.name} purged {ctx.channel.name}"
             )
         elif type(which) is discord.Role:
             deleted_messages = await ctx.channel.purge(
                 limit=amount,
                 check=lambda message: which.id in [r.id for r in message.author.roles],
-                reason=f"{ctx.author.name} purged {ctx.channel.name}"
+                reason=f"{ctx.author.name} purged {ctx.channel.name}",
             )
         else:
             deleted_messages = await ctx.channel.purge(
                 limit=amount,
                 check=lambda message: message.author.id == which.id,
-                reason=f"{ctx.author.name} purged {ctx.channel.name}"
+                reason=f"{ctx.author.name} purged {ctx.channel.name}",
             )
         await ctx.followup.send(f"Deleted {len(deleted_messages)} messages.", ephemeral=True)
 

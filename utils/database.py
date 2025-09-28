@@ -19,6 +19,7 @@ def db_to_datetime(val):
 aiosqlite.register_adapter(datetime, datetime_to_db)
 aiosqlite.register_converter("DATETIME", db_to_datetime)
 
+
 class ShortTermStorage:
     def __init__(self, path: str | Path):
         self.db: aiosqlite.Connection = None  # type: ignore

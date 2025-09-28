@@ -69,17 +69,13 @@ class InternalHooks(commands.Cog):
             if len(resp) == 1:
                 webhook = await self.get_or_fetch_webhook(resp.guild, resp.value)  # type: ignore
                 await webhook.send(
-                    embeds=sub_lists[WebhookType.Tagesschau],
-                    username="Tagesschau",
-                    avatar_url=TAGESSCHAU_IMAGE
+                    embeds=sub_lists[WebhookType.Tagesschau], username="Tagesschau", avatar_url=TAGESSCHAU_IMAGE
                 )
                 return
             for setting in resp:  # type: ignore
                 webhook = await self.get_or_fetch_webhook(setting.guild, setting.value)
                 await webhook.send(
-                    embeds=sub_lists[WebhookType.Tagesschau],
-                    username="Tagesschau",
-                    avatar_url=TAGESSCHAU_IMAGE
+                    embeds=sub_lists[WebhookType.Tagesschau], username="Tagesschau", avatar_url=TAGESSCHAU_IMAGE
                 )
 
     @commands.Cog.listener("on_webhook_entry")

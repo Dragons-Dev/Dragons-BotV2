@@ -11,12 +11,13 @@ from .logger import CustomLogger
 
 if TYPE_CHECKING:
     from .database import ShortTermStorage
-    from .orm_database import *
+    from .orm_database import ORMDataBase
     from .utils import VersionInfo
 
 
-class Bot(MulticogBot,
-          commands.Bot):  # subclass of both MulticogBot and commands.Bot to allow slash commands across multiple cogs
+class Bot(
+    MulticogBot, commands.Bot
+):  # subclass of both MulticogBot and commands.Bot to allow slash commands across multiple cogs
     def __init__(self, version, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client_version: VersionInfo = version

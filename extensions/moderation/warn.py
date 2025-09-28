@@ -29,17 +29,16 @@ class Warn(commands.Cog):
         "member",
         description="The member you want to warn",
         input_type=discord.SlashCommandOptionType.user,
-        required=True
+        required=True,
     )
     @discord.option("reason", description="The reason for the warn", input_type=str, required=True)
     async def warn(
         self,
         ctx: discord.ApplicationContext,
-            member: discord.Member | discord.User,
+        member: discord.Member | discord.User,
         reason: str,
     ):
         try:
-
             if member.top_role >= ctx.guild.me.top_role:
                 return await ctx.response.send_message(
                     "I can't warn that member since his top role is higher or even to mine", ephemeral=True
@@ -81,8 +80,9 @@ class Warn(commands.Cog):
                         ctx.guild, "channel", setting[0].value, default=None
                     )
                 else:
-                    log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value,
-                                                                          default=None)
+                    log_channel: discord.TextChannel = await get_or_fetch(
+                        ctx.guild, "channel", setting.value, default=None
+                    )
                 if log_channel:
                     await log_channel.send(embed=member_em)
             await ctx.followup.send(
@@ -96,7 +96,8 @@ class Warn(commands.Cog):
         if isinstance(exc, discord.ApplicationCommandInvokeError):
             try:  # this most likely fails if we try to invoke the warn command with a user_id
                 member_id = ctx.selected_options[0].get(
-                    "value")  # this is heavily dependent on the order returned by Discord
+                    "value"
+                )  # this is heavily dependent on the order returned by Discord
                 reason = ctx.selected_options[1].get("value")  # this might be the first point of failure
                 member = await ctx.bot.get_or_fetch_user(member_id)
                 await ctx.invoke(self.warn, member=member, reason=reason)
@@ -108,7 +109,7 @@ class Warn(commands.Cog):
                         f"CTX: {ctx.selected_options}, "
                         f"Member ID: {member_id}, "
                         f"Reason: {reason}",
-                        exc_info=e
+                        exc_info=e,
                     )
                 except Exception as f:  # we can't get the parameters for the warn command
                     self.logger.critical(f"Failed to get the parameters for the warn command: {f}", exc_info=f)
@@ -116,9 +117,9 @@ class Warn(commands.Cog):
                 await ctx.response.send_message(
                     embed=discord.Embed(
                         title="Error",
-                        description=f"An unexpected error occurred. Please try again later or contact the developer on "
-                                    f"[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
-                        color=discord.Color.brand_red()
+                        description="An unexpected error occurred. Please try again later or contact the developer on "
+                        "[GitHub](https://github.com/Dragons-Dev/Dragons-BotV2).\n",
+                        color=discord.Color.brand_red(),
                     ),
                     ephemeral=True,
                 )
