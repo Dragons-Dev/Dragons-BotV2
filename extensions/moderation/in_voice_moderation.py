@@ -169,11 +169,23 @@ class DnDManager(commands.Cog):
             pass
     
     @commands.Cog.listener("on_voice_state_update")
-    async def channel_left(self, member, before, after):
+    async def channel_left(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if before.channel is not None and after.channel is not None:
             if before.channel != after.channel:
                 if before.channel.id in self.claimed.keys():
                     await member.edit(deafen=False, mute=False)
+        if before.channel is not None:
+            if before.channel.id in [*self.claimed]:
+                if member.id == self.claimed[before.channel.id].id and before.channel != after.channel:
+                    del self.claimed[before.channel.id]
+                    try:
+                        await self.requested_message[before.channel.id].delete_original_message()
+                        del self.requested_message[before.channel.id]
+                    except KeyError:
+                        pass
+                    for member in before.channel.members:
+                            await member.edit(deafen=False, mute=False)
+
 
 def setup(client: Bot):
     client.add_cog(DnDManager(client))
