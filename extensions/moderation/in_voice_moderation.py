@@ -127,8 +127,8 @@ class DnDManager(commands.Cog):
                 if guild_claim == ctx.user or ctx.user.guild_permissions.administrator:
                     del self.claimed[ctx.channel_id]
                     try:
-                        await self.requested_message[ctx.user.id].delete_original_message()
-                        del self.requested_message[ctx.user.id]
+                        await self.requested_message[ctx.channel_id].delete_original_message()
+                        del self.requested_message[ctx.channel_id]
                     except KeyError:
                         pass
                     for member in ctx.channel.members:
@@ -149,7 +149,7 @@ class DnDManager(commands.Cog):
                 guild_claim = self.claimed[ctx.channel_id]
                 if guild_claim == ctx.user or ctx.user.guild_permissions.administrator:
                     message = await ctx.respond(view=MuteView(ctx.channel), ephemeral=True)
-                    self.requested_message[ctx.user.id] = message
+                    self.requested_message[ctx.channel_id] = message
                 else:
                     await ctx.response.send_message("You are not the owner of this channel",ephemeral=True,delete_after=5.0)
             except KeyError:
