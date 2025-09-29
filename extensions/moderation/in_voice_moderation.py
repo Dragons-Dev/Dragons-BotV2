@@ -84,6 +84,8 @@ class MuteView(discord.ui.View):
         self.user_in_channel = self.channel.members
         container = discord.ui.Container()
         for user in self.user_in_channel:
+            if user.bot:
+                continue
             mute = discord.ui.Section(
                 discord.ui.TextDisplay(content=user.display_name),
                 accessory=Mute(user, ctx = channel_ctx)
@@ -132,6 +134,8 @@ class DnDManager(commands.Cog):
                     except KeyError:
                         pass
                     for member in ctx.channel.members:
+                        if member.bot:
+                            continue
                         await member.edit(deafen=False, mute=False)
                     await ctx.response.send_message("You unclaimed this channel",ephemeral=True,delete_after=5.0)
                 else:
@@ -164,6 +168,8 @@ class DnDManager(commands.Cog):
             del self.claimed[ctx.id]
             if isinstance(ctx, discord.VoiceChannel):
                 for member in ctx.members:
+                    if member.bot:
+                        continue
                     await member.edit(deafen=False, mute=False)
         except KeyError:
             pass
@@ -184,6 +190,8 @@ class DnDManager(commands.Cog):
                     except KeyError:
                         pass
                     for member in before.channel.members:
+                            if member.bot:
+                                continue
                             await member.edit(deafen=False, mute=False)
 
 
