@@ -105,7 +105,9 @@ class InVoiceModeration(commands.Cog):
                     self.claimed[ctx.channel_id] = ctx.user
                     await ctx.response.send_message("You claimed this channel", ephemeral=True, delete_after=5.0)
                 else:
-                    await ctx.response.send_message("You cant claim a channel without being in it", ephemeral=True, delete_after=5.0)
+                    await ctx.response.send_message(
+                        "You cant claim a channel without being in it", ephemeral=True, delete_after=5.0
+                    )
         else:
             await ctx.response.send_message("This is not a voice channel", ephemeral=True, delete_after=5.0)
 
@@ -165,9 +167,8 @@ class InVoiceModeration(commands.Cog):
                     delete_after=5.0,
                 )
         else:
-            await ctx.response.send_message("This is not a voice channel",ephemeral=True,delete_after=5.0)
-    
-    
+            await ctx.response.send_message("This is not a voice channel", ephemeral=True, delete_after=5.0)
+
     @commands.Cog.listener("on_voice_state_update")
     async def channel_left(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         """
