@@ -3,6 +3,7 @@ from random import choice
 import discord
 from discord import ui
 from discord.ext import commands
+import pycord.multicog as pycog
 
 import utils
 from utils import Bot, CustomLogger, Settings, SettingsEnum
@@ -12,8 +13,7 @@ class Mute(discord.ui.Button):
         super().__init__(label="Mute")
         self.channel_ctx = ctx
         self.user = user
-        self.muted = self.user.voice.mute
-        if self.muted:
+        if self.user.voice.mute:
             self.emoji = ":speak_no_evil:"
             self.style = discord.ButtonStyle.red
         else:
@@ -23,33 +23,23 @@ class Mute(discord.ui.Button):
 
     async def callback(self, interaction):
         if self.user.voice.channel == self.channel_ctx:
-            if self.muted:
-                await self.unmute()
+            if self.user.voice.mute:
+                await self.user.edit(mute=False)
                 self.emoji = ":monkey_face:"
                 self.style = discord.ButtonStyle.green
             else:
-                await self.mute()
+                await self.user.edit(mute=True)
                 self.emoji = ":speak_no_evil:"
                 self.style = discord.ButtonStyle.red
             
         await interaction.response.edit_message(view=self.view)
-
-    async def mute(self):
-
-        await self.user.edit(mute=True)
-        self.muted = True
-
-    async def unmute(self):
-        await self.user.edit(mute=False)
-        self.muted = False
 
 class Deaf(discord.ui.Button):
     def __init__(self, user:discord.Member ,ctx: discord.ApplicationContext):
         super().__init__(label="Deaf")
         self.channel_ctx = ctx
         self.user = user
-        self.deafed = self.user.voice.deaf
-        if self.deafed:
+        if self.user.voice.deaf:
             self.emoji = ":hear_no_evil:"
             self.style = discord.ButtonStyle.red
         else:
@@ -58,24 +48,15 @@ class Deaf(discord.ui.Button):
 
     async def callback(self, interaction):
         if self.user.voice.channel == self.channel_ctx:
-            if self.deafed:
-                await self.undeaf()
+            if self.user.voice.deaf:
+                await self.user.edit(deafen=False)
                 self.emoji = ":monkey_face:"
                 self.style = discord.ButtonStyle.green
             else:
-                await self.deaf()
+                await self.user.edit(deafen=True)
                 self.emoji = ":hear_no_evil:"
                 self.style = discord.ButtonStyle.red
         await interaction.response.edit_message(view=self.view)
-
-    async def deaf(self):
-        await self.user.edit(deafen=True)
-        self.deafed = True
-
-    async def undeaf(self):
-        await self.user.edit(deafen=False)
-        self.deafed = False
-
 
 class MuteView(discord.ui.View):
     def __init__(self, channel_ctx: discord.VoiceChannel):
@@ -83,6 +64,7 @@ class MuteView(discord.ui.View):
         self.channel = channel_ctx
         self.user_in_channel = self.channel.members
         container = discord.ui.Container()
+        container.add_separator()
         for user in self.user_in_channel:
             if user.bot:
                 continue
@@ -99,7 +81,7 @@ class MuteView(discord.ui.View):
             container.add_separator()
         self.add_item(container)
 
-class DnDManager(commands.Cog):
+class InVoiceModeration(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
@@ -107,8 +89,12 @@ class DnDManager(commands.Cog):
         #   channel_id: user
         # }
         self.claimed = {}
+        # {
+        #   channel_id: message
+        # }
         self.requested_message = {}
 
+    @pycog.subcommand("voicemod", independent=True)
     @commands.slash_command(name="claim", description="Claim this channel to moderate it")
     async def claim(self, ctx: discord.ApplicationContext):
         if isinstance(ctx.channel, discord.VoiceChannel):
@@ -121,12 +107,17 @@ class DnDManager(commands.Cog):
         else:
             await ctx.response.send_message("This is not a voice channel",ephemeral=True,delete_after=5.0)
 
+    @pycog.subcommand("voicemod", independent=True)
     @commands.slash_command(name="unclaim", description="Unclaims the channel")
     async def unclaim(self, ctx: discord.ApplicationContext):
         if isinstance(ctx.channel, discord.VoiceChannel):
             try:
-                guild_claim = self.claimed[ctx.channel_id]
-                if guild_claim == ctx.user or ctx.user.guild_permissions.administrator:
+                user_claim = self.claimed[ctx.channel_id]
+                join2create = await self.client.db.get_temp_voice(ctx.channel)
+                is_channel_owner = False
+                if join2create is not None:
+                    is_channel_owner = (join2create.owner_id == ctx.user.id)
+                if user_claim == ctx.user or ctx.user.guild_permissions.administrator or is_channel_owner:
                     del self.claimed[ctx.channel_id]
                     try:
                         await self.requested_message[ctx.channel_id].delete_original_message()
@@ -145,15 +136,20 @@ class DnDManager(commands.Cog):
         else:
             await ctx.response.send_message("This is not a voice channel",ephemeral=True,delete_after=5.0)
 
-
+    @pycog.subcommand("voicemod", independent=True)
     @commands.slash_command(name="moderate", description="moderate user in this channel")
     async def moderate(self, ctx: discord.ApplicationContext):
         if isinstance(ctx.channel, discord.VoiceChannel):
             try:
-                guild_claim = self.claimed[ctx.channel_id]
-                if guild_claim == ctx.user or ctx.user.guild_permissions.administrator:
-                    message = await ctx.respond(view=MuteView(ctx.channel), ephemeral=True)
-                    self.requested_message[ctx.channel_id] = message
+                user_claim = self.claimed[ctx.channel_id]
+                if user_claim == ctx.user or ctx.user.guild_permissions.administrator:
+                    try:
+                        await self.requested_message[ctx.channel_id].delete_original_message()
+                        message = await ctx.respond(view=MuteView(ctx.channel), ephemeral=True)
+                        self.requested_message[ctx.channel_id] = message
+                    except KeyError:
+                        message = await ctx.respond(view=MuteView(ctx.channel), ephemeral=True)
+                        self.requested_message[ctx.channel_id] = message
                 else:
                     await ctx.response.send_message("You are not the owner of this channel",ephemeral=True,delete_after=5.0)
             except KeyError:
@@ -161,31 +157,22 @@ class DnDManager(commands.Cog):
         else:
             await ctx.response.send_message("This is not a voice channel",ephemeral=True,delete_after=5.0)
     
-    @commands.Cog.listener("on_guild_channel_delete")
-    async def channel_delete(self, ctx: discord.abc.GuildChannel):
-        try:
-            self.claimed[ctx.id]
-            del self.claimed[ctx.id]
-            if isinstance(ctx, discord.VoiceChannel):
-                for member in ctx.members:
-                    if member.bot:
-                        continue
-                    await member.edit(deafen=False, mute=False)
-        except KeyError:
-            pass
-    
     @commands.Cog.listener("on_voice_state_update")
     async def channel_left(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-        if before.channel is not None and after.channel is not None:
+        if after.channel is not None:
             if before.channel != after.channel:
-                if before.channel.id in self.claimed.keys():
+                if not member.bot:
                     await member.edit(deafen=False, mute=False)
+
         if before.channel is not None:
             if before.channel.id in [*self.claimed]:
                 if member.id == self.claimed[before.channel.id].id and before.channel != after.channel:
                     del self.claimed[before.channel.id]
                     try:
-                        await self.requested_message[before.channel.id].delete_original_message()
+                        try:
+                            await self.requested_message[before.channel.id].delete_original_message()
+                        except discord.NotFound:
+                            pass
                         del self.requested_message[before.channel.id]
                     except KeyError:
                         pass
@@ -193,7 +180,23 @@ class DnDManager(commands.Cog):
                             if member.bot:
                                 continue
                             await member.edit(deafen=False, mute=False)
+        
+        # Edit the moderation message when someone enters the channel
+        if after.channel is not None:
+            try :
+                message = self.requested_message[after.channel.id]
+                await message.edit(view=MuteView(after.channel))
+            except KeyError:
+                pass
+        
+        # Edit the moderation message when someone leaves the channel
+        if before.channel is not None:
+            try:
+                message = self.requested_message[before.channel.id]
+                await message.edit(view=MuteView(before.channel))
+            except KeyError:
+                pass
 
 
 def setup(client: Bot):
-    client.add_cog(DnDManager(client))
+    client.add_cog(InVoiceModeration(client))
