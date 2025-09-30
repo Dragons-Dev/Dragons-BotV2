@@ -98,8 +98,11 @@ class InVoiceModeration(commands.Cog):
                     f"This channel is already claimed by {guild_claim.display_name}", ephemeral=True, delete_after=5.0
                 )
             except KeyError:
-                self.claimed[ctx.channel_id] = ctx.user
-                await ctx.response.send_message("You claimed this channel", ephemeral=True, delete_after=5.0)
+                if ctx.user in ctx.channel.members:
+                    self.claimed[ctx.channel_id] = ctx.user
+                    await ctx.response.send_message("You claimed this channel", ephemeral=True, delete_after=5.0)
+                else:
+                    await ctx.response.send_message("You cant claim a channel without being in it", ephemeral=True, delete_after=5.0)
         else:
             await ctx.response.send_message("This is not a voice channel", ephemeral=True, delete_after=5.0)
 
@@ -154,15 +157,20 @@ class InVoiceModeration(commands.Cog):
                     )
             except KeyError:
                 await ctx.response.send_message(
-                    "Channel is unclaimed. \nClaim this channel by using the /claim command",
+                    f"Channel is unclaimed. \nClaim this channel by using the {self.claim.mention} command",
                     ephemeral=True,
                     delete_after=5.0,
                 )
         else:
             await ctx.response.send_message("This is not a voice channel",ephemeral=True,delete_after=5.0)
     
+    
     @commands.Cog.listener("on_voice_state_update")
     async def channel_left(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """
+        This function removes the server applied mute and deafen, as soon as they join any channel with this status.
+        Additionaly if the owner leaves the channel, the channel becomes unclaimed and the server applied mute and deafen are removed
+        """
         if after.channel is not None:
             if before.channel != after.channel:
                 if not member.bot:
