@@ -2,8 +2,8 @@ import discord
 from discord.ext import commands
 import pycord.multicog as pycog
 
-import utils
-from utils import Bot, CustomLogger, Settings, SettingsEnum
+from utils import Bot, CustomLogger
+
 
 class Mute(discord.ui.Button):
     def __init__(self, user: discord.Member, ctx: discord.ApplicationContext):
@@ -30,6 +30,7 @@ class Mute(discord.ui.Button):
 
         await interaction.response.edit_message(view=self.view)
 
+
 class Deaf(discord.ui.Button):
     def __init__(self, user: discord.Member, ctx: discord.ApplicationContext):
         super().__init__(label="Deaf")
@@ -54,6 +55,7 @@ class Deaf(discord.ui.Button):
                 self.style = discord.ButtonStyle.red
         await interaction.response.edit_message(view=self.view)
 
+
 class MuteView(discord.ui.View):
     def __init__(self, channel_ctx: discord.VoiceChannel):
         super().__init__()
@@ -74,6 +76,7 @@ class MuteView(discord.ui.View):
             container.add_item(item=deaf)
             container.add_separator()
         self.add_item(container)
+
 
 class InVoiceModeration(commands.Cog):
     def __init__(self, client):
@@ -115,7 +118,7 @@ class InVoiceModeration(commands.Cog):
                 join2create = await self.client.db.get_temp_voice(ctx.channel)
                 is_channel_owner = False
                 if join2create is not None:
-                    is_channel_owner = (join2create.owner_id == ctx.user.id)
+                    is_channel_owner = join2create.owner_id == ctx.user.id
                 if user_claim == ctx.user or ctx.user.guild_permissions.administrator or is_channel_owner:
                     del self.claimed[ctx.channel_id]
                     try:
@@ -135,7 +138,7 @@ class InVoiceModeration(commands.Cog):
             except KeyError:
                 await ctx.response.send_message("Channel is unclaimed", ephemeral=True, delete_after=5.0)
         else:
-            await ctx.response.send_message("This is not a voice channel",ephemeral=True,delete_after=5.0)
+            await ctx.response.send_message("This is not a voice channel", ephemeral=True, delete_after=5.0)
 
     @pycog.subcommand("voicemod", independent=True)
     @commands.slash_command(name="moderate", description="moderate user in this channel")
@@ -189,18 +192,18 @@ class InVoiceModeration(commands.Cog):
                     except KeyError:
                         pass
                     for member in before.channel.members:
-                            if member.bot:
-                                continue
-                            await member.edit(deafen=False, mute=False)
-        
+                        if member.bot:
+                            continue
+                        await member.edit(deafen=False, mute=False)
+
         # Edit the moderation message when someone enters the channel
         if after.channel is not None:
-            try :
+            try:
                 message = self.requested_message[after.channel.id]
                 await message.edit(view=MuteView(after.channel))
             except KeyError:
                 pass
-        
+
         # Edit the moderation message when someone leaves the channel
         if before.channel is not None:
             try:
