@@ -172,7 +172,7 @@ class InVoiceModeration(commands.Cog):
     async def channel_left(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         """
         This function removes the server applied mute and deafen, as soon as they join any channel with this status.
-        Additionaly if the owner leaves the channel, the channel becomes unclaimed and the server applied mute and deafen are removed
+        Additionaly if the owner leaves the channel, the channel becomes unclaimed and the server applied mute and deafen are removed.
         """
         if after.channel is not None:
             if before.channel != after.channel:
