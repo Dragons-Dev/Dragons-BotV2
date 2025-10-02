@@ -473,6 +473,8 @@ class Join2Create(commands.Cog):
             before (discord.VoiceState): members voice state before
             after (discord.VoiceState): members voice state after
         """
+        if before.channel == after.channel:
+            return
         if after.channel is not None:
             join2create_setting = await self.client.db.get_setting(
                 setting=SettingsEnum.Join2CreateChannel, guild=member.guild
