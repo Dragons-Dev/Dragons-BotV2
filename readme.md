@@ -20,24 +20,26 @@ It will have many different features, including a dashboard.
 Keys have to be added into the config.py
 ```py
 # config.py
+from logging import DEBUG, INFO, WARNING
+
 DISCORD_API_KEY = ""
 # The token you get from discord for authorizing your bot. https://discord.com/developers/applications
 
+DATABASE_URL = "sqlite+aiosqlite:///data/content.sqlite"
+# The database you want to utilize. Check out https://www.sqlalchemy.org/ for more information
+# Default path is ./data/content.sqlite
+
 GOOGLE_API_KEY = ""
-# An optional value required to scan for harmful urls in messages
-# you'll have to create a project at googles cloud services and then add the safebrowsing api to it.
-# after that you'll get an api key to use it
+# An api key from Google, this is required in order to scan for harmful urls
 # https://console.cloud.google.com/apis/api/safebrowsing.googleapis.com
 
-DEBUG_GUILDS: list[int] = []
-# A debug guild. this is an optional value but if it's unset some features like modmail are not possible to use.
-# commands can take up to one hour to sync. most times it's taking ~2-3 minuets to sync and maybe a client restart.
-
 log_level = DEBUG
-# depending on the set value there are
-# logged   possible values are DEBUG; INFO; WARNING; ERROR; CRITICAL
+# the log level. this bot has built in logging. by modifying this value with one from the first import you change what's
+# logged
+discord_log_level = WARNING
+# the log level for discord. Lowering this may lead to huge logs.
 
-IPC_SECRET = ""
+IPC_SECRET = "top_secret"
 # this secret will be used to encrypt the communication between the bot and webinterface
 ```
 ### Python
