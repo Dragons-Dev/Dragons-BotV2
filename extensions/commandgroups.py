@@ -10,8 +10,6 @@ class CommandGroups(commands.Cog):
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
     mod = discord.SlashCommandGroup("mod", contexts={discord.InteractionContextType.guild})
-    track = discord.SlashCommandGroup("track", contexts={discord.InteractionContextType.guild})
-    join2create = discord.SlashCommandGroup("join2create", contexts={discord.InteractionContextType.guild})
 
 
 def setup(client):
