@@ -9,6 +9,12 @@ from utils import Bot, CustomLogger
 
 class TimedUser:
     def __init__(self, user: discord.Member, guild: discord.Guild):
+        """
+        A helper class to keep track of a user's time in a voice channel.
+        Args:
+            user: The discord.Member to keep track of.
+            guild: The guild the voice time is counted in.
+        """
         self.user = user
         self.guild = guild
         self.time = datetime.now()
