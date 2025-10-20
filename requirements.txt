@@ -5,7 +5,7 @@ better-ipc~=2.0.3
 chat_exporter~=2.8.4
 colorama==0.4.6
 feedparser~=6.0.12
-psutil~=7.1.0
+psutil~=7.1.1
 py-cord<=2.6.1
 pycord-multicog~=2.1.1
 SQLAlchemy~=2.0.43
