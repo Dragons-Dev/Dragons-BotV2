@@ -61,21 +61,25 @@ class MuteView(discord.ui.View):
         super().__init__()
         self.channel = channel_ctx
         self.user_in_channel = self.channel.members
-        container = discord.ui.Container()
-        container.add_separator()
-        for user in self.user_in_channel:
-            if user.bot:
-                continue
-            mute = discord.ui.Section(
-                discord.ui.TextDisplay(content=user.display_name), accessory=Mute(user, ctx=channel_ctx)
+        # container = discord.ui.Container()
+        # container.add_separator()
+        self.row = 0
+        for member in self.user_in_channel[:13]:  # 13 * 3 Components = 39, noch sicher
+            # Button mit Name (disabled, nur Anzeige)
+            name_button = discord.ui.Button(
+                label=member.display_name, style=discord.ButtonStyle.gray, disabled=True, row=self.row
             )
-            deaf = discord.ui.Section(
-                discord.ui.TextDisplay(content=user.display_name), accessory=Deaf(user, ctx=channel_ctx)
-            )
-            container.add_item(item=mute)
-            container.add_item(item=deaf)
-            container.add_separator()
-        self.add_item(container)
+
+            mute_button = Mute(user=member, ctx=self.channel)
+            mute_button.row = self.row
+
+            deafen_button = Deaf(user=member, ctx=self.channel)
+            deafen_button.row = self.row
+
+            self.add_item(name_button)
+            self.add_item(mute_button)
+            self.add_item(deafen_button)
+            self.row += 1
 
 
 class InVoiceModeration(commands.Cog):
