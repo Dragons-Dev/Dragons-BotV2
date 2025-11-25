@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from collections.abc import Sequence
 
 from utils import Bot, CustomLogger, SettingsEnum, checks, is_team
 
@@ -31,7 +32,7 @@ def value_choices(ctx: discord.AutocompleteContext) -> list[str]:
     values = []
     entered = ctx.value
     bot: Bot = ctx.bot
-    setting: str = ctx.options.items().mapping["setting"]  # access the setting
+    setting: str | None = ctx.options.items().mapping["setting"]  # access the setting
     if setting is None:
         return ["Please select a setting first"]
     elif setting.endswith("Role"):
@@ -114,11 +115,13 @@ class SettingsCog(commands.Cog):
             enum = SettingsEnum(enum_value)
             setting_value = await self.client.db.get_setting(setting=enum, guild=ctx.guild)
             if setting_value is None:
-                pass
+                continue
+            elif isinstance(setting_value, Sequence):
+                continue
             else:
                 embed.add_field(
                     name=enum.value,
-                    value=f"<@&{setting_value}>" if enum.value.endswith("Role") else f"<#{setting_value}>",
+                    value=f"<@&{setting_value.value}>" if enum.value.endswith("Role") else f"<#{setting_value.value}>",
                     inline=True,
                 )
         if len(embed.fields) == 0:
