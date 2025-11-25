@@ -14,7 +14,7 @@ from config import DATABASE_URL
 
 from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from ..logger import CustomLogger
-from .models import Base, BotStatus, Infractions, Join2Create, Modmail, Settings, UserStats
+from .models import Base, BotStatus, Infractions, Join2Create, Modmail, Settings, UserStats, EnabledCommands
 
 
 class ORMDataBase:
@@ -60,7 +60,7 @@ class ORMDataBase:
             guild (discord.Guild | None): The guild associated with the setting. If None, retrieves the setting for all guilds.
 
         Returns:
-            Sequence[Row[tuple[Settings]]] | None: The retrieved setting(s) or None if not found.
+            Sequence[Settings] | None: The retrieved setting(s) or None if not found.
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -364,4 +364,29 @@ class ORMDataBase:
                 if result is None:
                     return
                 await session.delete(result)
+                await session.commit()
+
+    async def is_command_enabled(self, guild: discord.Guild, command_name: str) -> bool:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(EnabledCommands).where(
+                    EnabledCommands.guild_id == guild.id, EnabledCommands.command_name == command_name
+                )
+                result: EnabledCommands | None = (await session.execute(query)).scalar_one_or_none()
+                if result is None:
+                    return True
+                return bool(result.enabled)
+
+    async def toggle_command(self, guild: discord.Guild, command_name: str) -> None:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(EnabledCommands).where(
+                    EnabledCommands.guild_id == guild.id, EnabledCommands.command_name == command_name
+                )
+                result: EnabledCommands | None = (await session.execute(query)).scalar_one_or_none()
+                if result is None:
+                    obj = EnabledCommands(guild_id=guild.id, command_name=command_name, enabled=False)
+                    session.add(obj)
+                else:
+                    result.enabled = not bool(result.enabled)
                 await session.commit()
