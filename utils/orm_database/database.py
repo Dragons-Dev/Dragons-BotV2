@@ -367,6 +367,17 @@ class ORMDataBase:
                 await session.commit()
 
     async def is_command_enabled(self, guild: discord.Guild, command_name: str) -> bool:
+        """
+        Checks if a specific command is enabled for a given guild.
+
+        Args:
+            guild: The Discord guild to check the command status for.
+            command_name: The name of the command to check.
+
+        Returns:
+            True if the command is enabled for the guild, or if no record exists (default enabled).
+            False if the command is explicitly disabled.
+        """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(EnabledCommands).where(
