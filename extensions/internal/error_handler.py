@@ -25,11 +25,7 @@ class ErrorHandler(commands.Cog):
             return
         self.logger.warning(f"Commandname: {ctx.command.name}   Exception: {exc}: {type(exc)}")
 
-        if (
-            isinstance(exc, discord.CheckFailure)
-            or isinstance(exc, commands.CheckAnyFailure)
-            or isinstance(exc, commands.CheckFailure)
-        ):  # all check failures
+        if isinstance(exc, discord.CheckFailure):
             await ctx.response.send_message(
                 embed=error_embed(
                     title="Check failure",
