@@ -1,10 +1,7 @@
 import discord
 from discord.ext import commands
 
-from utils import Bot, CommandDisabledError, CustomLogger
-from utils import InsufficientPermission
-
-
+from utils import Bot, CommandDisabledError, CustomLogger, InsufficientPermission
 def error_embed(title: str, description: str) -> discord.Embed:
     return discord.Embed(
         title=title,
