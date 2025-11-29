@@ -17,7 +17,9 @@ async def autocomplete_commands(ctx: discord.AutocompleteContext) -> list[str]:
     if guild is None:
         return ["You can't disable commands in DMs."]  # Should not happen due to context restriction
     all_commands = [
-        cmd.qualified_name for cmd in bot.walk_application_commands() if not isinstance(cmd, SlashCommandGroup)
+        cmd.qualified_name
+        for cmd in bot.walk_application_commands()
+        if not isinstance(cmd, SlashCommandGroup) and cmd.name != "toggle-command"
     ]
     filtered = []
     if ctx.value:  # all_commands filter SlashCommandGroups because they are not executable commands
