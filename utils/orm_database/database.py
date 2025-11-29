@@ -407,7 +407,7 @@ class ORMDataBase:
                 if result is None:
                     obj = EnabledCommands(guild_id=guild.id, command_name=command_name, enabled=False)
                     session.add(obj)
-                    new_state = False  # new_state must be false because it's not in the db and thus enabled
+                    new_state = False  # Command not in DB means it was enabled; now disabling it
                 else:
                     result.enabled = not bool(result.enabled)
                     new_state = bool(result.enabled)
