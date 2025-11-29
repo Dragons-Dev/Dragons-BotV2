@@ -2,7 +2,7 @@ from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
-__all__ = ["Base", "Settings", "Infractions", "Join2Create", "Modmail", "UserStats", "BotStatus"]
+__all__ = ["Base", "Settings", "Infractions", "Join2Create", "Modmail", "UserStats", "BotStatus", "EnabledCommands"]
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -83,3 +83,13 @@ class BotStatus(Base):
         return (
             f"<BotStatus(status={self.status}, activity_type={self.activity_type}, activity_name={self.activity_name})>"
         )
+
+
+class EnabledCommands(Base):
+    __tablename__ = "enabledcommands"
+    guild_id = Column(Integer, primary_key=True)
+    command_name = Column(String, primary_key=True)
+    enabled = Column(Boolean)
+
+    def __repr__(self):
+        return f"<EnabledCommands(guild_id={self.guild_id}, command_name={self.command_name}, enabled={self.enabled})>"

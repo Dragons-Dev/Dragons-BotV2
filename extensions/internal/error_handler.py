@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from utils import Bot, CommandDisabledError, CustomLogger
+from utils import Bot, CommandDisabledError, CustomLogger, InsufficientPermission
 
 
 def error_embed(title: str, description: str) -> discord.Embed:
@@ -38,6 +38,14 @@ class ErrorHandler(commands.Cog):
                 embed=error_embed(
                     title="Command disabled",
                     description=f"The command `/{ctx.command.qualified_name}` is disabled in this guild.",
+                ),
+                ephemeral=True,
+            )
+        elif isinstance(exc, InsufficientPermission):
+            await ctx.response.send_message(
+                embed=error_embed(
+                    title="Insufficient Permission",
+                    description=str(exc),
                 ),
                 ephemeral=True,
             )
