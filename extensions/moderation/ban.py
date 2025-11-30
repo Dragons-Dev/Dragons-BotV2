@@ -6,6 +6,7 @@ import pycord.multicog as pycog
 from discord.ext import commands
 from discord.utils import format_dt, get_or_fetch
 
+from extensions.internal.error_handler import error_embed
 from utils import (
     Bot,
     ButtonConfirm,
@@ -15,6 +16,7 @@ from utils import (
     SettingsEnum,
     is_team,
 )
+from utils import CommandDisabledError
 
 
 class Ban(commands.Cog):
@@ -95,14 +97,14 @@ class Ban(commands.Cog):
     @ban.error
     async def ban_error_handler(self, ctx: discord.ApplicationContext, exc: discord.ApplicationCommandError):
         if isinstance(exc, discord.ApplicationCommandInvokeError):
-            try:  # this most likely fails if we try to invoke the warn command with a user_id
+            try:  # this most likely fails if we try to invoke the ban command with a user_id
                 member_id = ctx.selected_options[0].get(
                     "value"
                 )  # this is heavily dependent on the order returned by Discord
                 reason = ctx.selected_options[1].get("value")  # this might be the first point of failure
                 member = await ctx.bot.get_or_fetch_user(member_id)
                 await ctx.invoke(self.ban, member=member, reason=reason)
-            except Exception as e:  # we can't invoke the warn command or can't fetch/get the user
+            except Exception as e:  # we can't invoke the ban command or can't fetch/get the user
                 try:
                     self.logger.error(
                         f"Failed to invoke the ban command with "
@@ -112,7 +114,7 @@ class Ban(commands.Cog):
                         f"Reason: {reason}",
                         exc_info=e,
                     )
-                except Exception as f:  # we can't get the parameters for the warn command
+                except Exception as f:  # we can't get the parameters for the ban command
                     self.logger.critical(f"Failed to get the parameters for the ban command: {f}", exc_info=f)
             finally:
                 await ctx.response.send_message(
@@ -124,6 +126,14 @@ class Ban(commands.Cog):
                     ),
                     ephemeral=True,
                 )
+        elif isinstance(exc, CommandDisabledError):
+            await ctx.response.send_message(
+                embed=error_embed(
+                    title="Command disabled",
+                    description=f"The command `/{ctx.command.qualified_name}` is disabled in this guild.",
+                ),
+                ephemeral=True,
+            )
         else:
             raise exc
 

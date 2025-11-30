@@ -6,6 +6,7 @@ import pycord.multicog as pycog
 from discord.ext import commands
 from discord.utils import format_dt, get_or_fetch
 
+from extensions.internal.error_handler import error_embed
 from utils import (
     Bot,
     ButtonConfirm,
@@ -15,6 +16,7 @@ from utils import (
     SettingsEnum,
     is_team,
 )
+from utils import CommandDisabledError
 
 
 class Kick(commands.Cog):
@@ -77,12 +79,9 @@ class Kick(commands.Cog):
                     )
                 if log_channel:
                     await log_channel.send(embed=member_em)
-                    log_channel: discord.TextChannel = await get_or_fetch(
-                        ctx.guild, "channel", setting.value, default=None
-                    )
             await ctx.followup.send(
                 embed=em,
-                view=ButtonInfo("A copy of this was sent to the kicked member and the log channel!"),
+                view=ButtonInfo("A copy of this was sent to the warned member and the log channel!"),
                 ephemeral=True,
             )
 
@@ -92,6 +91,14 @@ class Kick(commands.Cog):
             return await ctx.response.send_message(
                 embed=discord.Embed(
                     title="Error", description="This user is no member of this guild.", color=discord.Color.brand_red()
+                ),
+                ephemeral=True,
+            )
+        elif isinstance(exc, CommandDisabledError):
+            await ctx.response.send_message(
+                embed=error_embed(
+                    title="Command disabled",
+                    description=f"The command `/{ctx.command.qualified_name}` is disabled in this guild.",
                 ),
                 ephemeral=True,
             )
