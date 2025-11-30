@@ -6,6 +6,7 @@ import pycord.multicog as pycog
 from discord.ext import commands
 from discord.utils import format_dt, get_or_fetch
 
+from extensions.internal.error_handler import error_embed
 from utils import (
     Bot,
     ButtonConfirm,
@@ -15,6 +16,7 @@ from utils import (
     SettingsEnum,
     is_team,
 )
+from utils import CommandDisabledError
 
 
 class Warn(commands.Cog):
@@ -123,6 +125,14 @@ class Warn(commands.Cog):
                     ),
                     ephemeral=True,
                 )
+        elif isinstance(exc, CommandDisabledError):
+            await ctx.response.send_message(
+                embed=error_embed(
+                    title="Command disabled",
+                    description=f"The command `/{ctx.command.qualified_name}` is disabled in this guild.",
+                ),
+                ephemeral=True,
+            )
         else:
             raise exc
 
