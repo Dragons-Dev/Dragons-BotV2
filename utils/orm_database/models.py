@@ -1,4 +1,7 @@
+import datetime
+
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Date
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
@@ -64,11 +67,12 @@ class UserStats(Base):
     __tablename__ = "userstats"
     user_id = Column(Integer, primary_key=True)
     stat_type = Column(String, primary_key=True)
-    value = Column(Integer, primary_key=True)
+    value = Column(Integer)
     guild_id = Column(Integer, primary_key=True)
+    date = Column(Date, default=datetime.date.today, primary_key=True)
 
     def __repr__(self):
-        return f"<UserStats(user_id={self.user_id}, stat_type={self.stat_type}, value={self.value}, guild={self.guild_id})>"
+        return f"<UserStats(user_id={self.user_id}, stat_type={self.stat_type}, value={self.value}, guild={self.guild_id}, date={self.date})>"
 
 
 class BotStatus(Base):

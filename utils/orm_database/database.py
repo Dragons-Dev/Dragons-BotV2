@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, date
 
 import discord
 from sqlalchemy import select
@@ -246,15 +246,26 @@ class ORMDataBase:
                 await session.delete(result)
                 await session.commit()
 
-    async def update_user_stat(self, user: discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild):
+    async def update_user_stat(
+        self, user: discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild, date_: date | None = None
+    ):
+        if date_ is None:
+            date_ = date.today()
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(UserStats).where(
-                    UserStats.user_id == user.id, UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id
+                    UserStats.user_id == user.id,
+                    UserStats.stat_type == stat_type.value,
+                    UserStats.guild_id == guild.id,
+                    UserStats.date == date_,
                 )
                 result = (await session.execute(query)).scalar_one_or_none()
                 if result is None:
-                    session.add(UserStats(user_id=user.id, stat_type=stat_type.value, value=value, guild_id=guild.id))
+                    session.add(
+                        UserStats(
+                            user_id=user.id, stat_type=stat_type.value, value=value, guild_id=guild.id, date=date_
+                        )
+                    )
                 else:
                     result.value += value
                 await session.commit()
