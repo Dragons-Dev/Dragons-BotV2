@@ -22,7 +22,6 @@ class ErrorHandler(commands.Cog):
     async def app_cmd_error(self, ctx: discord.ApplicationContext, exc: discord.DiscordException):
         if ctx.command.has_error_handler():
             return
-        self.logger.warning(f"Commandname: {ctx.command.name}   Exception: {exc}: {type(exc)}")
 
         if isinstance(exc, discord.CheckFailure):
             await ctx.response.send_message(
@@ -50,6 +49,7 @@ class ErrorHandler(commands.Cog):
                 ephemeral=True,
             )
         else:
+            self.logger.warning(f"Commandname: {ctx.command.name}   Exception: {exc}: {type(exc)}")
             raise exc
 
 

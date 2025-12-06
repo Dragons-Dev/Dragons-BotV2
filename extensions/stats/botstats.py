@@ -118,8 +118,9 @@ class BotStats(commands.Cog):
             return
         await self.client.db.update_user_stat(msg.author, utils.StatTypeEnum.MessagesSent, 1, msg.guild)
 
-    @tasks.loop(minutes=5)
-    async def save_voice_to_db(self) -> None:
+    # @tasks.loop(time=time(23, 59, 50))
+    @tasks.loop(minutes=5)  # TODO implement some logic, so if the next loop passes 23:59:50, it sets the next loop
+    async def save_voice_to_db(self) -> None:  # TODO  to execute at that time, after that switch it back!
         """
         Saves the voice time of all users in the voice_time_cache to the database. And resets their time in the cache.
         Returns: None
