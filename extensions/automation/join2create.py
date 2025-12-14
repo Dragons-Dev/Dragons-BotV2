@@ -410,7 +410,6 @@ class VoiceBoard(ui.View):
             button.callback = self.set_callback
             self.add_item(button)
 
-
     async def set_callback(self, interaction: discord.Interaction):
         if interaction.custom_id == "j2c__claim_ownership_button":
             await self._claim_channel(interaction)
