@@ -11,21 +11,21 @@ class Mute(discord.ui.Button):
         self.channel_ctx = ctx
         self.user = user
         if self.user.voice.mute:
-            self.emoji = ":speak_no_evil:"
+            self.emoji = "🙊"
             self.style = discord.ButtonStyle.red
         else:
-            self.emoji = ":monkey_face:"
+            self.emoji = "🐵"
             self.style = discord.ButtonStyle.green
 
     async def callback(self, interaction):
         if self.user.voice.channel == self.channel_ctx:
             if self.user.voice.mute:
                 await self.user.edit(mute=False)
-                self.emoji = ":monkey_face:"
+                self.emoji = "🐵"
                 self.style = discord.ButtonStyle.green
             else:
                 await self.user.edit(mute=True)
-                self.emoji = ":speak_no_evil:"
+                self.emoji = "🙊"
                 self.style = discord.ButtonStyle.red
 
         await interaction.response.edit_message(view=self.view)
@@ -37,21 +37,21 @@ class Deaf(discord.ui.Button):
         self.channel_ctx = ctx
         self.user = user
         if self.user.voice.deaf:
-            self.emoji = ":hear_no_evil:"
+            self.emoji = "🙉"
             self.style = discord.ButtonStyle.red
         else:
-            self.emoji = ":monkey_face:"
+            self.emoji = "🐵"
             self.style = discord.ButtonStyle.green
 
     async def callback(self, interaction):
         if self.user.voice.channel == self.channel_ctx:
             if self.user.voice.deaf:
                 await self.user.edit(deafen=False)
-                self.emoji = ":monkey_face:"
+                self.emoji = "🐵"
                 self.style = discord.ButtonStyle.green
             else:
                 await self.user.edit(deafen=True)
-                self.emoji = ":hear_no_evil:"
+                self.emoji = "🙉"
                 self.style = discord.ButtonStyle.red
         await interaction.response.edit_message(view=self.view)
 
