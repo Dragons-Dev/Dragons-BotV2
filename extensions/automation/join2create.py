@@ -335,6 +335,7 @@ class VoiceBoard(ui.View):
     def __init__(self, channel: discord.VoiceChannel = None):
         super().__init__(timeout=None)
         self.channel = channel
+
         self.button_names = {
             "j2c__user_limit_button": "Set User Limit",
             "j2c__claim_ownership_button": "Claim Ownership",
@@ -346,72 +347,69 @@ class VoiceBoard(ui.View):
             "j2c__bitrate_button": "Change bitrate",
         }
 
-        container = ui.Container(color=discord.Color.blue(), id=100)
-
-        user_limit_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary,
-            label="Set User Limit",
-            emoji="🔢",
-            custom_id="j2c__user_limit_button",
-            id=101,
-        )
-        claim_ownership_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary,
-            label="Claim Ownership",
-            emoji="👑",
-            custom_id="j2c__claim_ownership_button",
-            id=102,
-        )
-        blacklist_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary,
-            label="Unban Roles",
-            emoji="🎫",
-            custom_id="j2c__role_unban_button",
-            id=103,
-        )
-        whitelist_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary,
-            label="Ban Roles",
-            emoji="🚫",
-            custom_id="j2c__role_ban_button",
-            id=104,
-        )
-        unban_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, label="Unban a user", emoji="💌", custom_id="j2c__unban_button", id=105
-        )
-        ban_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary, label="Ban a user", emoji="🔨", custom_id="j2c__ban_button", id=106
-        )
-        bitrate_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary,
-            label="Change Bitrate",
-            emoji="👾",
-            custom_id="j2c__bitrate_button",
-            id=107,
-        )
-        reset_permission_button = discord.ui.Button(
-            style=discord.ButtonStyle.primary,
-            label="Reset Permission",
-            emoji="🔄",
-            custom_id="j2c__reset_permission_button",
-            id=108,
-        )
-
         buttons = [
-            user_limit_button,
-            claim_ownership_button,
-            reset_permission_button,
-            blacklist_button,
-            whitelist_button,
-            unban_button,
-            ban_button,
-            bitrate_button,
+            discord.ui.Button(
+                label="Set User Limit",
+                emoji="🔢",
+                style=discord.ButtonStyle.primary,
+                custom_id="j2c__user_limit_button",
+                row=0,
+            ),
+            discord.ui.Button(
+                label="Claim Ownership",
+                emoji="👑",
+                style=discord.ButtonStyle.primary,
+                custom_id="j2c__claim_ownership_button",
+                row=0,
+            ),
+            discord.ui.Button(
+                label="Reset Permission",
+                emoji="🔄",
+                style=discord.ButtonStyle.primary,
+                custom_id="j2c__reset_permission_button",
+                row=1,
+            ),
+            discord.ui.Button(
+                label="Unban Roles",
+                emoji="🎫",
+                style=discord.ButtonStyle.primary,
+                custom_id="j2c__role_unban_button",
+                row=1,
+            ),
+            discord.ui.Button(
+                label="Ban Roles",
+                emoji="🚫",
+                style=discord.ButtonStyle.primary,
+                custom_id="j2c__role_ban_button",
+                row=2,
+            ),
+            discord.ui.Button(
+                label="Unban a user",
+                emoji="💌",
+                style=discord.ButtonStyle.primary,
+                custom_id="j2c__unban_button",
+                row=2,
+            ),
+            discord.ui.Button(
+                label="Ban a user",
+                emoji="🔨",
+                style=discord.ButtonStyle.primary,
+                custom_id="j2c__ban_button",
+                row=3,
+            ),
+            discord.ui.Button(
+                label="Change Bitrate",
+                emoji="👾",
+                style=discord.ButtonStyle.primary,
+                custom_id="j2c__bitrate_button",
+                row=3,
+            ),
         ]
+
         for button in buttons:
             button.callback = self.set_callback
-            container.add_item(button)
-            container.add_item(ui.Separator(divider=False))
-        self.add_item(container)
+            self.add_item(button)
+
 
     async def set_callback(self, interaction: discord.Interaction):
         if interaction.custom_id == "j2c__claim_ownership_button":
