@@ -64,7 +64,11 @@ class MuteView(discord.ui.View):
         # container = discord.ui.Container()
         # container.add_separator()
         self.row = 0
-        for member in self.user_in_channel[:13]:  # 13 * 3 Components = 39, noch sicher
+        for member in self.user_in_channel[:5]:  # Mit dem neuen Kram ohne Container sind nur noch 5 Rows möglich
+            # Mögliche Erweiterungen wären:
+            # mehrere Nachrichten
+            # Page system mit umblättern
+            # Nicht mehr alle Nutzer anzeigen sondern nur "Spieler" die sich vorher angemeldet haben
             # Button mit Name (disabled, nur Anzeige)
             name_button = discord.ui.Button(
                 label=member.display_name, style=discord.ButtonStyle.gray, disabled=True, row=self.row
