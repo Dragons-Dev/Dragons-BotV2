@@ -8,4 +8,4 @@ feedparser~=6.0.12
 psutil~=7.1.0
 py-cord<=2.7.0rc1
 pycord-multicog~=2.1.1
-SQLAlchemy~=2.0.43
+SQLAlchemy~=2.0.45
