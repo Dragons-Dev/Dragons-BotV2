@@ -1,4 +1,5 @@
 from logging import DEBUG, INFO
+from zoneinfo import ZoneInfo
 
 DISCORD_API_KEY = ""
 # The token you get from discord for authorizing your bot. https://discord.com/developers/applications
@@ -26,3 +27,5 @@ IPC_SECRET = ""
 SPOTIFY_CLIENT_ID = ""
 SPOTIFY_CLIENT_SECRET = ""
 # get from https://developer.spotify.com/dashboard/
+
+SERVER_TZ = ZoneInfo("Europe/Berlin")
