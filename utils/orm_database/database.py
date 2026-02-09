@@ -246,7 +246,9 @@ class ORMDataBase:
                 await session.delete(result)
                 await session.commit()
 
-    async def update_user_stat(self, user: discord.User | discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild):
+    async def update_user_stat(
+        self, user: discord.User | discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild
+    ):
         """
         Upsert a stat for the user. Automatically creates a new date if necessary.
         :param user: the user to upsert the stat for
@@ -262,7 +264,7 @@ class ORMDataBase:
                     and_(
                         UserStats.user_id == user.id,
                         UserStats.stat_type == stat_type.value,
-                        UserStats.guild_id == guild.id
+                        UserStats.guild_id == guild.id,
                     )
                 )
                 result: UserStats | None = (await session.execute(query)).scalar_one_or_none()
@@ -278,8 +280,9 @@ class ORMDataBase:
                 else:
                     result.value += value
 
-
-    async def get_user_stat_days(self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild, days_back: int) -> Sequence[UserStats]:
+    async def get_user_stat_days(
+        self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild, days_back: int
+    ) -> Sequence[UserStats]:
         """
         Returns the stats for the specified date range
         :param user: the User to retrieve the stats for
@@ -290,18 +293,24 @@ class ORMDataBase:
         """
         start_date = date.today() - timedelta(days=days_back)
         async with self.AsyncSessionLocal() as session:
-            query = select(UserStats).where(
-                and_(
-                    UserStats.user_id == user.id,
-                    UserStats.stat_type == stat_type.value,
-                    UserStats.guild_id == guild.id,
-                    UserStats.day >= start_date
+            query = (
+                select(UserStats)
+                .where(
+                    and_(
+                        UserStats.user_id == user.id,
+                        UserStats.stat_type == stat_type.value,
+                        UserStats.guild_id == guild.id,
+                        UserStats.day >= start_date,
+                    )
                 )
-            ).order_by(UserStats.day.desc())
+                .order_by(UserStats.day.desc())
+            )
             result = (await session.execute(query)).scalars().all()
             return result
 
-    async def get_user_stat_total(self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild) -> int:
+    async def get_user_stat_total(
+        self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild
+    ) -> int:
         """
         Returns an int consisting of all values this user has for the stat.
         :param user: the User to retrieve the stats for
@@ -312,9 +321,7 @@ class ORMDataBase:
         async with self.AsyncSessionLocal() as session:
             query = select(func.sum(UserStats.value)).where(
                 and_(
-                    UserStats.user_id == user.id,
-                    UserStats.stat_type == stat_type.value,
-                    UserStats.guild_id == guild.id
+                    UserStats.user_id == user.id, UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id
                 )
             )
             result = (await session.execute(query)).scalar_one_or_none()

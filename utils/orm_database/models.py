@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, func, Date, UniqueConstraint, BigInteger
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Date, UniqueConstraint, BigInteger
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
@@ -73,7 +73,7 @@ class UserStats(Base):
 
     __table_args__ = (
         # Prevents duplicate entries for the same day and user
-        UniqueConstraint('user_id', 'guild_id', 'stat_type', 'day', name='_user_guild_stat_day_uc'),
+        UniqueConstraint("user_id", "guild_id", "stat_type", "day", name="_user_guild_stat_day_uc"),
     )
 
     def __repr__(self):
