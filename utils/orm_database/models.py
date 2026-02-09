@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from datetime import date
+
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, func, Date, UniqueConstraint, BigInteger
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
@@ -62,10 +64,17 @@ class Modmail(Base):
 
 class UserStats(Base):
     __tablename__ = "userstats"
-    user_id = Column(Integer, primary_key=True)
-    stat_type = Column(String, primary_key=True)
-    value = Column(Integer, primary_key=True)
-    guild_id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, nullable=False)
+    guild_id = Column(BigInteger, nullable=False)
+    stat_type = Column(String, nullable=False)
+    value = Column(Integer, default=0)
+    day = Column(Date, default=date.today, nullable=False)
+
+    __table_args__ = (
+        # Prevents duplicate entries for the same day and user
+        UniqueConstraint('user_id', 'guild_id', 'stat_type', 'day', name='_user_guild_stat_day_uc'),
+    )
 
     def __repr__(self):
         return f"<UserStats(user_id={self.user_id}, stat_type={self.stat_type}, value={self.value}, guild={self.guild_id})>"
