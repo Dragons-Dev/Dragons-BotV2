@@ -13,5 +13,6 @@ class CommandGroups(commands.Cog):
     join2create = discord.SlashCommandGroup("join2create", contexts={discord.InteractionContextType.guild})
     user = discord.SlashCommandGroup("user", contexts={discord.InteractionContextType.guild})
 
+
 def setup(client):
     client.add_cog(CommandGroups(client))
