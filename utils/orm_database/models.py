@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, ForeignKey
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
@@ -93,3 +93,23 @@ class EnabledCommands(Base):
 
     def __repr__(self):
         return f"<EnabledCommands(guild_id={self.guild_id}, command_name={self.command_name}, enabled={self.enabled})>"
+
+class Events(Base):
+    __tablename__ = "Events"
+    event_id = Column(String, primary_key=True)
+    host = Column(Integer)
+    event_name = Column(String)
+    time = Column(DateTime(timezone=True))
+    reminders = Column(String)
+
+    def __repr__(self):
+        return f"<{self.__tablename__}(event_id={self.event_id}, host={self.host}, event_name={self.event_name}, time={self.time}, reminders={self.reminders})>"
+    
+class Confirmation(Base):
+    __tablename__ = "Confirmation"
+    event_id = Column(String, ForeignKey("Events.event_id"), primary_key=True)
+    user_id = Column(Integer, primary_key=True)
+    confirmation = Column(Boolean, nullable=True)
+
+    def __repr__(self):
+        return f"<{self.__tablename__}(event_id={self.event_id}, user_id={self.user_id}, confirmation={self.confirmation})>"
