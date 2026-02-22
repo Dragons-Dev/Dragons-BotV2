@@ -26,16 +26,16 @@ class InfractionButton(discord.ui.Button):
             )
         else:
             for index, i in enumerate(infraction):
-                if index >= 5:  # limit to 29 (+1) to not trigger discords message limit (40 components)
-                    continue
-                else:
-                    container.add_text(
-                        f"**Case ID:** {i.case_id}\n"
-                        f"**Infraction:** {i.infraction}\n"
-                        f"**Reason:** {i.reason}\n"
-                        f"**Date:** {format_dt(i.date, style='D')}\n"
-                    )
-            container.add_text(f"**And {len(infraction) - 5} more...**")
+                if index >= 5:  # limit to 5 displayed infractions
+                    break
+                container.add_text(
+                    f"**Case ID:** {i.case_id}\n"
+                    f"**Infraction:** {i.infraction}\n"
+                    f"**Reason:** {i.reason}\n"
+                    f"**Date:** {format_dt(i.date, style='D')}\n"
+                )
+            if len(infraction) > 5:
+                container.add_text(f"**And {len(infraction) - 5} more...**")
         await interaction.response.send_message(view=discord.ui.DesignerView(container), ephemeral=True)
 
 
