@@ -6,6 +6,41 @@ from pycord import multicog as pycog
 from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum, is_team
 
 
+class InfractionButton(discord.ui.Button):
+    def __init__(self, client: Bot, target: discord.Member):
+        self.client = client
+        self.target = target
+        super().__init__(label="View Infraction", style=discord.ButtonStyle.red)
+
+    async def callback(self, interaction: discord.Interaction):
+        # Fetch the infraction details from the database using the infraction_id
+        infraction = await self.client.db.get_infraction(None, self.target, self.target.guild)
+        container = discord.ui.Container(color=discord.Color.brand_red())
+        container.add_text(f"## Infractions for {self.target.global_name or self.target.name}")
+        if len(infraction) == 1:
+            container.add_text(
+                f"**Case ID:** {infraction[0].case_id}\n"
+                f"**Infraction:** {infraction[0].infraction}\n"
+                f"**Reason:** {infraction[0].reason}\n"
+                f"**Date:** {format_dt(infraction[0].date, style='D')}\n"
+            )
+        else:
+            for index, i in enumerate(infraction):
+                if index >= 5:  # limit to 29 (+1) to not trigger discords message limit (40 components)
+                    continue
+                else:
+                    container.add_text(
+                        f"**Case ID:** {i.case_id}\n"
+                        f"**Infraction:** {i.infraction}\n"
+                        f"**Reason:** {i.reason}\n"
+                        f"**Date:** {format_dt(i.date, style='D')}\n"
+                    )
+            container.add_text(
+                f"**And {len(infraction) - 5} more...**"
+            )
+        await interaction.response.send_message(view=discord.ui.DesignerView(container), ephemeral=True)
+
+
 class UserInfo(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
@@ -27,26 +62,18 @@ class UserInfo(commands.Cog):
         target = cmd_member or ctx.author  # If no member is provided, use the command author as the target
         member = await ctx.guild.get_or_fetch(discord.Member, target.id, None)  # get the member object to cache
         team_role = await self.client.db.get_setting(SettingsEnum.TeamRole, ctx.guild)
+
         container = discord.ui.Container()
         container.add_section(
-                discord.ui.TextDisplay(content=f"## {member.global_name} Overview"),
+                discord.ui.TextDisplay(content=f"## {member.global_name or member.name} Overview"),
                 accessory=discord.ui.Thumbnail(
                 url=(member.avatar or member.default_avatar).url,
-            ),
+            ), # in case the member doesn't have a global name use the username, same for the avatar
         )
-
-        test = await ctx.guild.get_or_fetch(discord.Role, team_role.value, None)  # get the team role to cache
-        print(test)
-        print(test.members)
-        print(team_role)
-        print([r.id for r in member.roles])
-        print(member.roles)
-        print(((0 if not team_role else team_role.value) in [r.id for r in member.roles]))
-        print(ctx.author.get_role(team_role.value))
 
         if (
                 ctx.author == target or
-                ((0 if not team_role else team_role.value) in [r.id for r in member.roles]) or
+                ((0 if not team_role else team_role.value) in [r.id for r in ctx.author.roles]) or
                 ctx.author.guild_permissions.administrator or ctx.author.guild_permissions.manage_guild
         ):
             container.add_separator()
@@ -61,7 +88,15 @@ class UserInfo(commands.Cog):
                 f"Commands used ⚡: {commands_used or '0'}\n"
                 f"Infractions 🚨: {len(infractions) if infractions else '0'}"
             )
+            if infractions:
+                container.add_section(
+                    discord.ui.TextDisplay(content=f"See all infractions for this user"),
+                    accessory=InfractionButton(client=self.client, target=target)
+                )
         container.add_text(
+            f"User: {member.mention}\n"
+            f"User ID: {member.id}\n"
+            f"Top Role: {member.top_role.mention}\n"
             f"Joined server on: {format_dt(member.joined_at, style='D')}\n"
             f"Account created on: {format_dt(member.created_at, style='D')}"
         )
