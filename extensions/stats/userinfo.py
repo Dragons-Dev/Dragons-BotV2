@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from discord.utils import format_dt, get_or_fetch
+from discord.utils import format_dt
 from pycord import multicog as pycog
 
 from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum, is_team
