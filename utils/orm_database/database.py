@@ -327,7 +327,9 @@ class ORMDataBase:
             result = (await session.execute(query)).scalar_one_or_none()
             return result
 
-    async def delete_user_stats(self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None) -> None:
+    async def delete_user_stats(
+        self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None
+    ) -> None:
         """
         Deletes all stats of a user for a specific stat type and guild.
         :param user: the User to delete the stats for
@@ -342,7 +344,7 @@ class ORMDataBase:
                         and_(
                             UserStats.user_id == user.id,
                             UserStats.stat_type == stat_type.value,
-                            UserStats.guild_id == guild.id
+                            UserStats.guild_id == guild.id,
                         )
                     )
                 if user and not guild:
@@ -354,10 +356,7 @@ class ORMDataBase:
                     )
                 if not user and guild:
                     query = select(UserStats).where(
-                        and_(
-                            UserStats.stat_type == stat_type.value,
-                            UserStats.guild_id == guild.id
-                        )
+                        and_(UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id)
                     )
                 result = (await session.execute(query)).scalars().all()
                 for stat in result:

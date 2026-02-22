@@ -35,9 +35,7 @@ class InfractionButton(discord.ui.Button):
                         f"**Reason:** {i.reason}\n"
                         f"**Date:** {format_dt(i.date, style='D')}\n"
                     )
-            container.add_text(
-                f"**And {len(infraction) - 5} more...**"
-            )
+            container.add_text(f"**And {len(infraction) - 5} more...**")
         await interaction.response.send_message(view=discord.ui.DesignerView(container), ephemeral=True)
 
 
@@ -56,7 +54,7 @@ class UserInfo(commands.Cog):
         description="The member to get information about.",
         required=False,
         input_type=discord.Member,
-        parameter_name="cmd_member"
+        parameter_name="cmd_member",
     )
     async def slash_test_command(self, ctx: discord.ApplicationContext, cmd_member: discord.Member):
         target = cmd_member or ctx.author  # If no member is provided, use the command author as the target
@@ -65,8 +63,8 @@ class UserInfo(commands.Cog):
 
         container = discord.ui.Container()
         container.add_section(
-                discord.ui.TextDisplay(content=f"## {member.global_name or member.name} Overview"),
-                accessory=discord.ui.Thumbnail(
+            discord.ui.TextDisplay(content=f"## {member.global_name or member.name} Overview"),
+            accessory=discord.ui.Thumbnail(
                 url=(member.avatar or member.default_avatar).url,
             ),
         )
@@ -84,15 +82,15 @@ class UserInfo(commands.Cog):
             commands_used = await self.client.db.get_user_stat_total(target, StatTypeEnum.CommandsUsed, ctx.guild)
             infractions = await self.client.db.get_infraction(None, target, ctx.guild)
             container.add_text(
-                f"Voice time 🎤: {sec_to_readable((voice_time or '0'))}\n"
+                f"Voice time 🎤: {sec_to_readable(voice_time or '0')}\n"
                 f"Messages sent 💬: {messages_sent or '0'}\n"
                 f"Commands used ⚡: {commands_used or '0'}\n"
                 f"Infractions 🚨: {len(infractions) if infractions else '0'}"
             )
             if infractions:
                 container.add_section(
-                    discord.ui.TextDisplay(content=f"See all infractions for this user"),
-                    accessory=InfractionButton(client=self.client, target=target)
+                    discord.ui.TextDisplay(content="See all infractions for this user"),
+                    accessory=InfractionButton(client=self.client, target=target),
                 )
         container.add_text(
             f"User: {member.mention}\n"
@@ -103,6 +101,7 @@ class UserInfo(commands.Cog):
         )
 
         await ctx.response.send_message(view=discord.ui.DesignerView(container), ephemeral=True)
+
 
 def setup(client):
     client.add_cog(UserInfo(client))
