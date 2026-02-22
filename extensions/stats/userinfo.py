@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord.utils import format_dt
 from pycord import multicog as pycog
 
-from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum, is_team
+from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum
 
 
 class InfractionButton(discord.ui.Button):
@@ -68,13 +68,14 @@ class UserInfo(commands.Cog):
                 discord.ui.TextDisplay(content=f"## {member.global_name or member.name} Overview"),
                 accessory=discord.ui.Thumbnail(
                 url=(member.avatar or member.default_avatar).url,
-            ), # in case the member doesn't have a global name use the username, same for the avatar
+            ),
         )
 
         if (
-                ctx.author == target or
-                ((0 if not team_role else team_role.value) in [r.id for r in ctx.author.roles]) or
-                ctx.author.guild_permissions.administrator or ctx.author.guild_permissions.manage_guild
+            ctx.author == target
+            or ((0 if not team_role else team_role.value) in [r.id for r in member.roles])
+            or ctx.author.guild_permissions.administrator
+            or ctx.author.guild_permissions.manage_guild
         ):
             container.add_separator()
             # Database calls
