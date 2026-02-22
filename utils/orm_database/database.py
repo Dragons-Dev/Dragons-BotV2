@@ -470,6 +470,22 @@ class ORMDataBase:
                 )
                 users_ids = (await session.execute(query)).scalars().all()
                 return users_ids
+    
+    async def get_all_confirmations_for_event(self, *, event_id: str) -> list[int]:
+        """
+        Gets all user that were invited to the event 
+        Args:
+            event_id: ID of the event
+
+        Returns: List of all users that were invited
+        """
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(Confirmation.user_id).where(
+                    Confirmation.event_id == event_id
+                )
+                users_ids = (await session.execute(query)).scalars().all()
+                return users_ids
 
     async def create_event(self, *, host: int, event_name: str, time: datetime, reminders: list[int], invites: list[int]) -> str:
         """
@@ -507,13 +523,19 @@ class ORMDataBase:
             async with session.begin():
                 event = await session.get(Events, event_id)
                 users = await self.get_confirmations_for_event(event_id=event_id)
-        
+        if event is None:
+            return {}
+        if event.reminders == "":
+            reminders_t = []
+        else:
+            reminders_t = list(map(int, event.reminders.split(",")))
         event_t = {
             "event_id": event.event_id,
+            "host": event.host,
             "name": event.event_name,
             "time": event.time,
             "users": users,
-            "reminders": list(map(int, event.reminders.split(","))),
+            "reminders": reminders_t,
         }
         return event_t
 
@@ -539,6 +561,7 @@ class ORMDataBase:
             
             event_t = {
                 "event_id": event.event_id,
+                "host": event.host,
                 "name": event.event_name,
                 "time": event.time,
                 "users": users,

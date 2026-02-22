@@ -16,6 +16,24 @@ REMINDER_BUTTONS = {
     "1 Tag": 86400,
 }
 
+async def event_choices(ctx: discord.AutocompleteContext) -> list[str]:
+    """Shows all events to allow further invites.
+
+    Args:
+        ctx (discord.AutocompleteContext):
+
+    Returns:
+        list[str]: every event from the db
+    """
+    client: Bot = ctx.bot
+    events = await client.db.get_events()
+    event_name = []
+    for event in events:
+        if ctx.interaction.user.id == event["host"]:
+            event_name.append(event["name"] + " | " + str(event["time"]))
+    return event_name
+
+
 class ReminderButton(discord.ui.Button):
     def __init__(self, label: str, seconds: int):
         super().__init__(
@@ -205,7 +223,6 @@ class EventReminderModal(discord.ui.Modal):
         )
 
 
-
 class EventReminder(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
@@ -227,6 +244,50 @@ class EventReminder(commands.Cog):
     @commands.Cog.listener("on_start_done")
     async def start_done(self):
         self.reminder_loop.start()
+    
+    @commands.slash_command(
+            name="invite", description="Invite a user to an existing event", contexts={discord.InteractionContextType.guild}
+    )
+    @discord.option(
+        autocomplete=event_choices,
+        name="event",
+        description="Select an event to invite an user to.",
+        required=True,
+    )
+    @discord.option(
+        name="guest",
+        description="The member u want to invite",
+        input_type=discord.Member,
+        required=True
+    )
+    async def invite(
+        self,
+        ctx: discord.ApplicationContext,
+        event: str,
+        guest: discord.Member,
+    ):
+        res = event.split("|")
+        time = datetime.strptime(res[-1].strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=SERVER_TZ)
+        event_id = str(ctx.interaction.user.id) + str(time)
+        event_obj = await self.client.db.get_event_by_id(event_id=event_id)
+        try:
+            already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
+            print(already_invites)
+            if guest.id not in already_invites:
+                await self.client.db.create_confirmation(event_id=event_id, guest=guest.id, confirmation=None)
+            
+            em = discord.Embed(title=f"⏰ **Event**", color=discord.Color.brand_green())
+            em.add_field(name="",value=f"📅 **Du wurdest zu {event_obj["name"]} eingeladen!** \n am {time.date()} um 🕒{time.time().strftime('%H:%M')} ")
+            em.set_footer(text="Bitte bestätige deine Teilnahme 👇")
+            await guest.send(
+                embed=em,
+                view=ParticipationView(self.client, event_id)
+            )
+            await ctx.interaction.respond(f"{guest} was invited to the event")
+        except discord.Forbidden:
+                await ctx.interaction.respond(f"{guest} was invited not to the event")
+                pass  # DMs geschlossen
+        
 
     @tasks.loop(seconds=30)
     async def reminder_loop(self):
@@ -249,7 +310,7 @@ class EventReminder(commands.Cog):
                                     em.add_field(name="",value=f"**{event['name']}** beginnt jetzt!")
                                 else:
                                     em.add_field(name="",value=f"**{event['name']}** beginnt in {reminder // 60} Minute(n)")
-                                self.logger.info(f"Reminder sent to {user.id}")
+                                self.logger.info(f"Reminder sent to {user.id}, {reminder// 60} minutes before the event")
                                 await user.send(
                                     embed=em
                                 )
