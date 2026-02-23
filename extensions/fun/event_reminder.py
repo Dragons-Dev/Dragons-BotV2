@@ -57,61 +57,6 @@ class ReminderButton(discord.ui.Button):
         await interaction.response.edit_message(view=view)
 
 
-class EventReminderView(discord.ui.View):
-    def __init__(self, guild: discord.Guild, client: Bot, host: discord.User):
-        super().__init__(timeout=60)
-        self.guild = guild
-        self.client = client
-        self.host = host
-
-        self.selected_users: list[discord.Member] = []
-        self.selected_reminders: set[int] = set()
-
-        # Reminder Buttons hinzufügen
-        for label, seconds in REMINDER_BUTTONS.items():
-            self.add_item(ReminderButton(label, seconds))
-
-    @discord.ui.user_select(
-        placeholder="👥 Teilnehmer auswählen",
-        min_values=1,
-        max_values=15
-    )
-    async def user_select(self, select, interaction: discord.Interaction):
-        self.selected_users = select.values
-        await interaction.response.defer()
-
-    @discord.ui.button(label="Weiter", style=discord.ButtonStyle.primary, row=3)
-    async def continue_button(self, button, interaction: discord.Interaction):
-        if not self.selected_users:
-            await interaction.response.send_message(
-                "❌ Bitte wähle mindestens einen Nutzer aus.",
-                ephemeral=True
-            )
-            return
-
-        if not self.selected_reminders:
-            await interaction.response.send_message(
-                "❌ Bitte wähle mindestens eine Erinnerungszeit aus.",
-                ephemeral=True
-            )
-            return
-
-        modal = EventReminderModal(
-            self.guild,
-            self.client,
-            self.selected_users,
-            list(self.selected_reminders),
-            self.host,
-            title="Event Reminder"
-        )
-        await interaction.response.send_modal(modal)
-
-    async def on_timeout(self):
-        if self.message != None:
-            pass
-            #await self.message.delete()
-
-
 class ParticipationView(discord.ui.View):
     def __init__(self, client: Bot, event_id):
         super().__init__(timeout=None)
@@ -168,6 +113,7 @@ class EventReminderModal(discord.ui.Modal):
             label=f"Date & time(depends on ST)",
             placeholder="TT.MM.JJJJ HH:MM"
         )
+        
 
         self.add_item(self.event_name)
         self.add_item(self.event_time)
@@ -221,6 +167,61 @@ class EventReminderModal(discord.ui.Modal):
             "✅ Event erstellt & Teilnehmer benachrichtigt!",
             ephemeral=True
         )
+
+
+class EventReminderView(discord.ui.View):
+    def __init__(self, guild: discord.Guild, client: Bot, host: discord.User):
+        super().__init__(timeout=60)
+        self.guild = guild
+        self.client = client
+        self.host = host
+
+        self.selected_users: list[discord.Member] = []
+        self.selected_reminders: set[int] = set()
+
+        # Reminder Buttons hinzufügen
+        for label, seconds in REMINDER_BUTTONS.items():
+            self.add_item(ReminderButton(label, seconds))
+
+    @discord.ui.user_select(
+        placeholder="👥 Teilnehmer auswählen",
+        min_values=1,
+        max_values=15
+    )
+    async def user_select(self, select, interaction: discord.Interaction):
+        self.selected_users = select.values
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Weiter", style=discord.ButtonStyle.primary, row=3)
+    async def continue_button(self, button, interaction: discord.Interaction):
+        if not self.selected_users:
+            await interaction.response.send_message(
+                "❌ Bitte wähle mindestens einen Nutzer aus.",
+                ephemeral=True
+            )
+            return
+
+        if not self.selected_reminders:
+            await interaction.response.send_message(
+                "❌ Bitte wähle mindestens eine Erinnerungszeit aus.",
+                ephemeral=True
+            )
+            return
+
+        modal = EventReminderModal(
+            self.guild,
+            self.client,
+            self.selected_users,
+            list(self.selected_reminders),
+            self.host,
+            title="Event Reminder"
+        )
+        await interaction.response.send_modal(modal)
+
+    async def on_timeout(self):
+        if self.message != None:
+            pass
+            #await self.message.delete()
 
 
 class EventReminder(commands.Cog):
