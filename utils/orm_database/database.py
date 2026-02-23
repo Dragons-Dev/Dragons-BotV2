@@ -487,7 +487,7 @@ class ORMDataBase:
                 users_ids = (await session.execute(query)).scalars().all()
                 return users_ids
 
-    async def create_event(self, *, host: int, event_name: str, time: datetime, reminders: list[int], invites: list[int]) -> str:
+    async def create_event(self, *, host: int, event_name: str, time: datetime, reminders: list[int], invites: list[discord.User]) -> str:
         """
         Creates a new event
         Args:
