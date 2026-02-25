@@ -6,7 +6,7 @@ from .enums import InfractionsEnum, SettingsEnum, StatTypeEnum, WebhookType
 from .logger import CustomLogger, rem_log
 from .orm_database import ORMDataBase, Settings
 from .utils import VersionInfo, sec_to_readable
-from .views import ButtonConfirm, ButtonInfo
+from .views import ButtonConfirm, ButtonInfo, ContainerPaginator
 
 __all__ = [
     "Bot",
@@ -26,4 +26,5 @@ __all__ = [
     "sec_to_readable",
     "ButtonConfirm",
     "ButtonInfo",
+    "ContainerPaginator",
 ]

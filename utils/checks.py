@@ -23,7 +23,7 @@ def is_team():
                 )
 
         else:
-            role = await get_or_fetch(ctx.guild, "role", team_role.value, default=None)
+            role = await get_or_fetch(ctx.guild, discord.Role, team_role.value, default=None)
             if role is None:
                 raise PermissionError("The team role is not set up correctly. Please contact the guild owner!.")
             else:
