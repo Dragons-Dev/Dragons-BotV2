@@ -55,7 +55,7 @@ class PagninationButton(discord.ui.Button):
             label=label,
             style=(discord.ButtonStyle.blurple if not disabled else discord.ButtonStyle.gray),
             id=discord_id,
-            disabled=disabled
+            disabled=disabled,
         )
         self.new_page = new_page
 
@@ -76,9 +76,7 @@ class PageSelectModal(discord.ui.Modal):
         self.total_pages = len(trigger_view.pages)
 
         self.page_input = discord.ui.InputText(
-            label="Page Number",
-            placeholder=f"Page (1-{self.total_pages})",
-            required=True
+            label="Page Number", placeholder=f"Page (1-{self.total_pages})", required=True
         )
         self.add_item(self.page_input)
 
@@ -96,14 +94,10 @@ class PageSelectModal(discord.ui.Modal):
                 await interaction.response.edit_message(view=self.trigger_view)
             else:
                 await interaction.response.send_message(
-                    f"Please input a number between 1 and {self.total_pages}.",
-                    ephemeral=True
+                    f"Please input a number between 1 and {self.total_pages}.", ephemeral=True
                 )
         except ValueError:
-            await interaction.response.send_message(
-                "Pleas input a valid number.",
-                ephemeral=True
-            )
+            await interaction.response.send_message("Pleas input a valid number.", ephemeral=True)
 
 
 class PageSelectButton(discord.ui.Button):
@@ -112,16 +106,12 @@ class PageSelectButton(discord.ui.Button):
         A button that opens a PageSelectModal when clicked, allowing the user to input a page number to jump to.
         :param label: The buttons label, usually something like "Page X/Y". The actual page changing logic happens in the PageSelectModal's callback, this button just opens the modal.
         """
-        super().__init__(
-            label=label,
-            style=discord.ButtonStyle.green
-        )
+        super().__init__(label=label, style=discord.ButtonStyle.green)
 
     async def callback(self, interaction: discord.Interaction):
         view: ContainerPaginator = self.view  # type: ignore
-        await interaction.response.send_modal(
-            PageSelectModal(trigger_view=view)
-        )
+        await interaction.response.send_modal(PageSelectModal(trigger_view=view))
+
 
 class ContainerPaginator(discord.ui.DesignerView):
     def __init__(self, author: discord.User | None = None, *, pages: list[discord.ui.Container] | None = None):
@@ -148,8 +138,8 @@ class ContainerPaginator(discord.ui.DesignerView):
                         total_components += len(item.items)
                     else:
                         total_components += 1
-                if total_components + 6 > 40: # Reserver 6 components for actionrow + pagination buttons
-                    raise ValueError(f"Page {index+1} has too many components ({total_components}) limit is 40!")
+                if total_components + 6 > 40:  # Reserver 6 components for actionrow + pagination buttons
+                    raise ValueError(f"Page {index + 1} has too many components ({total_components}) limit is 40!")
         self.pages: list[discord.ui.Container] = pages or []
 
     def add_page(self, container: discord.ui.Container):
@@ -190,10 +180,22 @@ class ContainerPaginator(discord.ui.DesignerView):
         """
         if len(self.pages) > 1:
             first = PagninationButton("First", new_page=0, discord_id=100, disabled=(self.current_page == 0))
-            prev = PagninationButton("Previous", new_page=self.current_page-1, discord_id=101, disabled=(self.current_page == 0))
-            page_select = PageSelectButton(f"Page {self.current_page+1}/{len(self.pages)}")
-            next_ = PagninationButton("Next", new_page=self.current_page+1, discord_id=102, disabled=(self.current_page == len(self.pages) - 1))
-            last = PagninationButton("Last", new_page=len(self.pages)-1, discord_id=103, disabled=(self.current_page == len(self.pages) - 1))
+            prev = PagninationButton(
+                "Previous", new_page=self.current_page - 1, discord_id=101, disabled=(self.current_page == 0)
+            )
+            page_select = PageSelectButton(f"Page {self.current_page + 1}/{len(self.pages)}")
+            next_ = PagninationButton(
+                "Next",
+                new_page=self.current_page + 1,
+                discord_id=102,
+                disabled=(self.current_page == len(self.pages) - 1),
+            )
+            last = PagninationButton(
+                "Last",
+                new_page=len(self.pages) - 1,
+                discord_id=103,
+                disabled=(self.current_page == len(self.pages) - 1),
+            )
             action_row = discord.ui.ActionRow(first, prev, page_select, next_, last)
             self.add_item(action_row)
 

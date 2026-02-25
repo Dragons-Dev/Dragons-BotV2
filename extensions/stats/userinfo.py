@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 import discord
 from discord.ext import commands
@@ -9,7 +9,9 @@ from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum
 from utils.orm_database import Infractions
 
 
-def _build_infraction_container(inf_member: discord.User | discord.Member, infraction: Infractions | Sequence[Infractions]) -> discord.ui.DesignerView | ContainerPaginator:
+def _build_infraction_container(
+    inf_member: discord.User | discord.Member, infraction: Infractions | Sequence[Infractions]
+) -> discord.ui.DesignerView | ContainerPaginator:
     container = discord.ui.Container(color=discord.Color.brand_red())
     container.add_text(f"## Infraction for {inf_member.global_name or inf_member.name}")
     if len(infraction) == 1:
@@ -26,7 +28,7 @@ def _build_infraction_container(inf_member: discord.User | discord.Member, infra
         for i in range(pages_required):
             page_container = discord.ui.Container(color=discord.Color.brand_red())
             page_container.add_text(f"## Infractions for {inf_member.global_name or inf_member.name}")
-            for inf in infraction[i*5:(i+1)*5]:
+            for inf in infraction[i * 5 : (i + 1) * 5]:
                 page_container.add_text(
                     f"**Case ID:** {inf.case_id}\n"
                     f"**Infraction:** {inf.infraction}\n"

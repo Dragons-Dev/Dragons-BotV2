@@ -26,5 +26,5 @@ __all__ = [
     "sec_to_readable",
     "ButtonConfirm",
     "ButtonInfo",
-    "ContainerPaginator"
+    "ContainerPaginator",
 ]
