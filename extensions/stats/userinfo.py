@@ -1,9 +1,40 @@
+from typing import Sequence
+
 import discord
 from discord.ext import commands
 from discord.utils import format_dt
 from pycord import multicog as pycog
 
-from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum
+from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum, ContainerPaginator
+from utils.orm_database import Infractions
+
+
+def _build_infraction_container(inf_member: discord.User | discord.Member, infraction: Infractions | Sequence[Infractions]) -> discord.ui.DesignerView | ContainerPaginator:
+    container = discord.ui.Container(color=discord.Color.brand_red())
+    container.add_text(f"## Infraction for {inf_member.global_name or inf_member.name}")
+    if len(infraction) == 1:
+        container.add_text(
+            f"**Case ID:** {infraction.case_id}\n"
+            f"**Infraction:** {infraction.infraction}\n"
+            f"**Reason:** {infraction.reason}\n"
+            f"**Date:** {format_dt(infraction.date, style='D')}\n"
+        )
+        return discord.ui.DesignerView(container)
+    else:
+        paginator = ContainerPaginator()
+        pages_required = (len(infraction) + 4) // 5  # Show 5 infractions per page
+        for i in range(pages_required):
+            page_container = discord.ui.Container(color=discord.Color.brand_red())
+            page_container.add_text(f"## Infractions for {inf_member.global_name or inf_member.name}")
+            for inf in infraction[i*5:(i+1)*5]:
+                page_container.add_text(
+                    f"**Case ID:** {inf.case_id}\n"
+                    f"**Infraction:** {inf.infraction}\n"
+                    f"**Reason:** {inf.reason}\n"
+                    f"**Date:** {format_dt(inf.date, style='D')}\n"
+                )
+            paginator.add_page(page_container)
+        return paginator
 
 
 class InfractionButton(discord.ui.Button):
@@ -15,28 +46,8 @@ class InfractionButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         # Fetch the infraction details from the database using the infraction_id
         infraction = await self.client.db.get_infraction(None, self.target, self.target.guild)
-        container = discord.ui.Container(color=discord.Color.brand_red())
-        container.add_text(f"## Infractions for {self.target.global_name or self.target.name}")
-        if len(infraction) == 1:
-            container.add_text(
-                f"**Case ID:** {infraction[0].case_id}\n"
-                f"**Infraction:** {infraction[0].infraction}\n"
-                f"**Reason:** {infraction[0].reason}\n"
-                f"**Date:** {format_dt(infraction[0].date, style='D')}\n"
-            )
-        else:
-            for index, i in enumerate(infraction):
-                if index >= 5:  # limit to 5 displayed infractions
-                    break
-                container.add_text(
-                    f"**Case ID:** {i.case_id}\n"
-                    f"**Infraction:** {i.infraction}\n"
-                    f"**Reason:** {i.reason}\n"
-                    f"**Date:** {format_dt(i.date, style='D')}\n"
-                )
-            if len(infraction) > 5:
-                container.add_text(f"**And {len(infraction) - 5} more...**")
-        await interaction.response.send_message(view=discord.ui.DesignerView(container), ephemeral=True)
+        view = _build_infraction_container(self.target, infraction).update_view()
+        await interaction.response.send_message(view=view, ephemeral=True)
 
 
 class UserInfo(commands.Cog):
