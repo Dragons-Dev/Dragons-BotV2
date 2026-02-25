@@ -138,7 +138,7 @@ class ContainerPaginator(discord.ui.DesignerView):
                         total_components += len(item.items)
                     else:
                         total_components += 1
-                if total_components + 6 > 40:  # Reserver 6 components for actionrow + pagination buttons
+                if total_components + 6 > 40:  # Reserve 6 components for actionrow + pagination buttons
                     raise ValueError(f"Page {index + 1} has too many components ({total_components}) limit is 40!")
         self.pages: list[discord.ui.Container] = pages or []
 
@@ -161,7 +161,7 @@ class ContainerPaginator(discord.ui.DesignerView):
                 total_components += len(item.items)
             else:
                 total_components += 1
-        if total_components + 6 > 40:  # Reserver 6 components for actionrow + pagination buttons
+        if total_components + 6 > 40:  # Reserve 6 components for actionrow + pagination buttons
             raise ValueError(f"{container} has too many components ({total_components}) limit is 40!")
         self.pages.append(container)
 
@@ -179,18 +179,18 @@ class ContainerPaginator(discord.ui.DesignerView):
         :return: None
         """
         if len(self.pages) > 1:
-            first = PagninationButton("First", new_page=0, discord_id=100, disabled=(self.current_page == 0))
-            prev = PagninationButton(
+            first = PaginationButton("First", new_page=0, discord_id=100, disabled=(self.current_page == 0))
+            prev = PaginationButton(
                 "Previous", new_page=self.current_page - 1, discord_id=101, disabled=(self.current_page == 0)
             )
             page_select = PageSelectButton(f"Page {self.current_page + 1}/{len(self.pages)}")
-            next_ = PagninationButton(
+            next_ = PaginationButton(
                 "Next",
                 new_page=self.current_page + 1,
                 discord_id=102,
                 disabled=(self.current_page == len(self.pages) - 1),
             )
-            last = PagninationButton(
+            last = PaginationButton(
                 "Last",
                 new_page=len(self.pages) - 1,
                 discord_id=103,
