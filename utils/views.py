@@ -42,7 +42,7 @@ class ButtonConfirm(discord.ui.View):
         self.stop()
 
 
-class PagninationButton(discord.ui.Button):
+class PaginationButton(discord.ui.Button):
     def __init__(self, label: str, *, new_page: int, discord_id: int | None = None, disabled: bool = False):
         """
         A button that changes the page of a ContainerPaginator when clicked.
@@ -72,7 +72,7 @@ class PageSelectModal(discord.ui.Modal):
         :param trigger_view: The ContainerPaginator that triggered this modal. We need a reference to it to change the page and update the view after the user submits the modal.
         """
         super().__init__(title="Go to page")
-        self.trigger_view: ContainerPaginator = trigger_view  # Das Original-View speichern
+        self.trigger_view: ContainerPaginator = trigger_view  # Store the original view
         self.total_pages = len(trigger_view.pages)
 
         self.page_input = discord.ui.InputText(
@@ -97,7 +97,7 @@ class PageSelectModal(discord.ui.Modal):
                     f"Please input a number between 1 and {self.total_pages}.", ephemeral=True
                 )
         except ValueError:
-            await interaction.response.send_message("Pleas input a valid number.", ephemeral=True)
+            await interaction.response.send_message("Please input a valid number.", ephemeral=True)
 
 
 class PageSelectButton(discord.ui.Button):

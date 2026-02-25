@@ -48,7 +48,11 @@ class InfractionButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         # Fetch the infraction details from the database using the infraction_id
         infraction = await self.client.db.get_infraction(None, self.target, self.target.guild)
-        view = _build_infraction_container(self.target, infraction).update_view()
+        container_or_view = _build_infraction_container(self.target, infraction)
+        if isinstance(container_or_view, ContainerPaginator):
+            view = container_or_view.update_view()
+        else:
+            view = container_or_view
         await interaction.response.send_message(view=view, ephemeral=True)
 
 
@@ -69,7 +73,7 @@ class UserInfo(commands.Cog):
         input_type=discord.Member,
         parameter_name="cmd_member",
     )
-    async def slash_test_command(self, ctx: discord.ApplicationContext, cmd_member: discord.Member):
+    async def slash_test_command(self, ctx: discord.ApplicationContext, cmd_member: discord.Member | None = None):
         target = cmd_member or ctx.author  # If no member is provided, use the command author as the target
         member = await ctx.guild.get_or_fetch(discord.Member, target.id, None)  # get the member object to cache
         team_role = await self.client.db.get_setting(SettingsEnum.TeamRole, ctx.guild)

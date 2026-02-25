@@ -289,7 +289,7 @@ class ORMDataBase:
         :param stat_type: the type of stat to return
         :param guild: the specific guild to retrieve the stats for
         :param days_back: ``int`` the date range to retrieve stats for
-        :return: ``Sequence[UserStats]`` an iteratable with ``UserStats`` objects
+        :return: ``Sequence[UserStats]`` an iterable with ``UserStats`` objects
         """
         start_date = date.today() - timedelta(days=days_back)
         async with self.AsyncSessionLocal() as session:
@@ -325,7 +325,7 @@ class ORMDataBase:
                 )
             )
             result = (await session.execute(query)).scalar_one_or_none()
-            return result
+            return result or 0
 
     async def delete_user_stats(
         self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None
