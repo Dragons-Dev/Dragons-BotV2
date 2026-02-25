@@ -1,4 +1,4 @@
-aiohttp~=3.12.15
+aiohttp~=3.13.2
 aiosqlite==0.21.0
 beautifulsoup4~=4.13.5
 better-ipc~=2.0.3
