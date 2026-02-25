@@ -26,7 +26,7 @@ class ParticipationView(discord.ui.View):
         status_update = await self.client.db.update_confirmation(event_id=self.event_id, guest=interaction.user.id, confirmation=status)
         if status_update:
             await interaction.response.send_message(
-                    f"✅ Deine Antwort **{"Zusage" if status else "Absage"}** wurde gespeichert.",
+                    f"✅ Your answer **{"Accept" if status else "Reject"}** was stored.",
                     ephemeral=True
                 )
         else:
@@ -37,11 +37,11 @@ class ParticipationView(discord.ui.View):
                 )
         
 
-    @discord.ui.button(label="✅ Zusagen", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
     async def accept(self, button, interaction: discord.Interaction):
         await self._respond(interaction, True)
 
-    @discord.ui.button(label="❌ Absagen", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="❌ Reject", style=discord.ButtonStyle.danger)
     async def decline(self, button, interaction: discord.Interaction):
         await self._respond(interaction, False)
 
@@ -90,8 +90,8 @@ class EventInviteModal(discord.ui.DesignerModal):
                     await self.client.db.create_confirmation(event_id=event_id, guest=invite.id, confirmation=None)
                 
                 em = discord.Embed(title=f"⏰ **Event**", color=discord.Color.brand_green())
-                em.add_field(name="",value=f"📅 **Du wurdest zu {event_obj["name"]} eingeladen!** \n am {event_obj["time"].date()} um 🕒{event_obj["time"].time().strftime('%H:%M')} ")
-                em.set_footer(text="Bitte bestätige deine Teilnahme 👇")
+                em.add_field(name="",value=f"📅 **You were invited to {event_obj["name"]}!** \n on {event_obj["time"].date()} at 🕒{event_obj["time"].time().strftime('%H:%M')}")
+                em.set_footer(text="Please confirm your participation 👇")
                 await invite.send(
                     embed=em,
                     view=ParticipationView(self.client, event_id)
@@ -103,7 +103,7 @@ class EventInviteModal(discord.ui.DesignerModal):
                     )
         except discord.Forbidden:
                 await interaction.respond(
-                        f"{invite} was invited not to the event, because the user not allows dm's",
+                        f"{invite} was not invited to the event, because the user not allows direct messages",
                         ephemeral=True,
                         delete_after=5,
                     )
@@ -175,7 +175,7 @@ class EventReminderModal(discord.ui.DesignerModal):
             event_time_local = event_time_local.replace(tzinfo=SERVER_TZ)
         except ValueError:
             await interaction.response.send_message(
-                "Ungültiges Datum.\nBitte nutze: TT.MM.JJJJ HH:MM\nBeispiel: 10.02.2026 18:00",
+                "Invalid date.\nPlease use: TT.MM.JJJJ HH:MM\nExample: 10.02.2026 18:00",
                 ephemeral=True,
                 delete_after=5
             )
@@ -198,8 +198,8 @@ class EventReminderModal(discord.ui.DesignerModal):
         for user in guests:
             try:
                 em = discord.Embed(title=f"⏰ **Event**", color=discord.Color.brand_green())
-                em.add_field(name="",value=f"📅 **Du wurdest zu {self.event_name.item.value} eingeladen!** \n am {event_time_local.date()} um 🕒{event_time_local.time().strftime('%H:%M')} ")
-                em.set_footer(text="Bitte bestätige deine Teilnahme 👇")
+                em.add_field(name="",value=f"📅 **You were invited to {self.event_name.item.value}!** \n on {event_time_local.date()} at 🕒{event_time_local.time().strftime('%H:%M')}")
+                em.set_footer(text="Please confirm your participation 👇")
                 await user.send(
                     embed=em,
                     view=ParticipationView(self.client, event_id)
@@ -208,7 +208,7 @@ class EventReminderModal(discord.ui.DesignerModal):
                 pass  # DMs geschlossen
 
         await interaction.response.send_message(
-            "✅ Event erstellt & Teilnehmer benachrichtigt!",
+            "✅ Event created and guests messaged!",
             ephemeral=True
         )
 
@@ -271,11 +271,11 @@ class EventReminder(commands.Cog):
                     for user_id in event["users"]:
                             try:
                                 user = await self.client.fetch_user(user_id)
-                                em = discord.Embed(title=f"⏰ **Erinnerung**", color=discord.Color.brand_green())
+                                em = discord.Embed(title=f"⏰ **Reminder**", color=discord.Color.brand_green())
                                 if reminder == 0:
-                                    em.add_field(name="",value=f"**{event['name']}** beginnt jetzt!")
+                                    em.add_field(name="",value=f"**{event['name']}** starts now!")
                                 else:
-                                    em.add_field(name="",value=f"**{event['name']}** beginnt in {reminder // 60} Minute(n)")
+                                    em.add_field(name="",value=f"**{event['name']}** starts in {reminder // 60} minute(s)")
                                 self.logger.info(f"Reminder sent to {user.id}, {reminder// 60} minutes before the event")
                                 await user.send(
                                     embed=em
