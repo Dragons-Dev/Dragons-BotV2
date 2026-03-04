@@ -15,7 +15,18 @@ from config import DATABASE_URL, SERVER_TZ
 
 from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from ..logger import CustomLogger
-from .models import Base, BotStatus, Infractions, Join2Create, Modmail, Settings, UserStats, EnabledCommands, Events, Confirmation
+from .models import (
+    Base,
+    BotStatus,
+    Infractions,
+    Join2Create,
+    Modmail,
+    Settings,
+    UserStats,
+    EnabledCommands,
+    Events,
+    Confirmation,
+)
 from ..classes import Event
 
 
@@ -484,12 +495,10 @@ class ORMDataBase:
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                session.add(
-                    Confirmation(event_id=event_id, user_id=guest, confirmation=confirmation)
-                )
+                session.add(Confirmation(event_id=event_id, user_id=guest, confirmation=confirmation))
                 await session.commit()
                 self.logger.debug(f"Confirmation for {event_id} and user {guest} created")
-    
+
     async def update_confirmation(self, *, event_id: str, guest: int, confirmation: bool) -> bool:
         """
         Creates a new confirmation for an event
@@ -513,10 +522,10 @@ class ORMDataBase:
                         return False
         except SQLAlchemyError:
             return False
-    
+
     async def get_confirmations_for_event(self, *, event_id: str) -> list[int]:
         """
-        Gets all user that accepted the invitation for the event 
+        Gets all user that accepted the invitation for the event
         Args:
             event_id: ID of the event
 
@@ -525,15 +534,14 @@ class ORMDataBase:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(Confirmation.user_id).where(
-                    Confirmation.event_id == event_id,
-                    Confirmation.confirmation.is_(True)
+                    Confirmation.event_id == event_id, Confirmation.confirmation.is_(True)
                 )
                 users_ids = (await session.execute(query)).scalars().all()
                 return users_ids
-    
+
     async def get_all_confirmations_for_event(self, *, event_id: str) -> list[int]:
         """
-        Gets all user that were invited to the event 
+        Gets all user that were invited to the event
         Args:
             event_id: ID of the event
 
@@ -541,9 +549,7 @@ class ORMDataBase:
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                query = select(Confirmation.user_id).where(
-                    Confirmation.event_id == event_id
-                )
+                query = select(Confirmation.user_id).where(Confirmation.event_id == event_id)
                 users_ids = (await session.execute(query)).scalars().all()
                 return users_ids
 
@@ -565,7 +571,9 @@ class ORMDataBase:
         except SQLAlchemyError:
             return False
 
-    async def create_event(self, *, host: int, name: str, time: datetime, reminders: list[int], invites: list[discord.User], mode: str) -> str:
+    async def create_event(
+        self, *, host: int, name: str, time: datetime, reminders: list[int], invites: list[discord.User], mode: str
+    ) -> str:
         """
         Creates a new event
         Args:
@@ -579,11 +587,13 @@ class ORMDataBase:
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                #id = str(host) + str(time)
+                # id = str(host) + str(time)
                 id = str(host) + str(datetime.now(tz=SERVER_TZ))
                 reminders_db = ",".join(map(str, reminders))
                 session.add(
-                    Events(id=str(id), host=int(host), name=str(name), time=time, reminders=str(reminders_db), mode=mode)
+                    Events(
+                        id=str(id), host=int(host), name=str(name), time=time, reminders=str(reminders_db), mode=mode
+                    )
                 )
                 await session.commit()
                 for invite in invites:
@@ -610,8 +620,16 @@ class ORMDataBase:
             reminders_t = []
         else:
             reminders_t = list(map(int, event.reminders.split(",")))
-        event_t = Event(id=event.id, host=event.host, name=event.name, time=event.time, invites=users, reminders=reminders_t, mode=event.mode)
-        
+        event_t = Event(
+            id=event.id,
+            host=event.host,
+            name=event.name,
+            time=event.time,
+            invites=users,
+            reminders=reminders_t,
+            mode=event.mode,
+        )
+
         return event_t
 
     async def get_events(self) -> list[Event]:
@@ -633,12 +651,29 @@ class ORMDataBase:
                 reminders_t = []
             else:
                 reminders_t = list(map(int, event.reminders.split(",")))
-            event_t = Event(id=event.id, host=event.host, name=event.name, time=event.time, invites=users, reminders=reminders_t, mode=event.mode)
-            
+            event_t = Event(
+                id=event.id,
+                host=event.host,
+                name=event.name,
+                time=event.time,
+                invites=users,
+                reminders=reminders_t,
+                mode=event.mode,
+            )
+
             events_r.append(event_t)
         return events_r
-    
-    async def update_event(self, *, id: str, host: int | None = None, name: str | None = None, time: datetime | None = None, reminders: list[int] | None = None, mode: str | None = None) -> bool:
+
+    async def update_event(
+        self,
+        *,
+        id: str,
+        host: int | None = None,
+        name: str | None = None,
+        time: datetime | None = None,
+        reminders: list[int] | None = None,
+        mode: str | None = None,
+    ) -> bool:
         """
         Updates an event
         Args:
@@ -681,7 +716,7 @@ class ORMDataBase:
                     conf_deletion = await self.delete_confirmation_of_event(event_id=id)
                     if conf_deletion:
                         await session.execute(delete(Events).where(Events.id == id))
-                        await session.commit() 
+                        await session.commit()
                         return True
                     else:
                         return conf_deletion

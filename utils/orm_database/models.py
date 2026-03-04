@@ -103,6 +103,7 @@ class EnabledCommands(Base):
     def __repr__(self):
         return f"<EnabledCommands(guild_id={self.guild_id}, command_name={self.command_name}, enabled={self.enabled})>"
 
+
 class Events(Base):
     __tablename__ = "Events"
     id = Column(String, primary_key=True)
@@ -114,7 +115,8 @@ class Events(Base):
 
     def __repr__(self):
         return f"<{self.__tablename__}(id={self.id}, host={self.host}, name={self.name}, time={self.time}, reminders={self.reminders}, mode={self.mode})>"
-    
+
+
 class Confirmation(Base):
     __tablename__ = "Confirmation"
     event_id = Column(String, ForeignKey("Events.id"), primary_key=True)

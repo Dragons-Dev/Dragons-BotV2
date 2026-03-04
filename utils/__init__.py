@@ -27,5 +27,5 @@ __all__ = [
     "ButtonConfirm",
     "ButtonInfo",
     "ContainerPaginator",
-    "Event"
+    "Event",
 ]
