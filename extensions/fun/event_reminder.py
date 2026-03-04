@@ -194,7 +194,7 @@ class EventInviteModal(discord.ui.DesignerModal):
         for event in self.events:
             if ctx.interaction.user.id == event.host:
                 option = discord.SelectOption(
-                    label=event.name + " | " + str(event.time.strftime("%H:%M %d.%m.%Y")), value=event.id
+                    label=f"{event.name} | {event.time.strftime("%H:%M %d.%m.%Y")}", value=event.id
                 )
                 options.append(option)
 
@@ -555,7 +555,6 @@ class EventReminder(commands.Cog):
     def __init__(self, client: Bot):
         self.client = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.events = {}
 
     @pycog.subcommand("event")
     @commands.slash_command(name="create", description="Create an event")
@@ -595,7 +594,6 @@ class EventReminder(commands.Cog):
         now = datetime.now(tz=SERVER_TZ)
         filtered_events = []
         for event in events:
-            # if not event["event_mode"] == False:
             already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event.id)
             if ctx.interaction.user.id in already_invites and event.time.replace(tzinfo=SERVER_TZ) > now:
                 filtered_events.append(event)
