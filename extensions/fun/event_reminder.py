@@ -194,7 +194,7 @@ class EventInviteModal(discord.ui.DesignerModal):
         for event in self.events:
             if ctx.interaction.user.id == event.host:
                 option = discord.SelectOption(
-                    label=f"{event.name} | {event.time.strftime("%H:%M %d.%m.%Y")}", value=event.id
+                    label=f"{event.name} | {event.time.strftime('%H:%M %d.%m.%Y')}", value=event.id
                 )
                 options.append(option)
 
