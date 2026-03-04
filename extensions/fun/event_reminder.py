@@ -24,7 +24,7 @@ async def event_choices(ctx: discord.AutocompleteContext) -> list[str]:
     for event in events:
         event_time = event.time.replace(tzinfo=SERVER_TZ)
         if event.host == ctx.interaction.user.id and event_time >= now:
-            filtered_events.append(f"{event.name} | {event.time.strftime("%H:%M %d.%m.%Y")}")
+            filtered_events.append(f"{event.name} | {event.time.strftime('%H:%M %d.%m.%Y')}")
     return filtered_events
 
 
@@ -114,7 +114,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
         self.events = events
         for event in self.events:
             option = discord.SelectOption(
-                label=f"{event.name} | {event.time.strftime("%H:%M %d.%m.%Y")}", value=event.id
+                label=f"{event.name} | {event.time.strftime('%H:%M %d.%m.%Y')}", value=event.id
             )
             options.append(option)
 
@@ -612,12 +612,10 @@ class EventReminder(commands.Cog):
     @commands.slash_command(
         name="edit", description="Edit an event that you created", contexts={discord.InteractionContextType.guild}
     )
-    @discord.option(autocomplete=event_choices, name="event", description="Select the event you want to edit.", required=True)
-    async def edit(
-        self,
-        ctx: discord.ApplicationContext,
-        event: str
-    ):
+    @discord.option(
+        autocomplete=event_choices, name="event", description="Select the event you want to edit.", required=True
+    )
+    async def edit(self, ctx: discord.ApplicationContext, event: str):
         name = event.split(" | ")[0]
         time = datetime.strptime(event.split(" | ")[1], "%H:%M %d.%m.%Y").replace(tzinfo=SERVER_TZ)
         events = await self.client.db.get_events()
@@ -634,12 +632,10 @@ class EventReminder(commands.Cog):
     @commands.slash_command(
         name="delete", description="Delete an event that you created", contexts={discord.InteractionContextType.guild}
     )
-    @discord.option(autocomplete=event_choices, name="event", description="Select the event yxou want to edit.", required=True)
-    async def delete(
-        self,
-        ctx: discord.ApplicationContext,
-        event: str
-    ):
+    @discord.option(
+        autocomplete=event_choices, name="event", description="Select the event yxou want to edit.", required=True
+    )
+    async def delete(self, ctx: discord.ApplicationContext, event: str):
         name = event.split(" | ")[0]
         time = datetime.strptime(event.split(" | ")[1], "%H:%M %d.%m.%Y").replace(tzinfo=SERVER_TZ)
         events = await self.client.db.get_events()
