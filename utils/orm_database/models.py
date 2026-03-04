@@ -96,18 +96,19 @@ class EnabledCommands(Base):
 
 class Events(Base):
     __tablename__ = "Events"
-    event_id = Column(String, primary_key=True)
+    id = Column(String, primary_key=True)
     host = Column(Integer)
-    event_name = Column(String)
+    name = Column(String)
     time = Column(DateTime(timezone=True))
     reminders = Column(String)
+    mode = Column(String)
 
     def __repr__(self):
-        return f"<{self.__tablename__}(event_id={self.event_id}, host={self.host}, event_name={self.event_name}, time={self.time}, reminders={self.reminders})>"
+        return f"<{self.__tablename__}(id={self.id}, host={self.host}, name={self.name}, time={self.time}, reminders={self.reminders}, mode={self.mode})>"
     
 class Confirmation(Base):
     __tablename__ = "Confirmation"
-    event_id = Column(String, ForeignKey("Events.event_id"), primary_key=True)
+    event_id = Column(String, ForeignKey("Events.id"), primary_key=True)
     user_id = Column(Integer, primary_key=True)
     confirmation = Column(Boolean, nullable=True)
 

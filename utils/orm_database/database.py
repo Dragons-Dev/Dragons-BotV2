@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 import discord
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -11,11 +11,12 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from config import DATABASE_URL
+from config import DATABASE_URL, SERVER_TZ
 
 from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from ..logger import CustomLogger
 from .models import Base, BotStatus, Infractions, Join2Create, Modmail, Settings, UserStats, EnabledCommands, Events, Confirmation
+from ..classes import Event
 
 
 class ORMDataBase:
@@ -447,10 +448,13 @@ class ORMDataBase:
             async with self.AsyncSessionLocal() as session:
                 async with session.begin():
                     confirmation_obj: Confirmation = await session.get(Confirmation, (event_id, guest))
-                    confirmation_obj.confirmation = confirmation
-                    await session.commit()
-                    self.logger.debug(f"Confirmation for {event_id} and user {guest} updated to {confirmation}")
-                    return True
+                    if confirmation_obj is not None:
+                        confirmation_obj.confirmation = confirmation
+                        await session.commit()
+                        self.logger.debug(f"Confirmation for {event_id} and user {guest} updated to {confirmation}")
+                        return True
+                    else:
+                        return False
         except SQLAlchemyError:
             return False
     
@@ -487,33 +491,53 @@ class ORMDataBase:
                 users_ids = (await session.execute(query)).scalars().all()
                 return users_ids
 
-    async def create_event(self, *, host: int, event_name: str, time: datetime, reminders: list[int], invites: list[discord.User]) -> str:
+    async def delete_confirmation_of_event(self, event_id: str) -> bool:
+        """
+        Deletes all confirmation that are linked to the given event id
+        Args:
+            event_id: Unique id for every event.
+
+        Returns: Bool if everything was deleted
+        """
+        try:
+            async with self.AsyncSessionLocal() as session:
+                async with session.begin():
+                    await session.execute(delete(Confirmation).where(Confirmation.event_id == event_id))
+                    await session.commit()
+                    self.logger.info(f"Deleted all confirmations for event: {event_id}")
+                    return True
+        except SQLAlchemyError:
+            return False
+
+    async def create_event(self, *, host: int, name: str, time: datetime, reminders: list[int], invites: list[discord.User], mode: str) -> str:
         """
         Creates a new event
         Args:
             host: User id of the host of the event.
-            event_name: Name of the event.
+            name: Name of the event.
             time: Time when the event happens.
             reminders: List of reminders set for the event f.e. [0, 60, ...] in s
+            mode: Whether the event is open, closed or invite only
 
-        Returns: The event_id to identify the event.
+        Returns: The id to identify the event.
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                event_id = str(host) + str(time)
+                #id = str(host) + str(time)
+                id = str(host) + str(datetime.now(tz=SERVER_TZ))
                 reminders_db = ",".join(map(str, reminders))
                 session.add(
-                    Events(event_id=str(event_id), host=int(host), event_name=str(event_name), time=time, reminders=str(reminders_db))
+                    Events(id=str(id), host=int(host), name=str(name), time=time, reminders=str(reminders_db), mode=mode)
                 )
                 await session.commit()
                 for invite in invites:
-                    await self.create_confirmation(event_id=event_id, guest=invite.id, confirmation=None)
-            self.logger.debug(f"Event created {event_id}")
-            return event_id
+                    await self.create_confirmation(event_id=id, guest=invite.id, confirmation=None)
+            self.logger.debug(f"Event created {id}")
+            return id
 
-    async def get_event_by_id(self, event_id: str) -> dict:
+    async def get_event_by_id(self, id: str) -> Event:
         """
-        Gets an event by an event_id
+        Gets an event by an id
         Args:
 
         Returns:
@@ -521,25 +545,20 @@ class ORMDataBase:
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                event = await session.get(Events, event_id)
-                users = await self.get_confirmations_for_event(event_id=event_id)
+                event = await session.get(Events, id)
+                users = await self.get_confirmations_for_event(event_id=id)
         if event is None:
+            self.logger.error(f"Event not found by id {id}")
             return {}
         if event.reminders == "":
             reminders_t = []
         else:
             reminders_t = list(map(int, event.reminders.split(",")))
-        event_t = {
-            "event_id": event.event_id,
-            "host": event.host,
-            "name": event.event_name,
-            "time": event.time,
-            "users": users,
-            "reminders": reminders_t,
-        }
+        event_t = Event(id=event.id, host=event.host, name=event.name, time=event.time, invites=users, reminders=reminders_t, mode=event.mode)
+        
         return event_t
 
-    async def get_events(self) -> list[dict]:
+    async def get_events(self) -> list[Event]:
         """
         Gets all events
         Args:
@@ -553,52 +572,62 @@ class ORMDataBase:
                 events = (await session.execute(query)).scalars().all()
         events_r = []
         for event in events:
-            users = await self.get_confirmations_for_event(event_id=event.event_id)
+            users = await self.get_confirmations_for_event(event_id=event.id)
             if event.reminders == "":
                 reminders_t = []
             else:
                 reminders_t = list(map(int, event.reminders.split(",")))
+            event_t = Event(id=event.id, host=event.host, name=event.name, time=event.time, invites=users, reminders=reminders_t, mode=event.mode)
             
-            event_t = {
-                "event_id": event.event_id,
-                "host": event.host,
-                "name": event.event_name,
-                "time": event.time,
-                "users": users,
-                "reminders": reminders_t,
-            }
             events_r.append(event_t)
         return events_r
     
-    async def update_event(self, *, event_id: str, host: int | None = None, event_name: str | None = None, time: datetime | None = None, reminders: list[int] | None = None) -> bool:
+    async def update_event(self, *, id: str, host: int | None = None, name: str | None = None, time: datetime | None = None, reminders: list[int] | None = None, mode: str | None = None) -> bool:
         """
         Updates an event
         Args:
-            event_id: Unique id for an event.
+            id: Unique id for an event.
             host: User id of the host of the event.
-            event_name: Name of the event.
+            name: Name of the event.
             time: Time when the event happens.
             reminders: List of reminders set for the event f.e. [0, 60, ...] in s
+            mode: Whether the event is open, closed or invite only
 
         Returns: The event_id to identify the event.
         """
         try:
             async with self.AsyncSessionLocal() as session:
                 async with session.begin():
-                    event = await session.get(Events, event_id)
+                    event = await session.get(Events, id)
                     if event is None:
                         return False
                     if host is not None:
                         event.host = host
-                    if event_name is not None:
-                        event.event_name = event_name
+                    if name is not None:
+                        event.name = name
                     if time is not None:
                         event.time = time
                     if reminders is not None:
                         reminders_db = ",".join(map(str, reminders))
                         event.reminders = reminders_db
+                    if mode is not None:
+                        event.mode = mode
                     await session.commit()
-            self.logger.debug(f"Event {event_id} updated")
+            self.logger.debug(f"Event {id} updated")
             return True
+        except SQLAlchemyError:
+            return False
+
+    async def delete_event(self, id: str) -> bool:
+        try:
+            async with self.AsyncSessionLocal() as session:
+                async with session.begin():
+                    conf_deletion = await self.delete_confirmation_of_event(event_id=id)
+                    if conf_deletion:
+                        await session.execute(delete(Events).where(Events.id == id))
+                        await session.commit() 
+                        return True
+                    else:
+                        return conf_deletion
         except SQLAlchemyError:
             return False
