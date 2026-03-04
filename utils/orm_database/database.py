@@ -587,7 +587,6 @@ class ORMDataBase:
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                # id = str(host) + str(time)
                 id = str(host) + str(datetime.now(tz=SERVER_TZ))
                 reminders_db = ",".join(map(str, reminders))
                 session.add(

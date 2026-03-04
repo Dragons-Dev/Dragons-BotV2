@@ -42,13 +42,4 @@ class Event:
         self.mode = mode
 
     def __repr__(self):
-        event_t = {
-            "event_id": self.id,
-            "host": self.host,
-            "name": self.name,
-            "time": self.time,
-            "users": self.invites,
-            "reminders": self.reminders,
-            "event_mode": self.mode,
-        }
-        return str(event_t)
+        return f"<Event(id={self.id}, host={self.host}, name={self.name}, time={self.time}, invites={self.invites}, reminders={self.reminders}, mode={self.mode})>"

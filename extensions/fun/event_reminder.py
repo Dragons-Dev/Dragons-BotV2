@@ -8,7 +8,6 @@ from utils import Bot, CustomLogger
 import pycord.multicog as pycog
 
 
-# events = []
 async def event_choices(ctx: discord.AutocompleteContext) -> list[str]:
     """Supplies all event ids owned by the ctx.interaction.user
 
@@ -25,7 +24,7 @@ async def event_choices(ctx: discord.AutocompleteContext) -> list[str]:
     for event in events:
         event_time = event.time.replace(tzinfo=SERVER_TZ)
         if event.host == ctx.interaction.user.id and event_time >= now:
-            filtered_events.append(str(event.name) + " | " + str(event.time.strftime("%H:%M %d.%m.%Y")))
+            filtered_events.append(f"{event.name} | {event.time.strftime("%H:%M %d.%m.%Y")}")
     return filtered_events
 
 
@@ -44,7 +43,7 @@ class InviteMode(Enum):
 
 
 class ParticipationView(discord.ui.View):
-    def __init__(self, client: Bot, event_id):
+    def __init__(self, client: Bot, event_id: str):
         super().__init__(timeout=None)
         self.client = client
         self.event_id = event_id
@@ -72,7 +71,7 @@ class ParticipationView(discord.ui.View):
 
 
 class InviteRequestView(discord.ui.View):
-    def __init__(self, client: Bot, event_id, requester):
+    def __init__(self, client: Bot, event_id: str, requester: discord.User):
         super().__init__(timeout=None)
         self.client = client
         self.event_id = event_id
@@ -115,7 +114,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
         self.events = events
         for event in self.events:
             option = discord.SelectOption(
-                label=event.name + " | " + str(event.time.strftime("%H:%M %d.%m.%Y")), value=event.id
+                label=f"{event.name} | {event.time.strftime("%H:%M %d.%m.%Y")}", value=event.id
             )
             options.append(option)
 
@@ -252,11 +251,11 @@ class EventInviteModal(discord.ui.DesignerModal):
                 ephemeral=True,
                 delete_after=5,
             )
-            pass  # DMs geschlossen
+            pass
 
 
 class EventReminderModal(discord.ui.DesignerModal):
-    def __init__(self, guild: discord.Guild, client: Bot, host, *args, **kwargs):
+    def __init__(self, guild: discord.Guild, client: Bot, host: discord.User, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.guild = guild
         self.client = client
@@ -267,7 +266,6 @@ class EventReminderModal(discord.ui.DesignerModal):
             discord.ui.InputText(
                 placeholder="e.g. Game Night",
                 required=True,
-                # required=False,
             ),
         )
 
@@ -276,7 +274,6 @@ class EventReminderModal(discord.ui.DesignerModal):
             discord.ui.InputText(
                 placeholder="TT.MM.JJJJ HH:MM",
                 required=True,
-                # required=False,
             ),
         )
 
@@ -286,7 +283,6 @@ class EventReminderModal(discord.ui.DesignerModal):
                 select_type=discord.ComponentType.user_select,
                 placeholder="Select all you want to invite.",
                 required=True,
-                # required=False,
                 max_values=25,
             ),
         )
@@ -301,7 +297,6 @@ class EventReminderModal(discord.ui.DesignerModal):
                 placeholder="Select a reminder.",
                 options=options,
                 required=True,
-                # required=False,
                 max_values=len(options),
             ),
         )
@@ -355,7 +350,6 @@ class EventReminderModal(discord.ui.DesignerModal):
             mode=mode,
         )
 
-        # 🔔 Sofort-Benachrichtigung
         for user in guests:
             try:
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
@@ -366,7 +360,7 @@ class EventReminderModal(discord.ui.DesignerModal):
                 em.set_footer(text="Please confirm your participation 👇.")
                 await user.send(embed=em, view=ParticipationView(self.client, event_id))
             except discord.Forbidden:
-                pass  # DMs geschlossen
+                pass
 
         await interaction.response.send_message("✅ Event created and guests messaged!", ephemeral=True)
 
@@ -383,7 +377,6 @@ class EventEditModal(discord.ui.DesignerModal):
                 placeholder="e.g. Game Night",
                 value=self.event.name,
                 required=True,
-                # required=False,
             ),
         )
 
@@ -393,7 +386,6 @@ class EventEditModal(discord.ui.DesignerModal):
                 placeholder="TT.MM.JJJJ HH:MM",
                 value=self.event.time.strftime("%d.%m.%Y %H:%M"),
                 required=True,
-                # required=False,
             ),
         )
 
@@ -414,7 +406,6 @@ class EventEditModal(discord.ui.DesignerModal):
             discord.ui.Select(
                 placeholder=f"Select a reminder, previous selected: {reminders}.",
                 options=options,
-                # required=True,
                 required=False,
                 max_values=len(options),
             ),
@@ -437,7 +428,6 @@ class EventEditModal(discord.ui.DesignerModal):
             discord.ui.Select(
                 placeholder=f"Select an invite mode, previous selected: {mode}.",
                 options=options,
-                # required=True,
                 required=False,
             ),
         )
@@ -498,7 +488,7 @@ class EventEditModal(discord.ui.DesignerModal):
                     em.set_footer(text="Please confirm your participation again 👇.")
                     await user_obj.send(embed=em, view=ParticipationView(self.client, self.event.id))
                 except discord.Forbidden:
-                    pass  # DMs geschlossen
+                    pass
 
         await interaction.response.send_message("✅ Event updated and guests messaged!", ephemeral=True)
 
@@ -516,7 +506,6 @@ class EventDeleteModal(discord.ui.DesignerModal):
                 required=True,
                 min_length=6,
                 max_length=6,
-                # required=False,
             ),
         )
 
@@ -563,8 +552,8 @@ class EventDeleteModal(discord.ui.DesignerModal):
 
 
 class EventReminder(commands.Cog):
-    def __init__(self, client):
-        self.client: Bot = client
+    def __init__(self, client: Bot):
+        self.client = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.events = {}
 
@@ -623,15 +612,11 @@ class EventReminder(commands.Cog):
     @commands.slash_command(
         name="edit", description="Edit an event that you created", contexts={discord.InteractionContextType.guild}
     )
+    @discord.option(autocomplete=event_choices, name="event", description="Select the event you want to edit.", required=True)
     async def edit(
         self,
         ctx: discord.ApplicationContext,
-        event: discord.Option(  # type: ignore
-            autocomplete=event_choices,
-            name="event",
-            description="Select the event you want to edit.",
-            required=True,
-        ),  # ignoring those two @mypy because it's the intended behavior by the library
+        event: str
     ):
         name = event.split(" | ")[0]
         time = datetime.strptime(event.split(" | ")[1], "%H:%M %d.%m.%Y").replace(tzinfo=SERVER_TZ)
@@ -649,15 +634,11 @@ class EventReminder(commands.Cog):
     @commands.slash_command(
         name="delete", description="Delete an event that you created", contexts={discord.InteractionContextType.guild}
     )
+    @discord.option(autocomplete=event_choices, name="event", description="Select the event yxou want to edit.", required=True)
     async def delete(
         self,
         ctx: discord.ApplicationContext,
-        event: discord.Option(  # type: ignore
-            autocomplete=event_choices,
-            name="event",
-            description="Select the event you want to edit.",
-            required=True,
-        ),  # ignoring those two @mypy because it's the intended behavior by the library
+        event: str
     ):
         name = event.split(" | ")[0]
         time = datetime.strptime(event.split(" | ")[1], "%H:%M %d.%m.%Y").replace(tzinfo=SERVER_TZ)
@@ -675,13 +656,12 @@ class EventReminder(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def reminder_loop(self):
-        now = datetime.now(tz=SERVER_TZ)  # tz-aware aktuelle Server-Zeit
+        now = datetime.now(tz=SERVER_TZ)
         events = await self.client.db.get_events()
 
         for event in events:
             event_time = event.time.replace(tzinfo=SERVER_TZ)
             delta = (event_time - now).total_seconds()
-            # print(event["users"])
 
             for reminder in event.reminders:
                 if delta <= reminder:
