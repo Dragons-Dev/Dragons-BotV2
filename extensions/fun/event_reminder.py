@@ -486,7 +486,7 @@ class EventEditModal(discord.ui.DesignerModal):
             id=self.event.id, name=updated_name, time=updated_time, reminders=updated_reminders, mode=updated_mode
         )
         updated_event = await self.client.db.get_event_by_id(self.event.id)
-        if updated_time != None:
+        if updated_time is not None:
             for user in updated_event.invites:
                 try:
                     user_obj: discord.User = await self.client.get_or_fetch_user(user)
