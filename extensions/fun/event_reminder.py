@@ -490,7 +490,9 @@ class EventEditModal(discord.ui.DesignerModal):
                 except discord.Forbidden:
                     pass
 
-        await interaction.response.send_message("✅ Event updated and guests messaged!(if the date changed)", ephemeral=True)
+        await interaction.response.send_message(
+            "✅ Event updated and guests messaged!(if the date changed)", ephemeral=True
+        )
 
 
 class EventDeleteModal(discord.ui.DesignerModal):
