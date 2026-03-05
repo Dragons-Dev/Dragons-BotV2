@@ -673,7 +673,7 @@ class EventReminder(commands.Cog):
                             await user.send(embed=em)
                         except discord.Forbidden:
                             pass
-                    
+
                         self.logger.info(f"Reminder for {event.id} send {reminder // 60} minutes before the event")
                     await self.client.db.update_event(id=event.id, reminders=event.reminders)
 
