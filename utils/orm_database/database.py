@@ -497,7 +497,7 @@ class ORMDataBase:
             async with session.begin():
                 session.add(Confirmation(event_id=event_id, user_id=guest, confirmation=confirmation))
                 await session.commit()
-                self.logger.debug(f"Confirmation for {event_id} and user {guest} created")
+                self.logger.info(f"Confirmation for {event_id} and user {guest} created")
 
     async def update_confirmation(self, *, event_id: str, guest: int, confirmation: bool) -> bool:
         """
@@ -516,7 +516,7 @@ class ORMDataBase:
                     if confirmation_obj is not None:
                         confirmation_obj.confirmation = confirmation
                         await session.commit()
-                        self.logger.debug(f"Confirmation for {event_id} and user {guest} updated to {confirmation}")
+                        self.logger.info(f"Confirmation for {event_id} and user {guest} updated to {confirmation}")
                         return True
                     else:
                         return False
@@ -597,7 +597,7 @@ class ORMDataBase:
                 await session.commit()
                 for invite in invites:
                     await self.create_confirmation(event_id=id, guest=invite.id, confirmation=None)
-            self.logger.debug(f"Event created {id}")
+            self.logger.info(f"Event created {id}")
             return id
 
     async def get_event_by_id(self, id: str) -> Event:
@@ -703,7 +703,7 @@ class ORMDataBase:
                     if mode is not None:
                         event.mode = mode
                     await session.commit()
-            self.logger.debug(f"Event {id} updated")
+            self.logger.info(f"Event {id} updated")
             return True
         except SQLAlchemyError:
             return False
@@ -716,6 +716,7 @@ class ORMDataBase:
                     if conf_deletion:
                         await session.execute(delete(Events).where(Events.id == id))
                         await session.commit()
+                        self.logger.info(f"Event {id} deleted")
                         return True
                     else:
                         return conf_deletion

@@ -668,11 +668,11 @@ class EventReminder(commands.Cog):
                                 em.add_field(name="", value=f"**{event.name}** starts now!")
                             else:
                                 em.add_field(name="", value=f"**{event.name}** starts in {reminder // 60} minute(s)")
-                            self.logger.info(f"Reminder sent to {user.id}, {reminder // 60} minutes before the event")
                             await user.send(embed=em)
                         except discord.Forbidden:
                             pass
-
+                    
+                        self.logger.info(f"Reminder for {event.id} send {reminder // 60} minutes before the event")
                     await self.client.db.update_event(id=event.id, reminders=event.reminders)
 
 

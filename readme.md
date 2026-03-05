@@ -39,8 +39,11 @@ log_level = DEBUG
 
 IPC_SECRET = ""
 # this secret will be used to encrypt the communication between the bot and webinterface
+
+SERVER_TZ = ZoneInfo("")
+# Server time zone for for events to send reminders based on server time
 ```
 ### Python
-Download Python version from 3.11 from [python.org](https://www.python.org/downloads/release/python-3117/)
+Download Python version from 3.13 from [python.org](https://www.python.org/downloads/release/python-3117/)
 ### pip packages
 ``pip install -r requirements.txt``
