@@ -439,8 +439,8 @@ class EventEditModal(discord.ui.DesignerModal):
 
     async def callback(self, interaction: discord.Interaction):
         updated_name = None
-        if self.event.name != self.event_name.item.value[0]:
-            updated_name = self.event_name.item.value[0]
+        if self.event.name != self.event_name.item.value:
+            updated_name = self.event_name.item.value
 
         try:
             event_time_local = datetime.strptime(self.event_time.item.value.strip(), "%d.%m.%Y %H:%M")
@@ -490,7 +490,7 @@ class EventEditModal(discord.ui.DesignerModal):
                 except discord.Forbidden:
                     pass
 
-        await interaction.response.send_message("✅ Event updated and guests messaged!", ephemeral=True)
+        await interaction.response.send_message("✅ Event updated and guests messaged!(if the date changed)", ephemeral=True)
 
 
 class EventDeleteModal(discord.ui.DesignerModal):
