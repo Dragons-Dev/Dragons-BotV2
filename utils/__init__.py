@@ -1,6 +1,6 @@
 from .bot import Bot
 from .checks import is_team
-from .classes import CommandDisabledError, InsufficientPermission
+from .classes import CommandDisabledError, InsufficientPermission, Event
 from .database import ShortTermStorage
 from .enums import InfractionsEnum, SettingsEnum, StatTypeEnum, WebhookType
 from .logger import CustomLogger, rem_log
@@ -27,4 +27,5 @@ __all__ = [
     "ButtonConfirm",
     "ButtonInfo",
     "ContainerPaginator",
+    "Event",
 ]

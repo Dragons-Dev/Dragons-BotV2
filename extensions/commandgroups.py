@@ -11,6 +11,8 @@ class CommandGroups(commands.Cog):
 
     mod = discord.SlashCommandGroup("mod", contexts={discord.InteractionContextType.guild})
     join2create = discord.SlashCommandGroup("join2create", contexts={discord.InteractionContextType.guild})
+    event = discord.SlashCommandGroup("event", contexts={discord.InteractionContextType.guild})
+
     user = discord.SlashCommandGroup("user", contexts={discord.InteractionContextType.guild})
 
 
