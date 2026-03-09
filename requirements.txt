@@ -9,3 +9,4 @@ psutil~=7.1.0
 py-cord<=2.7.1
 pycord-multicog~=2.1.1
 SQLAlchemy~=2.0.43
+tzdata~=2025.3

@@ -10,7 +10,105 @@ class VersionInfo:
 
     def __hash__(self):
         return hash(str(self))
+    
+    def __eq__(self, other: "VersionInfo") -> bool:
+        return (self.mayor == other.mayor and self.minor == other.minor and self.patch == other.patch and self.release_level == other.release_level)
+    
+    def __ne__(self, other: "VersionInfo") -> bool:
+        return not self == other
 
+    def __lt__(self, other: "VersionInfo") -> bool:
+        if self.mayor < other.mayor:
+            return True
+        elif self.mayor == other.mayor:
+            if self.minor < other.minor:
+                return True
+            elif self.minor == other.minor:
+                if self.patch < other.patch:
+                    return True
+                elif self.patch == other.patch:
+                    # How compare release level??????????
+                    return False
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False
+            
+    def __le__(self, other: "VersionInfo") -> bool:
+        if self.mayor < other.mayor:
+            return True
+        elif self.mayor == other.mayor:
+            if self.minor < other.minor:
+                return True
+            elif self.minor == other.minor:
+                if self.patch < other.patch:
+                    return True
+                elif self.patch == other.patch:
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False
+
+    def __gt__(self, other: "VersionInfo") -> bool:
+        if self.mayor > other.mayor:
+            return True
+        elif self.mayor == other.mayor:
+            if self.minor > other.minor:
+                return True
+            elif self.minor == other.minor:
+                if self.patch > other.patch:
+                    return True
+                elif self.patch == other.patch:
+                    # How compare release level??????????
+                    return False
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False
+
+    def __ge__(self, other: "VersionInfo") -> bool:
+        if self.mayor > other.mayor:
+            return True
+        elif self.mayor == other.mayor:
+            if self.minor > other.minor:
+                return True
+            elif self.minor == other.minor:
+                if self.patch > other.patch:
+                    return True
+                elif self.patch == other.patch:
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False
+
+    @classmethod
+    def from_str(cls, other: str) -> "VersionInfo":
+        try:
+            mayor, minor, patch_release = other.lower().strip().split(".")
+            patch = ""
+            for char in patch_release:
+                if char.isnumeric():
+                    patch += char
+                else:
+                    break
+            if mayor.startswith("v"):
+                mayor = mayor[1:]
+            if patch == "":
+                patch = "0"
+            return VersionInfo(int(mayor), int(minor), int(patch), patch_release.replace(patch, "").strip())
+        except:
+            print(other)
+            pass
 
 def sec_to_readable(time: int | float) -> str:
     """
