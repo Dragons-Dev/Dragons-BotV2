@@ -150,9 +150,9 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                 or (event_obj.mode == InviteMode.CLOSED.value and interaction.user.id in already_invites)
             ):
                 if interaction.user.id not in already_invites:
-                    await self.client.db.create_confirmation( # type: ignore
+                    await self.client.db.create_confirmation(  # type: ignore
                         event_id=event_id, guest=interaction.user.id, confirmation=None
-                    )  
+                    )
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                 em.add_field(
                     name="",
