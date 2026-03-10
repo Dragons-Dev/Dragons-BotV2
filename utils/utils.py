@@ -101,7 +101,7 @@ class VersionInfo:
             return False
 
     @classmethod
-    def from_str(cls, other: str) -> "VersionInfo":
+    def from_str(cls, other: str) -> "VersionInfo" | None:
         try:
             mayor, minor, patch_release = other.lower().strip().split(".")
             patch = ""
@@ -117,7 +117,7 @@ class VersionInfo:
             return VersionInfo(int(mayor), int(minor), int(patch), patch_release.replace(patch, "", 1).strip())
         except Exception as e:
             print(e)
-            return
+            return None
 
 
 def sec_to_readable(time: int | float) -> str:

@@ -512,7 +512,7 @@ class ORMDataBase:
         try:
             async with self.AsyncSessionLocal() as session:
                 async with session.begin():
-                    confirmation_obj: Confirmation = await session.get(Confirmation, (event_id, guest))
+                    confirmation_obj: Confirmation | None = await session.get(Confirmation, (event_id, guest))
                     if confirmation_obj is not None:
                         confirmation_obj.confirmation = confirmation
                         await session.commit()
@@ -600,7 +600,7 @@ class ORMDataBase:
             self.logger.info(f"Event created {id}")
             return id
 
-    async def get_event_by_id(self, id: str) -> Event:
+    async def get_event_by_id(self, id: str) -> Event | None:
         """
         Gets an event by an id
         Args:
@@ -614,7 +614,7 @@ class ORMDataBase:
                 users = await self.get_confirmations_for_event(event_id=id)
         if event is None:
             self.logger.error(f"Event not found by id {id}")
-            return {}
+            return None
         if event.reminders == "":
             reminders_t = []
         else:

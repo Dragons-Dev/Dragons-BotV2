@@ -23,6 +23,8 @@ class ReleaseAnnouncer(commands.Cog):
             async with session.get(f"{self.github_api}/releases/latest") as response:
                 new_latest = await response.json()
                 github_version = VersionInfo.from_str(new_latest["tag_name"])
+                if github_version is None:
+                    return
                 try:
                     if self.client.client_version >= github_version:
                         pass
