@@ -81,8 +81,8 @@ class InviteRequestView(discord.ui.View):
         if status:
             already_invites = await self.client.db.get_all_confirmations_for_event(event_id=self.event_id)
             if self.requester.id not in already_invites:
-                await self.client.db.create_confirmation(  # type: ignore
-                    event_id=self.event_id, guest=self.requester.id, confirmation=None
+                await self.client.db.create_confirmation(
+                    event_id=self.event_id, guest=self.requester.id, confirmation=None  # type: ignore
                 )
             event_obj: Event | None = await self.client.db.get_event_by_id(id=self.event_id)
             if event_obj is None:
@@ -150,8 +150,8 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                 or (event_obj.mode == InviteMode.CLOSED.value and interaction.user.id in already_invites)
             ):
                 if interaction.user.id not in already_invites:
-                    await self.client.db.create_confirmation(  # type: ignore
-                        event_id=event_id, guest=interaction.user.id, confirmation=None
+                    await self.client.db.create_confirmation(
+                        event_id=event_id, guest=interaction.user.id, confirmation=None  # type: ignore
                     )
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                 em.add_field(
