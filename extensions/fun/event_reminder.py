@@ -646,6 +646,7 @@ class EventReminder(commands.Cog):
 
         if selected_event is None:
             await ctx.interaction.response("Something went wrong. Event not found")
+            return
         modal = EventDeleteModal(
             client=self.client, ctx=ctx, event=selected_event, title=f"Delete {selected_event.name}"
         )
