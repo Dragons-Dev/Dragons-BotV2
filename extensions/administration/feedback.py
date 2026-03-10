@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord.utils import get_or_fetch
 
-from utils import Bot, ButtonInfo, CustomLogger, SettingsEnum
+from utils import Bot, ButtonInfo, CustomLogger, SettingsEnum, Settings
 
 
 class FeedbackModal(discord.ui.Modal):
@@ -33,7 +33,14 @@ class FeedbackModal(discord.ui.Modal):
         await interaction.response.send_message(
             embeds=[embed], ephemeral=True, view=ButtonInfo("The embed you are seeing is sent to the administrators.")
         )
-        feedback_id = await self.client.db.get_setting(SettingsEnum.FeedbackChannel, interaction.guild)
+        feedback_id_from_db = await self.client.db.get_setting(SettingsEnum.FeedbackChannel, interaction.guild)
+        if isinstance(feedback_id_from_db, Settings):
+            feedback_id = feedback_id_from_db
+        elif feedback_id_from_db is None:
+            feedback_id = None
+        else:
+            feedback_id = feedback_id_from_db[0]
+            
         if feedback_id:
             feedback_channel = await get_or_fetch(interaction.guild, "channel", feedback_id.value, default=None)
             await feedback_channel.send(embeds=[embed])

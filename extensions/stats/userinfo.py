@@ -6,7 +6,7 @@ from discord.utils import format_dt
 from pycord import multicog as pycog
 
 from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum, ContainerPaginator
-from utils.orm_database import Infractions
+from utils.orm_database import Infractions, Settings
 
 
 def _build_infraction_container(
@@ -50,7 +50,7 @@ class InfractionButton(discord.ui.Button):
         infraction = await self.client.db.get_infraction(None, self.target, self.target.guild)
         if infraction is None:
             await interaction.response.send_message(
-                "Something went wrong. There are no infractions for the selected target and guild", ephemeral=True
+                "Something went wrong. There are no infractions for the selected target and guild", ephemeral=True, 
             )
             return
         container_or_view = _build_infraction_container(self.target, infraction)
@@ -81,8 +81,14 @@ class UserInfo(commands.Cog):
     async def slash_test_command(self, ctx: discord.ApplicationContext, cmd_member: discord.Member | None = None):
         target = cmd_member or ctx.author  # If no member is provided, use the command author as the target
         member = await ctx.guild.get_or_fetch(discord.Member, target.id, None)  # get the member object to cache
-        team_role = await self.client.db.get_setting(SettingsEnum.TeamRole, ctx.guild)
-
+        team_role_from_db = await self.client.db.get_setting(SettingsEnum.TeamRole, ctx.guild)
+        
+        if isinstance(team_role_from_db,Settings):
+            team_role = team_role_from_db
+        elif team_role_from_db is None:
+            team_role = None
+        else:
+            team_role = team_role_from_db[0]
         container = discord.ui.Container()
         container.add_section(
             discord.ui.TextDisplay(content=f"## {member.global_name or member.name} Overview"),
