@@ -10,10 +10,15 @@ class VersionInfo:
 
     def __hash__(self):
         return hash(str(self))
-    
+
     def __eq__(self, other: "VersionInfo") -> bool:
-        return (self.mayor == other.mayor and self.minor == other.minor and self.patch == other.patch and self.release_level == other.release_level)
-    
+        return (
+            self.mayor == other.mayor
+            and self.minor == other.minor
+            and self.patch == other.patch
+            and self.release_level == other.release_level
+        )
+
     def __ne__(self, other: "VersionInfo") -> bool:
         return not self == other
 
@@ -35,7 +40,7 @@ class VersionInfo:
                 return False
         else:
             return False
-            
+
     def __le__(self, other: "VersionInfo") -> bool:
         if self.mayor < other.mayor:
             return True
@@ -109,6 +114,7 @@ class VersionInfo:
         except:
             print(other)
             pass
+
 
 def sec_to_readable(time: int | float) -> str:
     """

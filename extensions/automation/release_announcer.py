@@ -16,7 +16,7 @@ class ReleaseAnnouncer(commands.Cog):
     @commands.Cog.listener("on_start_done")
     async def start_done(self):
         self.reminder_loop.start()
-    
+
     @tasks.loop(time=time(hour=12, tzinfo=SERVER_TZ))
     async def reminder_loop(self):
         async with aiohttp.ClientSession() as session:
@@ -30,16 +30,19 @@ class ReleaseAnnouncer(commands.Cog):
                         self.logger.info(f"Newer release on github. Pls update. Version: {github_version}")
                         owner = (await self.client.application_info()).owner
                         if owner is None:
-                            self.logger.critical(f"Fuck something is terible wrong pls nuke everything and begin from the start.")
+                            self.logger.critical(
+                                "Fuck something is terible wrong pls nuke everything and begin from the start."
+                            )
                             return
                         em = discord.Embed(title="🚨 UPDATE YOUR BOT", color=discord.Color.brand_red())
                         em.add_field(
                             name="",
-                            value=f"Your bot is no longer on the newest verion `{github_version}`.\nYour bot is on version `{self.client.client_version}`."
-                            )
+                            value=f"Your bot is no longer on the newest verion `{github_version}`.\nYour bot is on version `{self.client.client_version}`.",
+                        )
                         await owner.send(embed=em)
                 except:
                     pass
-    
+
+
 def setup(client):
     client.add_cog(ReleaseAnnouncer(client))
