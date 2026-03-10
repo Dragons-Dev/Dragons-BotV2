@@ -121,7 +121,7 @@ class Confirmation(Base):
     __tablename__ = "Confirmation"
     event_id = Column(String, ForeignKey("Events.id"), primary_key=True)
     user_id = Column(Integer, primary_key=True)
-    confirmation = Column(Boolean, nullable=True) # type: ignore
+    confirmation = Column(Boolean, nullable=True)
 
     def __repr__(self):
         return f"<{self.__tablename__}(event_id={self.event_id}, user_id={self.user_id}, confirmation={self.confirmation})>"
