@@ -111,9 +111,8 @@ class VersionInfo:
             if patch == "":
                 patch = "0"
             return VersionInfo(int(mayor), int(minor), int(patch), patch_release.replace(patch, "", 1).strip())
-        except:
-            print(other)
-            pass
+        except Exception as e:
+            print(e)
 
 
 def sec_to_readable(time: int | float) -> str:

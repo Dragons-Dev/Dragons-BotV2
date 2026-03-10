@@ -40,8 +40,8 @@ class ReleaseAnnouncer(commands.Cog):
                             value=f"Your bot is no longer on the newest verion `{github_version}`.\nYour bot is on version `{self.client.client_version}`.",
                         )
                         await owner.send(embed=em)
-                except:
-                    pass
+                except Exception as e:
+                    self.logger.warning(f"{e}")
 
 
 def setup(client):
