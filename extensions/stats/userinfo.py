@@ -104,7 +104,7 @@ class UserInfo(commands.Cog):
             commands_used = await self.client.db.get_user_stat_total(target, StatTypeEnum.CommandsUsed, ctx.guild)
             infractions = await self.client.db.get_infraction(None, target, ctx.guild)
             container.add_text(
-                f"Voice time 🎤: {sec_to_readable(voice_time or '0')}\n"
+                f"Voice time 🎤: {sec_to_readable(voice_time or 0)}\n"
                 f"Messages sent 💬: {messages_sent or '0'}\n"
                 f"Commands used ⚡: {commands_used or '0'}\n"
                 f"Infractions 🚨: {len(infractions) if infractions else '0'}"
