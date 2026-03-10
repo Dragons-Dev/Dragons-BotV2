@@ -13,15 +13,15 @@ from .models import (
 )
 
 __all__ = [
-    ORMDataBase,
-    Base,
-    Settings,
-    Infractions,
-    Join2Create,
-    Modmail,
-    UserStats,
-    BotStatus,
-    EnabledCommands,
-    Events,
-    Confirmation,
+    "ORMDataBase",
+    "Base",
+    "Settings",
+    "Infractions",
+    "Join2Create",
+    "Modmail",
+    "UserStats",
+    "BotStatus",
+    "EnabledCommands",
+    "Events",
+    "Confirmation",
 ]

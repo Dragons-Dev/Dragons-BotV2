@@ -14,7 +14,7 @@ def _build_infraction_container(
 ) -> discord.ui.DesignerView | ContainerPaginator:
     container = discord.ui.Container(color=discord.Color.brand_red())
     container.add_text(f"## Infraction for {inf_member.global_name or inf_member.name}")
-    if len(infraction) == 1:
+    if isinstance(infraction, Infractions):
         container.add_text(
             f"**Case ID:** {infraction.case_id}\n"
             f"**Infraction:** {infraction.infraction}\n"
