@@ -7,7 +7,7 @@ from discord.utils import format_dt, get_or_fetch
 
 from utils import Bot, ButtonInfo, CustomLogger, InfractionsEnum, SettingsEnum, is_team
 
-
+# type: ignore
 class Timeout(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
