@@ -59,6 +59,8 @@ class ParticipationView(discord.ui.View):
         else:
             await interaction.response.send_message(
                 "Something went wrong.",
+                ephemeral=True,
+                delete_after=5
             )
 
     @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
@@ -86,7 +88,7 @@ class InviteRequestView(discord.ui.View):
                 )
             event_obj: Event | None = await self.client.db.get_event_by_id(id=self.event_id)
             if event_obj is None:
-                await interaction.respond("Something went wrong. The event no longer exits.")
+                await interaction.response.send_message("Something went wrong. The event no longer exits.", ephemeral=True, delete_after=5)
                 return
             em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
             em.add_field(
@@ -98,7 +100,7 @@ class InviteRequestView(discord.ui.View):
             await interaction.response.send_message("✅ Invitation was send.")
 
         else:
-            await interaction.response.send_message("Something went wrong.")
+            await interaction.response.send_message("Something went wrong.", ephemeral=True, delete_after=5)
 
     @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
     async def accept(self, button, interaction: discord.Interaction):
@@ -139,7 +141,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
         event_id = self.event.item.values[0]
         event_obj = await self.client.db.get_event_by_id(id=event_id)
         if event_obj is None:
-            await interaction.respond("Something went wrong. The event no longer exists.")
+            await interaction.response.send_message("Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5)
             return
         try:
             already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
@@ -233,7 +235,7 @@ class EventInviteModal(discord.ui.DesignerModal):
         event_id = self.event.item.values[0]
         event_obj: Event | None = await self.client.db.get_event_by_id(id=event_id)
         if event_obj is None:
-            await interaction.respond("Something went wrong. The event no longer exists.")
+            await interaction.response.send_message("Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5)
             return
         invites = self.invites.item.values
         try:
@@ -486,7 +488,7 @@ class EventEditModal(discord.ui.DesignerModal):
         )
         updated_event = await self.client.db.get_event_by_id(self.event.id)
         if updated_event is None:
-            await interaction.respond("Something went wrong. The event no longer exists.")
+            await interaction.response.send_message("Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5)
             return
         if updated_time is not None:
             for user in updated_event.invites:
@@ -637,7 +639,7 @@ class EventReminder(commands.Cog):
                 break
 
         if selected_event is None:
-            await ctx.interaction.response("Something went wrong. Event not found")
+            await ctx.interaction.response.send_message("Something went wrong. Event not found", ephemeral=True, delete_after=5)
             return
         modal = EventEditModal(client=self.client, ctx=ctx, event=selected_event, title=f"Edit {selected_event.name}")
         await ctx.interaction.response.send_modal(modal)
@@ -660,7 +662,7 @@ class EventReminder(commands.Cog):
                 break
 
         if selected_event is None:
-            await ctx.interaction.response("Something went wrong. Event not found")
+            await ctx.interaction.response.send_message("Something went wrong. Event not found", ephemeral=True, delete_after=5)
             return
         modal = EventDeleteModal(
             client=self.client, ctx=ctx, event=selected_event, title=f"Delete {selected_event.name}"
