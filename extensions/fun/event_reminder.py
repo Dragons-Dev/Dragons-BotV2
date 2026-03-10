@@ -136,7 +136,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
         event_id = self.event.item.values[0]
         event_obj = await self.client.db.get_event_by_id(id=event_id)
         if event_obj is None:
-            await interaction.respond(f"Something went wrong. The event no longer exists.")
+            await interaction.respond("Something went wrong. The event no longer exists.")
             return
         try:
             already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
@@ -202,7 +202,7 @@ class EventInviteModal(discord.ui.DesignerModal):
                 options.append(option)
 
         if options == []:
-            options = None # type: ignore
+            options = None  # type: ignore
 
         self.event = discord.ui.Label(
             "Event",
