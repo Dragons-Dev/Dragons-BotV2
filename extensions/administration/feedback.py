@@ -40,7 +40,7 @@ class FeedbackModal(discord.ui.Modal):
             feedback_id = None
         else:
             feedback_id = feedback_id_from_db[0]
-            
+
         if feedback_id:
             feedback_channel = await get_or_fetch(interaction.guild, "channel", feedback_id.value, default=None)
             await feedback_channel.send(embeds=[embed])
