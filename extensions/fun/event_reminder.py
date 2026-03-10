@@ -665,7 +665,7 @@ class EventReminder(commands.Cog):
                     for user_id in event.invites:
                         try:
                             user = await self.client.fetch_user(user_id)
-                            em = discord.Embed(title="⏰ **Reminder**", color=discord.Color.brand_green())
+                            em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                             if reminder == 0:
                                 em.add_field(name="", value=f"**{event.name}** starts now!")
                             else:
