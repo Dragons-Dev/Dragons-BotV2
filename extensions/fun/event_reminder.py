@@ -417,16 +417,16 @@ class EventEditModal(discord.ui.DesignerModal):
             options.append(d_option)
 
         if event.mode == InviteMode.OPEN.value:
-            mode = InviteMode.OPEN.name
+            mode_show = InviteMode.OPEN.name
         elif event.mode == InviteMode.INVITE_ONLY.value:
-            mode = InviteMode.INVITE_ONLY.name
+            mode_show = InviteMode.INVITE_ONLY.name
         elif event.mode == InviteMode.CLOSED.value:
-            mode = InviteMode.CLOSED.name
+            mode_show = InviteMode.CLOSED.name
 
         self.event_mode = discord.ui.Label(
             "Invite Mode",
             discord.ui.Select(
-                placeholder=f"Select an invite mode, previous selected: {mode}.",
+                placeholder=f"Select an invite mode, previous selected: {mode_show}.",
                 options=options,
                 required=False,
             ),
@@ -476,6 +476,8 @@ class EventEditModal(discord.ui.DesignerModal):
             id=self.event.id, name=updated_name, time=updated_time, reminders=updated_reminders, mode=updated_mode
         )
         updated_event = await self.client.db.get_event_by_id(self.event.id)
+        if updated_event is None:
+            interaction.respond(f"Something went wrong. The event no longer exists.")
         if updated_time is not None:
             for user in updated_event.invites:
                 try:
@@ -623,7 +625,10 @@ class EventReminder(commands.Cog):
             if event.name == name and event.time.replace(tzinfo=SERVER_TZ) == time:
                 selected_event = event
                 break
-
+        
+        if selected_event is None:
+            await ctx.interaction.response("Something went wrong. Event not found")
+            return
         modal = EventEditModal(client=self.client, ctx=ctx, event=selected_event, title=f"Edit {selected_event.name}")
         await ctx.interaction.response.send_modal(modal)
 
