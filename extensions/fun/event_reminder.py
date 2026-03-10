@@ -643,9 +643,9 @@ class EventReminder(commands.Cog):
             if event.name == name and event.time.replace(tzinfo=SERVER_TZ) == time:
                 selected_event = event
                 break
-        
+
         if selected_event is None:
-            await ctx.interaction.response(f"Something went wrong. Event not found")
+            await ctx.interaction.response("Something went wrong. Event not found")
         modal = EventDeleteModal(
             client=self.client, ctx=ctx, event=selected_event, title=f"Delete {selected_event.name}"
         )
