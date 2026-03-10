@@ -83,8 +83,11 @@ class InviteRequestView(discord.ui.View):
             if self.requester.id not in already_invites:
                 await self.client.db.create_confirmation(
                     event_id=self.event_id, guest=self.requester.id, confirmation=None
-                )
+                ) # type: ignore
             event_obj: Event = await self.client.db.get_event_by_id(id=self.event_id)
+            if event_obj is None:
+                await interaction.respond(f"Something went wrong. The event no longer exits.")
+                return
             em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
             em.add_field(
                 name="",
@@ -119,7 +122,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
             options.append(option)
 
         if options == []:
-            options = None
+            options = None # type: ignore
         self.event = discord.ui.Label(
             "Event",
             discord.ui.Select(
@@ -149,7 +152,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                 if interaction.user.id not in already_invites:
                     await self.client.db.create_confirmation(
                         event_id=event_id, guest=interaction.user.id, confirmation=None
-                    )
+                    ) # type: ignore
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                 em.add_field(
                     name="",
