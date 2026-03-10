@@ -477,7 +477,7 @@ class EventEditModal(discord.ui.DesignerModal):
         )
         updated_event = await self.client.db.get_event_by_id(self.event.id)
         if updated_event is None:
-            interaction.respond(f"Something went wrong. The event no longer exists.")
+            interaction.respond("Something went wrong. The event no longer exists.")
         if updated_time is not None:
             for user in updated_event.invites:
                 try:
@@ -625,7 +625,7 @@ class EventReminder(commands.Cog):
             if event.name == name and event.time.replace(tzinfo=SERVER_TZ) == time:
                 selected_event = event
                 break
-        
+
         if selected_event is None:
             await ctx.interaction.response("Something went wrong. Event not found")
             return
