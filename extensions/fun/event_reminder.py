@@ -496,11 +496,10 @@ class EventEditModal(discord.ui.DesignerModal):
 
 
 class EventDeleteModal(discord.ui.DesignerModal):
-    def __init__(self, ctx: discord.ApplicationContext, client: Bot, event: Event, error=False, *args, **kwargs):
+    def __init__(self, ctx: discord.ApplicationContext, client: Bot, event: Event, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
         self.event = event
-        self.error = error
 
         self.event_delete = discord.ui.Label(
             "Type DELETE to cancel the event.",
@@ -644,9 +643,11 @@ class EventReminder(commands.Cog):
             if event.name == name and event.time.replace(tzinfo=SERVER_TZ) == time:
                 selected_event = event
                 break
-
+        
+        if selected_event is None:
+            await ctx.interaction.response(f"Something went wrong. Event not found")
         modal = EventDeleteModal(
-            client=self.client, ctx=ctx, event=selected_event, error=False, title=f"Delete {selected_event.name}"
+            client=self.client, ctx=ctx, event=selected_event, title=f"Delete {selected_event.name}"
         )
         await ctx.interaction.response.send_modal(modal)
 
