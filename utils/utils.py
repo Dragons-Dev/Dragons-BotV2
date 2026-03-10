@@ -117,7 +117,7 @@ class VersionInfo:
             return VersionInfo(int(mayor), int(minor), int(patch), patch_release.replace(patch, "", 1).strip())
         except Exception as e:
             print(e)
-            return VersionInfo(-1,-1,-1,"")
+            return VersionInfo(-1, -1, -1, "")
 
 
 def sec_to_readable(time: int | float) -> str:

@@ -227,7 +227,7 @@ class EventInviteModal(discord.ui.DesignerModal):
         event_id = self.event.item.values[0]
         event_obj: Event | None = await self.client.db.get_event_by_id(id=event_id)
         if event_obj is None:
-            await interaction.respond(f"Something went wrong. The event no longer exists.")
+            await interaction.respond("Something went wrong. The event no longer exists.")
         invites = self.invites.item.values
         try:
             for invite in invites:
