@@ -48,6 +48,9 @@ class InfractionButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         # Fetch the infraction details from the database using the infraction_id
         infraction = await self.client.db.get_infraction(None, self.target, self.target.guild)
+        if infraction is None:
+            await interaction.response.send_message(f"Something went wrong. There are no infractions for the selected target and guild", ephemeral=True)
+            return
         container_or_view = _build_infraction_container(self.target, infraction)
         if isinstance(container_or_view, ContainerPaginator):
             view = container_or_view.update_view()
