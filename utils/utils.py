@@ -11,7 +11,9 @@ class VersionInfo:
     def __hash__(self):
         return hash(str(self))
 
-    def __eq__(self, other: "VersionInfo") -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, VersionInfo):
+            return NotImplemented
         return (
             self.mayor == other.mayor
             and self.minor == other.minor
@@ -19,7 +21,9 @@ class VersionInfo:
             and self.release_level == other.release_level
         )
 
-    def __ne__(self, other: "VersionInfo") -> bool:
+    def __ne__(self, other: object) -> bool:
+        if not isinstance(other, VersionInfo):
+            return NotImplemented
         return not self == other
 
     def __lt__(self, other: "VersionInfo") -> bool:
@@ -113,6 +117,7 @@ class VersionInfo:
             return VersionInfo(int(mayor), int(minor), int(patch), patch_release.replace(patch, "", 1).strip())
         except Exception as e:
             print(e)
+            return VersionInfo(-1, -1, -1, "")
 
 
 def sec_to_readable(time: int | float) -> str:

@@ -1,3 +1,4 @@
+# type: ignore
 import uuid as _uuid
 
 import discord

@@ -57,9 +57,7 @@ class ParticipationView(discord.ui.View):
                 f"✅ Your answer **{'Accept' if status else 'Reject'}** was stored."
             )
         else:
-            await interaction.response.send_message(
-                "Something went wrong.",
-            )
+            await interaction.response.send_message("Something went wrong.", ephemeral=True, delete_after=5)
 
     @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
     async def accept(self, button, interaction: discord.Interaction):
@@ -82,9 +80,16 @@ class InviteRequestView(discord.ui.View):
             already_invites = await self.client.db.get_all_confirmations_for_event(event_id=self.event_id)
             if self.requester.id not in already_invites:
                 await self.client.db.create_confirmation(
-                    event_id=self.event_id, guest=self.requester.id, confirmation=None
+                    event_id=self.event_id,
+                    guest=self.requester.id,
+                    confirmation=None,  # type: ignore
                 )
-            event_obj: Event = await self.client.db.get_event_by_id(id=self.event_id)
+            event_obj: Event | None = await self.client.db.get_event_by_id(id=self.event_id)
+            if event_obj is None:
+                await interaction.response.send_message(
+                    "Something went wrong. The event no longer exits.", ephemeral=True, delete_after=5
+                )
+                return
             em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
             em.add_field(
                 name="",
@@ -95,7 +100,7 @@ class InviteRequestView(discord.ui.View):
             await interaction.response.send_message("✅ Invitation was send.")
 
         else:
-            await interaction.response.send_message("Something went wrong.")
+            await interaction.response.send_message("Something went wrong.", ephemeral=True, delete_after=5)
 
     @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
     async def accept(self, button, interaction: discord.Interaction):
@@ -119,7 +124,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
             options.append(option)
 
         if options == []:
-            options = None
+            options = None  # type: ignore
         self.event = discord.ui.Label(
             "Event",
             discord.ui.Select(
@@ -135,6 +140,11 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
     async def callback(self, interaction):
         event_id = self.event.item.values[0]
         event_obj = await self.client.db.get_event_by_id(id=event_id)
+        if event_obj is None:
+            await interaction.response.send_message(
+                "Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5
+            )
+            return
         try:
             already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
 
@@ -145,7 +155,9 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
             ):
                 if interaction.user.id not in already_invites:
                     await self.client.db.create_confirmation(
-                        event_id=event_id, guest=interaction.user.id, confirmation=None
+                        event_id=event_id,
+                        guest=interaction.user.id,
+                        confirmation=None,  # type: ignore
                     )
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                 em.add_field(
@@ -199,7 +211,7 @@ class EventInviteModal(discord.ui.DesignerModal):
                 options.append(option)
 
         if options == []:
-            options = None
+            options = None  # type: ignore
 
         self.event = discord.ui.Label(
             "Event",
@@ -225,13 +237,18 @@ class EventInviteModal(discord.ui.DesignerModal):
 
     async def callback(self, interaction):
         event_id = self.event.item.values[0]
-        event_obj: Event = await self.client.db.get_event_by_id(id=event_id)
+        event_obj: Event | None = await self.client.db.get_event_by_id(id=event_id)
+        if event_obj is None:
+            await interaction.response.send_message(
+                "Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5
+            )
+            return
         invites = self.invites.item.values
         try:
             for invite in invites:
                 already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
                 if invite.id not in already_invites:
-                    await self.client.db.create_confirmation(event_id=event_id, guest=invite.id, confirmation=None)
+                    await self.client.db.create_confirmation(event_id=event_id, guest=invite.id, confirmation=None)  # type: ignore
 
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                 em.add_field(
@@ -417,16 +434,16 @@ class EventEditModal(discord.ui.DesignerModal):
             options.append(d_option)
 
         if event.mode == InviteMode.OPEN.value:
-            mode = InviteMode.OPEN.name
+            mode_show = InviteMode.OPEN.name
         elif event.mode == InviteMode.INVITE_ONLY.value:
-            mode = InviteMode.INVITE_ONLY.name
+            mode_show = InviteMode.INVITE_ONLY.name
         elif event.mode == InviteMode.CLOSED.value:
-            mode = InviteMode.CLOSED.name
+            mode_show = InviteMode.CLOSED.name
 
         self.event_mode = discord.ui.Label(
             "Invite Mode",
             discord.ui.Select(
-                placeholder=f"Select an invite mode, previous selected: {mode}.",
+                placeholder=f"Select an invite mode, previous selected: {mode_show}.",
                 options=options,
                 required=False,
             ),
@@ -476,6 +493,11 @@ class EventEditModal(discord.ui.DesignerModal):
             id=self.event.id, name=updated_name, time=updated_time, reminders=updated_reminders, mode=updated_mode
         )
         updated_event = await self.client.db.get_event_by_id(self.event.id)
+        if updated_event is None:
+            await interaction.response.send_message(
+                "Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5
+            )
+            return
         if updated_time is not None:
             for user in updated_event.invites:
                 try:
@@ -496,11 +518,10 @@ class EventEditModal(discord.ui.DesignerModal):
 
 
 class EventDeleteModal(discord.ui.DesignerModal):
-    def __init__(self, ctx: discord.ApplicationContext, client: Bot, event: Event, error=False, *args, **kwargs):
+    def __init__(self, ctx: discord.ApplicationContext, client: Bot, event: Event, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
         self.event = event
-        self.error = error
 
         self.event_delete = discord.ui.Label(
             "Type DELETE to cancel the event.",
@@ -625,6 +646,11 @@ class EventReminder(commands.Cog):
                 selected_event = event
                 break
 
+        if selected_event is None:
+            await ctx.interaction.response.send_message(
+                "Something went wrong. Event not found", ephemeral=True, delete_after=5
+            )
+            return
         modal = EventEditModal(client=self.client, ctx=ctx, event=selected_event, title=f"Edit {selected_event.name}")
         await ctx.interaction.response.send_modal(modal)
 
@@ -645,8 +671,13 @@ class EventReminder(commands.Cog):
                 selected_event = event
                 break
 
+        if selected_event is None:
+            await ctx.interaction.response.send_message(
+                "Something went wrong. Event not found", ephemeral=True, delete_after=5
+            )
+            return
         modal = EventDeleteModal(
-            client=self.client, ctx=ctx, event=selected_event, error=False, title=f"Delete {selected_event.name}"
+            client=self.client, ctx=ctx, event=selected_event, title=f"Delete {selected_event.name}"
         )
         await ctx.interaction.response.send_modal(modal)
 

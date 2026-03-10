@@ -6,7 +6,7 @@ from discord.utils import format_dt
 from pycord import multicog as pycog
 
 from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum, ContainerPaginator
-from utils.orm_database import Infractions
+from utils.orm_database import Infractions, Settings
 
 
 def _build_infraction_container(
@@ -14,7 +14,7 @@ def _build_infraction_container(
 ) -> discord.ui.DesignerView | ContainerPaginator:
     container = discord.ui.Container(color=discord.Color.brand_red())
     container.add_text(f"## Infraction for {inf_member.global_name or inf_member.name}")
-    if len(infraction) == 1:
+    if isinstance(infraction, Infractions):
         container.add_text(
             f"**Case ID:** {infraction.case_id}\n"
             f"**Infraction:** {infraction.infraction}\n"
@@ -48,6 +48,12 @@ class InfractionButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         # Fetch the infraction details from the database using the infraction_id
         infraction = await self.client.db.get_infraction(None, self.target, self.target.guild)
+        if infraction is None:
+            await interaction.response.send_message(
+                "Something went wrong. There are no infractions for the selected target and guild",
+                ephemeral=True,
+            )
+            return
         container_or_view = _build_infraction_container(self.target, infraction)
         if isinstance(container_or_view, ContainerPaginator):
             view = container_or_view.update_view()
@@ -76,8 +82,14 @@ class UserInfo(commands.Cog):
     async def slash_test_command(self, ctx: discord.ApplicationContext, cmd_member: discord.Member | None = None):
         target = cmd_member or ctx.author  # If no member is provided, use the command author as the target
         member = await ctx.guild.get_or_fetch(discord.Member, target.id, None)  # get the member object to cache
-        team_role = await self.client.db.get_setting(SettingsEnum.TeamRole, ctx.guild)
+        team_role_from_db = await self.client.db.get_setting(SettingsEnum.TeamRole, ctx.guild)
 
+        if isinstance(team_role_from_db, Settings):
+            team_role = team_role_from_db
+        elif team_role_from_db is None:
+            team_role = None
+        else:
+            team_role = team_role_from_db[0]
         container = discord.ui.Container()
         container.add_section(
             discord.ui.TextDisplay(content=f"## {member.global_name or member.name} Overview"),
@@ -99,7 +111,7 @@ class UserInfo(commands.Cog):
             commands_used = await self.client.db.get_user_stat_total(target, StatTypeEnum.CommandsUsed, ctx.guild)
             infractions = await self.client.db.get_infraction(None, target, ctx.guild)
             container.add_text(
-                f"Voice time 🎤: {sec_to_readable(voice_time or '0')}\n"
+                f"Voice time 🎤: {sec_to_readable(voice_time or 0)}\n"
                 f"Messages sent 💬: {messages_sent or '0'}\n"
                 f"Commands used ⚡: {commands_used or '0'}\n"
                 f"Infractions 🚨: {len(infractions) if infractions else '0'}"
