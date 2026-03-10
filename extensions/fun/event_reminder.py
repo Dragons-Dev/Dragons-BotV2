@@ -225,13 +225,15 @@ class EventInviteModal(discord.ui.DesignerModal):
 
     async def callback(self, interaction):
         event_id = self.event.item.values[0]
-        event_obj: Event = await self.client.db.get_event_by_id(id=event_id)
+        event_obj: Event | None = await self.client.db.get_event_by_id(id=event_id)
+        if event_obj is None:
+            await interaction.respond(f"Something went wrong. The event no longer exists.")
         invites = self.invites.item.values
         try:
             for invite in invites:
                 already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
                 if invite.id not in already_invites:
-                    await self.client.db.create_confirmation(event_id=event_id, guest=invite.id, confirmation=None)
+                    await self.client.db.create_confirmation(event_id=event_id, guest=invite.id, confirmation=None)  # type: ignore
 
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                 em.add_field(
@@ -477,7 +479,8 @@ class EventEditModal(discord.ui.DesignerModal):
         )
         updated_event = await self.client.db.get_event_by_id(self.event.id)
         if updated_event is None:
-            interaction.respond("Something went wrong. The event no longer exists.")
+            await interaction.respond("Something went wrong. The event no longer exists.")
+            return
         if updated_time is not None:
             for user in updated_event.invites:
                 try:
