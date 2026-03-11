@@ -258,7 +258,7 @@ class EventInviteModal(discord.ui.DesignerModal):
         super().__init__(*args, **kwargs)
         self.client = client
 
-        options: list[discord.SelectOption] | None = []
+        options: list[discord.SelectOption] = []
         self.events = events
         for event in self.events:
             if ctx.interaction.user.id == event.host:
@@ -267,15 +267,12 @@ class EventInviteModal(discord.ui.DesignerModal):
                 )
                 options.append(option)
 
-        if options == []:
-            options = None
-
         self.event = discord.ui.Label(
             "Event",
             discord.ui.Select(
                 placeholder="Select the Event you want invite to.",
                 required=True,
-                options=options,
+                options=options if options else None,
                 min_values=1,
                 max_values=1,
             ),
