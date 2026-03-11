@@ -497,11 +497,15 @@ class ORMDataBase:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 reminders_db = ",".join(map(str, reminders))
-                session.add(ConfirmationDB(event_id=event_id, user_id=guest, confirmation=confirmation, reminders=reminders_db))
+                session.add(
+                    ConfirmationDB(event_id=event_id, user_id=guest, confirmation=confirmation, reminders=reminders_db)
+                )
                 await session.commit()
                 self.logger.info(f"Confirmation for {event_id} and user {guest} created")
 
-    async def update_confirmation(self, *, event_id: str, guest: int, confirmation: bool | None = None, reminders: list[int] | None = None) -> bool:
+    async def update_confirmation(
+        self, *, event_id: str, guest: int, confirmation: bool | None = None, reminders: list[int] | None = None
+    ) -> bool:
         """
         Creates a new confirmation for an event
         Args:
@@ -522,7 +526,9 @@ class ORMDataBase:
                             reminders_db = ",".join(map(str, reminders))
                             confirmation_obj.reminders = reminders_db
                         await session.commit()
-                        self.logger.info(f"Confirmation for {event_id} and user {guest} updated to {confirmation} and/or reminders to {reminders_db}")
+                        self.logger.info(
+                            f"Confirmation for {event_id} and user {guest} updated to {confirmation} and/or reminders to {reminders_db}"
+                        )
                         return True
                     else:
                         return False
@@ -548,8 +554,13 @@ class ORMDataBase:
                     reminders_t = []
                 else:
                     reminders_t = list(map(int, confirm.reminders.split(",")))
-                return Confirmation(event_id=confirm.event_id, guest=confirm.user_id, confirmation=confirm.confirmation, reminders=reminders_t)
-                
+                return Confirmation(
+                    event_id=confirm.event_id,
+                    guest=confirm.user_id,
+                    confirmation=confirm.confirmation,
+                    reminders=reminders_t,
+                )
+
     async def get_confirmations_for_event(self, *, event_id: str) -> list[int]:
         """
         Gets all user that accepted the invitation for the event
@@ -566,7 +577,7 @@ class ORMDataBase:
                 users_ids = (await session.execute(query)).scalars().all()
                 return users_ids
 
-    async def get_complete_confirmations_for_event(self, *, event_id: str) ->list[Confirmation]:
+    async def get_complete_confirmations_for_event(self, *, event_id: str) -> list[Confirmation]:
         """
         Gets all user that accepted the invitation for the event
         Args:
@@ -576,7 +587,9 @@ class ORMDataBase:
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                query = select(ConfirmationDB).where(ConfirmationDB.event_id == event_id, ConfirmationDB.confirmation.is_(True))
+                query = select(ConfirmationDB).where(
+                    ConfirmationDB.event_id == event_id, ConfirmationDB.confirmation.is_(True)
+                )
             confir: list[ConfirmationDB] = (await session.execute(query)).scalars().all()
             res = []
             for conf in confir:
@@ -584,7 +597,9 @@ class ORMDataBase:
                     reminders_t = []
                 else:
                     reminders_t = list(map(int, conf.reminders.split(",")))
-                new_conf = Confirmation(event_id=conf.event_id, guest=conf.user_id, confirmation=conf.confirmation, reminders=reminders_t)
+                new_conf = Confirmation(
+                    event_id=conf.event_id, guest=conf.user_id, confirmation=conf.confirmation, reminders=reminders_t
+                )
                 res.append(new_conf)
             return res
 
@@ -636,11 +651,7 @@ class ORMDataBase:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 id = str(host) + str(datetime.now(tz=SERVER_TZ))
-                session.add(
-                    Events(
-                        id=str(id), host=int(host), name=str(name), time=time, mode=mode
-                    )
-                )
+                session.add(Events(id=str(id), host=int(host), name=str(name), time=time, mode=mode))
                 await session.commit()
                 for invite in invites:
                     await self.create_confirmation(event_id=id, guest=invite.id, confirmation=None, reminders=[0])  # type: ignore

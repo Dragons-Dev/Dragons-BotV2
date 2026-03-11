@@ -41,13 +41,14 @@ class Event:
 
     def __repr__(self):
         return f"<Event(id={self.id}, host={self.host}, name={self.name}, time={self.time}, invites={self.invites}, mode={self.mode})>"
-    
+
+
 class Confirmation:
     def __init__(self, *, event_id: str, guest: int, confirmation: bool | None, reminders: list[int]):
         self.event_id = event_id
         self.guest = guest
         self.confirmation = confirmation
         self.reminders = reminders
-    
+
     def __repr__(self):
         return f"<Confirmation(event_id={self.event_id}, guest={self.guest}, confirmation={self.confirmation}, reminders={self.reminders})>"
