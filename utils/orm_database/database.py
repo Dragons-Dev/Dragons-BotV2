@@ -483,7 +483,7 @@ class ORMDataBase:
                 await session.commit()
                 return new_state
 
-    async def create_confirmation(self, *, event_id: str, guest: int, confirmation: bool, reminders: list[int]) -> None:
+    async def create_confirmation(self, *, event_id: str, guest: int, confirmation: bool | None, reminders: list[int]) -> None:
         """
         Creates a new confirmation for an event
         Args:
