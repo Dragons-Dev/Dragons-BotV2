@@ -23,5 +23,5 @@ __all__ = [
     "BotStatus",
     "EnabledCommands",
     "Events",
-    "Confirmation",
+    "ConfirmationDB",
 ]
