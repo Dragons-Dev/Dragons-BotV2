@@ -51,7 +51,7 @@ class InviteReminderSelectModal(discord.ui.DesignerModal):
             ):
                 d_option = discord.SelectOption(label=reminder, value=str(REMINDER_BUTTONS[reminder]))
                 options.append(d_option)
-            
+
         self.event_reminders = discord.ui.Label(
             "Select",
             discord.ui.Select(
