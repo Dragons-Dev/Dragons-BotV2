@@ -9,7 +9,7 @@ from .models import (
     BotStatus,
     EnabledCommands,
     Events,
-    Confirmation,
+    ConfirmationDB,
 )
 
 __all__ = [

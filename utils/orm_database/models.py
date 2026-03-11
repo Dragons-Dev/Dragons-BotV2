@@ -110,18 +110,18 @@ class Events(Base):
     host = Column(Integer)
     name = Column(String)
     time = Column(DateTime(timezone=True))
-    reminders = Column(String)
     mode = Column(String)
 
     def __repr__(self):
-        return f"<{self.__tablename__}(id={self.id}, host={self.host}, name={self.name}, time={self.time}, reminders={self.reminders}, mode={self.mode})>"
+        return f"<{self.__tablename__}(id={self.id}, host={self.host}, name={self.name}, time={self.time}, mode={self.mode})>"
 
 
-class Confirmation(Base):
+class ConfirmationDB(Base):
     __tablename__ = "Confirmation"
     event_id = Column(String, ForeignKey("Events.id"), primary_key=True)
     user_id = Column(Integer, primary_key=True)
     confirmation = Column(Boolean, nullable=True)
+    reminders = Column(String)
 
     def __repr__(self):
-        return f"<{self.__tablename__}(event_id={self.event_id}, user_id={self.user_id}, confirmation={self.confirmation})>"
+        return f"<{self.__tablename__}(event_id={self.event_id}, user_id={self.user_id}, confirmation={self.confirmation}, reminders={self.reminders})>"

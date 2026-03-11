@@ -4,7 +4,7 @@ from datetime import datetime
 from config import SERVER_TZ
 from enum import Enum
 from utils import Event
-from utils import Bot, CustomLogger
+from utils import Bot, CustomLogger, sec_to_readable
 import pycord.multicog as pycog
 
 
@@ -36,6 +36,43 @@ REMINDER_BUTTONS = {
 }
 
 
+class InviteReminderSelectModal(discord.ui.DesignerModal):
+    def __init__(self, client: Bot, event_id: str, guest: int, status: bool, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.client = client
+        self.event_id = event_id
+        self.guest = guest
+        self.status = status
+
+        options = []
+        for reminder in REMINDER_BUTTONS:
+            d_option = discord.SelectOption(label=reminder, value=str(REMINDER_BUTTONS[reminder]))
+            options.append(d_option)
+        self.event_reminders = discord.ui.Label(
+            "Select",
+            discord.ui.Select(
+                placeholder="Select a reminder.",
+                options=options,
+                required=False,
+                max_values=len(options),
+            ),
+        )
+        self.add_item(self.event_reminders)
+        
+    async def callback(self, interaction):
+        new_reminders = self.event_reminders.item.values
+
+        status_update = await self.client.db.update_confirmation(
+            event_id=self.event_id, guest=interaction.user.id, confirmation=self.status, reminders=[0] + new_reminders
+        )
+        if status_update:
+            await interaction.response.send_message(
+                f"✅ Your answer **{'Accept' if self.status else 'Reject'}** was stored and the selected reminders were set."
+            )
+        else:
+            await interaction.response.send_message("Something went wrong.", ephemeral=True, delete_after=5)
+
+
 class InviteMode(Enum):
     OPEN = "OPEN"
     INVITE_ONLY = "INVITE_ONLY"
@@ -49,15 +86,17 @@ class ParticipationView(discord.ui.View):
         self.event_id = event_id
 
     async def _respond(self, interaction: discord.Interaction, status: bool):
-        status_update = await self.client.db.update_confirmation(
-            event_id=self.event_id, guest=interaction.user.id, confirmation=status
-        )
-        if status_update:
-            await interaction.response.send_message(
-                f"✅ Your answer **{'Accept' if status else 'Reject'}** was stored."
-            )
+        if status:
+            modal = InviteReminderSelectModal(client=self.client, event_id=self.event_id, guest=interaction.user.id, status=status, title="Reminder Selection")
+            await interaction.response.send_modal(modal=modal)
         else:
-            await interaction.response.send_message("Something went wrong.", ephemeral=True, delete_after=5)
+            status_update = await self.client.db.update_confirmation(
+                event_id=self.event_id, guest=interaction.user.id, confirmation=status, reminders=[0]
+            )
+            if status_update:
+                await interaction.response.send_message(f"✅ Your answer **{'Accept' if status else 'Reject'}** was stored")
+            else:
+                await interaction.response.send_message("Something went wrong.", ephemeral=True, delete_after=5)
 
     @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
     async def accept(self, button, interaction: discord.Interaction):
@@ -158,6 +197,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                         event_id=event_id,
                         guest=interaction.user.id,
                         confirmation=None,  # type: ignore
+                        reminders=[0]
                     )
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                 em.add_field(
@@ -248,7 +288,7 @@ class EventInviteModal(discord.ui.DesignerModal):
             for invite in invites:
                 already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
                 if invite.id not in already_invites:
-                    await self.client.db.create_confirmation(event_id=event_id, guest=invite.id, confirmation=None)  # type: ignore
+                    await self.client.db.create_confirmation(event_id=event_id, guest=invite.id, confirmation=None, reminders=[0])  # type: ignore
 
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                 em.add_field(
@@ -271,7 +311,7 @@ class EventInviteModal(discord.ui.DesignerModal):
             pass
 
 
-class EventReminderModal(discord.ui.DesignerModal):
+class EventCreateModal(discord.ui.DesignerModal):
     def __init__(self, guild: discord.Guild, client: Bot, host: discord.User, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.guild = guild
@@ -286,12 +326,20 @@ class EventReminderModal(discord.ui.DesignerModal):
             ),
         )
 
-        self.event_time = discord.ui.Label(
-            "When will the event happen:",
+        self.event_date = discord.ui.Label(
+            "Date of the event:",
             discord.ui.InputText(
-                placeholder="TT.MM.JJJJ HH:MM",
+                placeholder="TT.MM.JJJJ",
                 required=True,
             ),
+        )
+
+        self.event_time = discord.ui.Label(
+            "Time of the event:",
+            discord.ui.InputText(
+                placeholder="HH:MM",
+                required=True
+            )
         )
 
         self.event_guests = discord.ui.Label(
@@ -304,19 +352,6 @@ class EventReminderModal(discord.ui.DesignerModal):
             ),
         )
 
-        options = []
-        for reminder in REMINDER_BUTTONS:
-            d_option = discord.SelectOption(label=reminder, value=str(REMINDER_BUTTONS[reminder]))
-            options.append(d_option)
-        self.event_reminders = discord.ui.Label(
-            "Select",
-            discord.ui.Select(
-                placeholder="Select a reminder.",
-                options=options,
-                required=True,
-                max_values=len(options),
-            ),
-        )
 
         options = []
         for mode in InviteMode:
@@ -327,21 +362,22 @@ class EventReminderModal(discord.ui.DesignerModal):
         )
 
         self.add_item(self.event_name)
+        self.add_item(self.event_date)
         self.add_item(self.event_time)
         self.add_item(self.event_guests)
-        self.add_item(self.event_reminders)
         self.add_item(self.event_mode)
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            event_time_local = datetime.strptime(self.event_time.item.value.strip(), "%d.%m.%Y %H:%M")
+            combined_time = f"{self.event_date.item.value.strip()} {self.event_time.item.value.strip()}"
+            event_time_local = datetime.strptime(combined_time, "%d.%m.%Y %H:%M")
             event_time_local = event_time_local.replace(tzinfo=SERVER_TZ)
             now = datetime.now(tz=SERVER_TZ)
             if event_time_local < now:
                 raise ValueError
         except ValueError:
             await interaction.response.send_message(
-                "Invalid date.\nPlease use: TT.MM.JJJJ HH:MM\nExample: 10.02.2026 18:00\nAnd event needs to be in the future.",
+                "Invalid date.\nPlease use: TT.MM.JJJJ and HH:MM\nExample: 10.02.2026 and 18:00\nAnd event needs to be in the future.",
                 ephemeral=True,
                 delete_after=5,
             )
@@ -349,7 +385,6 @@ class EventReminderModal(discord.ui.DesignerModal):
         guests = []
         for guest in self.event_guests.item.values:
             guests.append(guest)
-        reminders = list(map(int, self.event_reminders.item.values))
 
         if self.event_mode.item.values[0] == InviteMode.OPEN.value:
             mode = InviteMode.OPEN.value
@@ -362,7 +397,6 @@ class EventReminderModal(discord.ui.DesignerModal):
             host=self.host.id,
             name=self.event_name.item.value,
             time=event_time_local,
-            reminders=[0] + reminders,
             invites=guests,
             mode=mode,
         )
@@ -397,35 +431,22 @@ class EventEditModal(discord.ui.DesignerModal):
             ),
         )
 
-        self.event_time = discord.ui.Label(
+        self.event_date = discord.ui.Label(
             "When will the event happen:",
             discord.ui.InputText(
-                placeholder="TT.MM.JJJJ HH:MM",
-                value=self.event.time.strftime("%d.%m.%Y %H:%M"),
+                placeholder="TT.MM.JJJJ",
                 required=True,
+                value=self.event.time.strftime("%d.%m.%Y"),
             ),
         )
 
-        options = []
-        for reminder in REMINDER_BUTTONS:
-            d_option = discord.SelectOption(label=reminder, value=str(REMINDER_BUTTONS[reminder]))
-            options.append(d_option)
-
-        reminders = []
-        for reminder in event.reminders:
-            inverted_reminder = {v: k for k, v in REMINDER_BUTTONS.items()}
-            if reminder == 0:
-                continue
-            reminders.append(inverted_reminder[reminder])
-
-        self.event_reminders = discord.ui.Label(
-            "Select",
-            discord.ui.Select(
-                placeholder=f"Select a reminder, previous selected: {reminders}.",
-                options=options,
-                required=False,
-                max_values=len(options),
-            ),
+        self.event_time = discord.ui.Label(
+            "When will the event happen:",
+            discord.ui.InputText(
+                placeholder="HH:MM",
+                required=True,
+                value=self.event.time.strftime("%H:%M"),
+            )
         )
 
         options = []
@@ -450,8 +471,8 @@ class EventEditModal(discord.ui.DesignerModal):
         )
 
         self.add_item(self.event_name)
+        self.add_item(self.event_date)
         self.add_item(self.event_time)
-        self.add_item(self.event_reminders)
         self.add_item(self.event_mode)
 
     async def callback(self, interaction: discord.Interaction):
@@ -460,7 +481,8 @@ class EventEditModal(discord.ui.DesignerModal):
             updated_name = self.event_name.item.value
 
         try:
-            event_time_local = datetime.strptime(self.event_time.item.value.strip(), "%d.%m.%Y %H:%M")
+            combined_time = f"{self.event_date.item.value.strip()} {self.event_time.item.value.strip()}"
+            event_time_local = datetime.strptime(combined_time, "%d.%m.%Y %H:%M")
             event_time_local = event_time_local.replace(tzinfo=SERVER_TZ)
             if event_time_local < datetime.now(tz=SERVER_TZ):
                 raise ValueError
@@ -474,11 +496,6 @@ class EventEditModal(discord.ui.DesignerModal):
         if self.event.time.replace(tzinfo=SERVER_TZ) != event_time_local:
             updated_time = event_time_local
 
-        updated_reminders = None
-        if self.event_reminders.item.values != []:
-            if self.event.reminders != [0] + list(map(int, self.event_reminders.item.values)):
-                updated_reminders = [0] + list(map(int, self.event_reminders.item.values))
-
         updated_mode = None
         if self.event_mode.item.values != []:
             if self.event_mode.item.values[0] == InviteMode.OPEN.value:
@@ -490,7 +507,7 @@ class EventEditModal(discord.ui.DesignerModal):
             if self.event.mode != mode:
                 updated_mode = mode
         await self.client.db.update_event(
-            id=self.event.id, name=updated_name, time=updated_time, reminders=updated_reminders, mode=updated_mode
+            id=self.event.id, name=updated_name, time=updated_time, mode=updated_mode
         )
         updated_event = await self.client.db.get_event_by_id(self.event.id)
         if updated_event is None:
@@ -582,7 +599,7 @@ class EventReminder(commands.Cog):
     @pycog.subcommand("event")
     @commands.slash_command(name="create", description="Create an event")
     async def create(self, ctx: discord.ApplicationContext):
-        modal = EventReminderModal(ctx.guild, self.client, ctx.author, title="Create an Event")
+        modal = EventCreateModal(ctx.guild, self.client, ctx.author, title="Create an Event")
         await ctx.response.send_modal(modal)
 
     @commands.Cog.listener("on_start_done")
@@ -690,23 +707,28 @@ class EventReminder(commands.Cog):
             event_time = event.time.replace(tzinfo=SERVER_TZ)
             delta = (event_time - now).total_seconds()
 
-            for reminder in event.reminders:
-                if delta <= reminder:
-                    event.reminders.remove(reminder)
-                    for user_id in event.invites:
+            for user_id in event.invites:
+                conf = await self.client.db.get_comfirmation_for_event_and_user(event_id=event.id, guest=user_id)
+                deleted = False
+                for reminder in conf.reminders:
+                    if delta <= reminder:
+                        conf.reminders.remove(reminder)
                         try:
                             user = await self.client.fetch_user(user_id)
                             em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                             if reminder == 0:
                                 em.add_field(name="", value=f"**{event.name}** starts now!")
+                                await self.client.db.delete_event(event.id)
+                                deleted = True
                             else:
-                                em.add_field(name="", value=f"**{event.name}** starts in {reminder // 60} minute(s)")
+                                em.add_field(name="", value=f"**{event.name}** starts in {sec_to_readable(reminder)}.")
                             await user.send(embed=em)
+                            self.logger.info(f"Reminder for {event.id} send {sec_to_readable(reminder)} minutes before the event")
                         except discord.Forbidden:
                             pass
+                        if not deleted:
+                            await self.client.db.update_confirmation(event_id=event.id, guest=user_id, reminders=conf.reminders)
 
-                        self.logger.info(f"Reminder for {event.id} send {reminder // 60} minutes before the event")
-                    await self.client.db.update_event(id=event.id, reminders=event.reminders)
 
 
 def setup(client):
