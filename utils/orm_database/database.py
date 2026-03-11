@@ -656,7 +656,7 @@ class ORMDataBase:
                 session.add(Events(id=str(id), host=int(host), name=str(name), time=time, mode=mode))
                 await session.commit()
                 for invite in invites:
-                    await self.create_confirmation(event_id=id, guest=invite.id, confirmation=None, reminders=[0])  # type: ignore
+                    await self.create_confirmation(event_id=id, guest=invite.id, confirmation=None, reminders=[0])
             self.logger.info(f"Event created {id}")
             return id
 
