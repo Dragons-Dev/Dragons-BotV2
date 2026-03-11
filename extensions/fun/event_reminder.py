@@ -303,7 +303,10 @@ class EventInviteModal(discord.ui.DesignerModal):
                 already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
                 if invite.id not in already_invites:
                     await self.client.db.create_confirmation(
-                        event_id=event_id, guest=invite.id, confirmation=None, reminders=[0]  # type: ignore
+                        event_id=event_id,
+                        guest=invite.id,
+                        confirmation=None,
+                        reminders=[0],  # type: ignore
                     )
 
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
@@ -413,7 +416,9 @@ class EventCreateModal(discord.ui.DesignerModal):
         )
         event_obj = await self.client.db.get_event_by_id(event_id)
         if event_obj is None:
-            await interaction.response.send_message(f"Something went wrong. The event no longer exits. I dont even know how that would happen maybe i should by a lotto ticket.")
+            await interaction.response.send_message(
+                "Something went wrong. The event no longer exits. I dont even know how that would happen maybe i should by a lotto ticket."
+            )
             return
         for user in guests:
             try:
