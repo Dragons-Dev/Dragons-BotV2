@@ -44,21 +44,19 @@ class InviteReminderSelectModal(discord.ui.DesignerModal):
         self.guest = guest
         self.status = status
 
-        options: list[discord.SelectOption] | None = []
+        options: list[discord.SelectOption] = []
         for reminder in REMINDER_BUTTONS:
             if self.event.time.replace(tzinfo=SERVER_TZ) > (
                 datetime.now(tz=SERVER_TZ) + timedelta(seconds=REMINDER_BUTTONS[reminder])
             ):
                 d_option = discord.SelectOption(label=reminder, value=str(REMINDER_BUTTONS[reminder]))
                 options.append(d_option)
-                print(reminder)
-        if options == []:
-            options = None
+            
         self.event_reminders = discord.ui.Label(
             "Select",
             discord.ui.Select(
                 placeholder="Select a reminder.",
-                options=options,
+                options=options if options else None,
                 required=False,
                 max_values=len(options),
             ),
@@ -170,7 +168,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
         super().__init__(*args, **kwargs)
         self.client = client
 
-        options: list[discord.SelectOption] | None = []
+        options: list[discord.SelectOption] = []
         self.events = events
         for event in self.events:
             option = discord.SelectOption(
@@ -178,14 +176,12 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
             )
             options.append(option)
 
-        if options == []:
-            options = None
         self.event = discord.ui.Label(
             "Event",
             discord.ui.Select(
                 placeholder="Select the Event you want to attend.",
                 required=True,
-                options=options,
+                options=options if options else None,
                 min_values=1,
                 max_values=1,
             ),
