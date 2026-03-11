@@ -39,7 +39,7 @@ class ORMDataBase:
         """
         Initializes the ORMDataBase instance with an async engine and session maker.
         """
-        self.logger: CustomLogger = None  # type: ignore
+        self.logger: CustomLogger = None  # type: ignore 
         self.engine: AsyncEngine = create_async_engine(DATABASE_URL)
         self.AsyncSessionLocal: AsyncSession = async_sessionmaker(self.engine, expire_on_commit=False)  # type: ignore
 
