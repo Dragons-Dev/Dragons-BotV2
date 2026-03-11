@@ -44,7 +44,7 @@ class InviteReminderSelectModal(discord.ui.DesignerModal):
         self.guest = guest
         self.status = status
 
-        options = []
+        options: list[discord.SelectOption] | None = []
         for reminder in REMINDER_BUTTONS:
             if self.event.time.replace(tzinfo=SERVER_TZ) > (
                 datetime.now(tz=SERVER_TZ) + timedelta(seconds=REMINDER_BUTTONS[reminder])
@@ -53,7 +53,7 @@ class InviteReminderSelectModal(discord.ui.DesignerModal):
                 options.append(d_option)
                 print(reminder)
         if options == []:
-            options = None  # type: ignore
+            options = None
         self.event_reminders = discord.ui.Label(
             "Select",
             discord.ui.Select(
@@ -135,7 +135,8 @@ class InviteRequestView(discord.ui.View):
                 await self.client.db.create_confirmation(
                     event_id=self.event.id,
                     guest=self.requester.id,
-                    confirmation=None,  # type: ignore
+                    confirmation=None,
+                    reminders=[0],
                 )
             event_obj: Event | None = await self.client.db.get_event_by_id(id=self.event.id)
             if event_obj is None:
@@ -168,7 +169,8 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
     def __init__(self, ctx: discord.ApplicationContext, client: Bot, events: list[Event], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
-        options = []
+
+        options: list[discord.SelectOption] | None = []
         self.events = events
         for event in self.events:
             option = discord.SelectOption(
@@ -177,7 +179,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
             options.append(option)
 
         if options == []:
-            options = None  # type: ignore
+            options = None
         self.event = discord.ui.Label(
             "Event",
             discord.ui.Select(
@@ -210,7 +212,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                     await self.client.db.create_confirmation(
                         event_id=event_id,
                         guest=interaction.user.id,
-                        confirmation=None,  # type: ignore
+                        confirmation=None,
                         reminders=[0],
                     )
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
@@ -255,7 +257,8 @@ class EventInviteModal(discord.ui.DesignerModal):
     def __init__(self, ctx: discord.ApplicationContext, client: Bot, events: list[Event], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
-        options = []
+
+        options: list[discord.SelectOption] | None = []
         self.events = events
         for event in self.events:
             if ctx.interaction.user.id == event.host:
@@ -265,7 +268,7 @@ class EventInviteModal(discord.ui.DesignerModal):
                 options.append(option)
 
         if options == []:
-            options = None  # type: ignore
+            options = None
 
         self.event = discord.ui.Label(
             "Event",
@@ -306,7 +309,7 @@ class EventInviteModal(discord.ui.DesignerModal):
                         event_id=event_id,
                         guest=invite.id,
                         confirmation=None,
-                        reminders=[0],  # type: ignore
+                        reminders=[0],
                     )
 
                 em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
