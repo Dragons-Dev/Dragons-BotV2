@@ -79,7 +79,7 @@ class InviteReminderSelectModal(discord.ui.DesignerModal):
             await interaction.response.defer(invisible=True)
             await interaction.message.reply(
                 f"✅ Your answer **{'Accept' if self.status else 'Reject'}** was stored and the selected reminders were set.",
-                silent=True
+                silent=True,
             )
         else:
             await interaction.response.send_message("Something went wrong.", ephemeral=True, delete_after=5)
@@ -628,7 +628,7 @@ class EventReminder(commands.Cog):
                 if event_time >= now:
                     self.client.add_view(ParticipationView(client=self.client, event=event))
             self.persistent_views_added = True
-            self.logger.info(f"Persistant view for event invites added.")
+            self.logger.info("Persistant view for event invites added.")
         self.reminder_loop.start()
 
     @pycog.subcommand("event")
