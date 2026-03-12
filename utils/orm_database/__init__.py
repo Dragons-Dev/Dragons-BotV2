@@ -9,7 +9,7 @@ from .models import (
     BotStatus,
     EnabledCommands,
     Events,
-    Confirmation,
+    ConfirmationDB,
 )
 
 __all__ = [
@@ -23,5 +23,5 @@ __all__ = [
     "BotStatus",
     "EnabledCommands",
     "Events",
-    "Confirmation",
+    "ConfirmationDB",
 ]
