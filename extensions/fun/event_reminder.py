@@ -36,6 +36,12 @@ REMINDER_BUTTONS = {
 }
 
 
+class InviteMode(Enum):
+    OPEN = "OPEN"
+    INVITE_ONLY = "INVITE_ONLY"
+    CLOSED = "CLOSED"
+
+
 class InviteReminderSelectModal(discord.ui.DesignerModal):
     def __init__(self, client: Bot, event: Event, guest: int, status: bool, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -75,12 +81,6 @@ class InviteReminderSelectModal(discord.ui.DesignerModal):
             )
         else:
             await interaction.response.send_message("Something went wrong.", ephemeral=True, delete_after=5)
-
-
-class InviteMode(Enum):
-    OPEN = "OPEN"
-    INVITE_ONLY = "INVITE_ONLY"
-    CLOSED = "CLOSED"
 
 
 class ParticipationView(discord.ui.View):
