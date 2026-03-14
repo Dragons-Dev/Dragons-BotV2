@@ -60,15 +60,13 @@ def _build_mute_view(channel_ctx: discord.VoiceChannel) -> ContainerPaginator:
     channel = channel_ctx
     user_in_channel = channel.members
     paginator = ContainerPaginator()
-    user_per_page = 5 # Show 5 user per page
-    pages_required = (len(user_in_channel) + 4) // user_per_page # +4 
+    user_per_page = 5  # Show 5 user per page
+    pages_required = (len(user_in_channel) + 4) // user_per_page  # +4
 
     for i in range(pages_required):
         page_container = discord.ui.Container()
-        for user in user_in_channel[i * user_per_page:(i + 1) * user_per_page]:
-            name_button = discord.ui.Button(
-                label=user.display_name, style=discord.ButtonStyle.gray, disabled=True
-            )
+        for user in user_in_channel[i * user_per_page : (i + 1) * user_per_page]:
+            name_button = discord.ui.Button(label=user.display_name, style=discord.ButtonStyle.gray, disabled=True)
 
             mute_button = Mute(user=user, ctx=channel)
 
@@ -204,6 +202,7 @@ class InVoiceModeration(commands.Cog):
                         if member.bot:
                             continue
                         await member.edit(deafen=False, mute=False)
+
 
 def setup(client: Bot):
     client.add_cog(InVoiceModeration(client))
