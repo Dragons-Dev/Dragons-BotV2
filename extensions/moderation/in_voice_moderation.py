@@ -152,6 +152,7 @@ class InVoiceModeration(commands.Cog):
                 if user_claim == ctx.user or ctx.user.guild_permissions.administrator:
                     container = _build_mute_view(ctx.channel)
                     view = container.update_view()
+                    view.timeout = None
                     try:
                         await self.requested_message[ctx.channel_id].delete_original_message()
                         message = await ctx.response.send_message(view=view, ephemeral=True)
@@ -178,13 +179,15 @@ class InVoiceModeration(commands.Cog):
         This function removes the server applied mute and deafen, as soon as they join any channel with this status.
         Additionaly if the owner leaves the channel, the channel becomes unclaimed and the server applied mute and deafen are removed.
         """
+        # The function should only trigger when a user joins/leaves the channel
+        if before.channel == after.channel:
+            return
         # Removes mute and deaf from anyone joining a channel
         if after.channel is not None:
-            if before.channel != after.channel:
-                if not member.bot:
-                    await member.edit(deafen=False, mute=False)
+            if not member.bot:
+                await member.edit(deafen=False, mute=False)
 
-        # If the user that claimed the channel leaves the channel becomes unclaimed and all mutes and deafs are removed from user in thath channel
+        # If the user that claimed the channel leaves the channel becomes unclaimed and all mutes and deafs are removed from user in that channel
         if before.channel is not None:
             if before.channel.id in [*self.claimed]:
                 if member.id == self.claimed[before.channel.id].id and before.channel != after.channel:
@@ -201,27 +204,6 @@ class InVoiceModeration(commands.Cog):
                         if member.bot:
                             continue
                         await member.edit(deafen=False, mute=False)
-
-        # Edit the moderation message when someone enters the channel
-        if after.channel is not None:
-            try:
-                container = _build_mute_view(after.channel)
-                view = container.update_view()
-                message = self.requested_message[after.channel.id]
-                await message.edit(view=view)
-            except KeyError:
-                pass
-
-        # Edit the moderation message when someone leaves the channel
-        if before.channel is not None:
-            try:
-                container = _build_mute_view(before.channel)
-                view = container.update_view()
-                message = self.requested_message[before.channel.id]
-                await message.edit(view=view)
-            except KeyError:
-                pass
-
 
 def setup(client: Bot):
     client.add_cog(InVoiceModeration(client))
