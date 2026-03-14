@@ -17,7 +17,6 @@ from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from ..logger import CustomLogger
 from .models import (
     Base,
-    BotStatus,
     Infractions,
     Join2Create,
     Modmail,
@@ -26,6 +25,8 @@ from .models import (
     EnabledCommands,
     Events,
     Confirmation,
+    TwitchStream,
+    TwitchInterested
 )
 from ..classes import Event
 
@@ -376,65 +377,6 @@ class ORMDataBase:
                     await session.delete(stat)
                 await session.commit()
 
-    async def create_bot_status(self, activity_type: discord.ActivityType, status: discord.Status, activity_name: str):
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                session.add(
-                    BotStatus(activity_type=int(activity_type), status=str(status), activity_name=activity_name)
-                )
-                await session.commit()
-
-    async def edit_bot_status(
-        self,
-        id_: int,
-        activity_type: discord.ActivityType = None,
-        status: discord.Status = None,
-        activity_name: str = None,
-    ) -> None:
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(BotStatus).where(BotStatus.id == id_)
-                result = (await session.execute(query)).scalar_one_or_none()
-                if result is None:
-                    return None
-                result.activity_type = int(activity_type) if activity_type else result.activity_type
-                result.status = str(status) if status else result.status
-                result.activity_name = activity_name if activity_name else result.activity_name
-                await session.commit()
-
-    async def get_bot_status(self, id_: int | None) -> BotStatus | Sequence[BotStatus] | None:
-        """
-        Gets the bot status from the database.
-        Args:
-            id_:
-
-        Returns:
-            A BotStatus object, a list of it or None. The BotStatus object uses py-cords enums for activity_type and
-            status. You will have to convert them to the correct type, to use them effectively.
-        """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                if id_:
-                    query = select(BotStatus).where(BotStatus.id == id_)
-                else:
-                    query = select(BotStatus)
-                bot_status = (await session.execute(query)).scalars().all()
-        if len(bot_status) == 0:
-            return None
-        if len(bot_status) == 1:
-            return bot_status[0]
-        return bot_status
-
-    async def delete_bot_status(self, id_: int):
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(BotStatus).where(BotStatus.id == id_)
-                result = (await session.execute(query)).scalar_one_or_none()
-                if result is None:
-                    return
-                await session.delete(result)
-                await session.commit()
-
     async def is_command_enabled(self, guild: discord.Guild, command_name: str) -> bool:
         """
         Checks if a specific command is enabled for a given guild.
@@ -722,3 +664,52 @@ class ORMDataBase:
                         return conf_deletion
         except SQLAlchemyError:
             return False
+
+    async def get_twitch_streams(self, guild: discord.Guild | None) -> Sequence[TwitchStream] | None:
+        async with self.AsyncSessionLocal() as session:
+            if guild:
+                query = select(TwitchStream).where(TwitchStream.guild_id == guild.id)
+            else:
+                query = select(TwitchStream)
+            result = (await session.execute(query)).scalars().all()
+            return result if result else None
+
+    async def insert_twitch_stream(self, stream: str, guild: discord.Guild) -> None:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                session.add(TwitchStream(streamer=stream, guild_id=guild.id))
+                await session.commit()
+
+    async def delete_twitch_stream(self, stream: str, guild: discord.Guild) -> None:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(TwitchStream).where(
+                    TwitchStream.streamer == stream, TwitchStream.guild_id == guild.id
+                )
+                result = (await session.execute(query)).scalar_one_or_none()
+                if result is not None:
+                    await session.delete(result)
+                    await session.commit()
+
+    async def get_twitch_interested(self, stream: str, guild: discord.Guild) -> Sequence[TwitchInterested] | None:
+        async with self.AsyncSessionLocal() as session:
+            query = select(TwitchInterested).where(TwitchInterested.guild_id == guild.id, TwitchInterested.streamer == stream)
+            result = (await session.execute(query)).scalars().all()
+            return result if result else None
+
+    async def insert_twitch_interested(self, stream: str, user: discord.User, guild: discord.Guild) -> None:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                session.add(TwitchInterested(streamer=stream, user_id=user.id, guild_id=guild.id))
+                await session.commit()
+
+    async def delete_twitch_interested(self, stream: str, user: discord.User, guild: discord.Guild) -> None:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(TwitchInterested).where(
+                    TwitchInterested.streamer == stream, TwitchInterested.user_id == user.id, TwitchInterested.guild_id == guild.id
+                )
+                result = (await session.execute(query)).scalar_one_or_none()
+                if result is not None:
+                    await session.delete(result)
+                    await session.commit()

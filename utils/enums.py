@@ -19,6 +19,7 @@ class SettingsEnum(Enum):
     AuditLogChannel = "Audit-Log Channel"
     TagesschauChannel = "Tagesschau Channel"
     FeedbackChannel = "Feedback Channel"
+    SocialMediaChannel = "Social Media Channel"
 
 
 class InfractionsEnum(Enum):
@@ -37,3 +38,4 @@ class StatTypeEnum(Enum):
 class WebhookType(Enum):
     Tagesschau = "Tagesschau"
     Modmail = "Modmail"
+    SocialMedia = "SocialMedia"

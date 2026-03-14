@@ -26,8 +26,8 @@ class InternalHooks(commands.Cog):
         Returns:
             ``discord.Webhook`` the webhook associated with this bot and the discord channel.
         """
-        guild: discord.Guild = await get_or_fetch(self.client, "guild", guild_id, default=None)
-        channel: discord.TextChannel = await get_or_fetch(guild, "channel", channel_id, default=None)
+        guild: discord.Guild = await get_or_fetch(self.client, discord.Guild, guild_id, default=None)
+        channel: discord.TextChannel = await get_or_fetch(guild, discord.TextChannel, channel_id, default=None)
         if str(guild_id) not in self.webhooks:
             self.webhooks[str(guild_id)] = {}  # creating a new dict for the guild
         if self.webhooks[str(guild_id)].get(str(channel_id)):
@@ -43,6 +43,7 @@ class InternalHooks(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def send_news(self):
+        # TODO: Make more modular, so we don't have to rework for every new webhook!
         if len(self.send_queue) <= 0:
             return
 

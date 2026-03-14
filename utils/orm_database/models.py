@@ -4,7 +4,7 @@ from sqlalchemy import Boolean, Column, DateTime, Integer, String, Date, UniqueC
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
-__all__ = ["Base", "Settings", "Infractions", "Join2Create", "Modmail", "UserStats", "BotStatus", "EnabledCommands"]
+__all__ = ["Base", "Settings", "Infractions", "Join2Create", "Modmail", "UserStats", "BotStatus", "EnabledCommands", "TwitchStream", "TwitchInterested"]
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -125,3 +125,20 @@ class Confirmation(Base):
 
     def __repr__(self):
         return f"<{self.__tablename__}(event_id={self.event_id}, user_id={self.user_id}, confirmation={self.confirmation})>"
+
+class TwitchStream(Base):
+    __tablename__ = "twitchstream"
+    streamer = Column(String, primary_key=True)
+    guild_id = Column(Integer, primary_key=True)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}(streamer={self.streamer}, guild_id={self.guild_id})>"
+
+class TwitchInterested(Base):
+    __tablename__ = "twitchinterested"
+    streamer = Column(String, primary_key=True)
+    user_id = Column(Integer, primary_key=True)
+    guild_id = Column(Integer, primary_key=True)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}(streamer={self.streamer}, user_id={self.user_id}, guild_id={self.guild_id})>"
