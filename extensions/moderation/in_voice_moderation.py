@@ -61,7 +61,7 @@ def _build_mute_view(channel_ctx: discord.VoiceChannel) -> ContainerPaginator:
     user_in_channel = channel.members
     paginator = ContainerPaginator()
     user_per_page = 5  # Show 5 user per page
-    pages_required = (len(user_in_channel) + 4) // user_per_page  # +4
+    pages_required = (len(user_in_channel) + 4) // user_per_page  # +4 needed to have atleast one page
 
     for i in range(pages_required):
         page_container = discord.ui.Container()
