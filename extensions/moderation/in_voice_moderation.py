@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import pycord.multicog as pycog
 
-from utils import Bot, CustomLogger
+from utils import Bot, CustomLogger, ContainerPaginator
 
 
 class Mute(discord.ui.Button):
@@ -56,34 +56,25 @@ class Deaf(discord.ui.Button):
         await interaction.response.edit_message(view=self.view)
 
 
-class MuteView(discord.ui.View):
-    def __init__(self, channel_ctx: discord.VoiceChannel):
-        super().__init__()
-        self.channel = channel_ctx
-        self.user_in_channel = self.channel.members
-        # container = discord.ui.Container()
-        # container.add_separator()
-        self.row = 0
-        for member in self.user_in_channel[:5]:  # Mit dem neuen Kram ohne Container sind nur noch 5 Rows möglich
-            # Mögliche Erweiterungen wären:
-            # mehrere Nachrichten
-            # Page system mit umblättern
-            # Nicht mehr alle Nutzer anzeigen sondern nur "Spieler" die sich vorher angemeldet haben
-            # Button mit Name (disabled, nur Anzeige)
-            name_button = discord.ui.Button(
-                label=member.display_name, style=discord.ButtonStyle.gray, disabled=True, row=self.row
-            )
+def _build_mute_view(channel_ctx: discord.VoiceChannel) -> ContainerPaginator:
+    channel = channel_ctx
+    user_in_channel = channel.members
+    paginator = ContainerPaginator()
+    user_per_page = 5  # Show 5 user per page
+    pages_required = (len(user_in_channel) + 4) // user_per_page  # +4 needed to have atleast one page
 
-            mute_button = Mute(user=member, ctx=self.channel)
-            mute_button.row = self.row
+    for i in range(pages_required):
+        page_container = discord.ui.Container()
+        for user in user_in_channel[i * user_per_page : (i + 1) * user_per_page]:
+            name_button = discord.ui.Button(label=user.display_name, style=discord.ButtonStyle.gray, disabled=True)
 
-            deafen_button = Deaf(user=member, ctx=self.channel)
-            deafen_button.row = self.row
+            mute_button = Mute(user=user, ctx=channel)
 
-            self.add_item(name_button)
-            self.add_item(mute_button)
-            self.add_item(deafen_button)
-            self.row += 1
+            deafen_button = Deaf(user=user, ctx=channel)
+            action_row = discord.ui.ActionRow(name_button, mute_button, deafen_button)
+            page_container.add_item(action_row)
+        paginator.add_page(page_container)
+    return paginator
 
 
 class InVoiceModeration(commands.Cog):
@@ -157,12 +148,15 @@ class InVoiceModeration(commands.Cog):
             try:
                 user_claim = self.claimed[ctx.channel_id]
                 if user_claim == ctx.user or ctx.user.guild_permissions.administrator:
+                    container = _build_mute_view(ctx.channel)
+                    view = container.update_view()
+                    view.timeout = None
                     try:
                         await self.requested_message[ctx.channel_id].delete_original_message()
-                        message = await ctx.respond(view=MuteView(ctx.channel), ephemeral=True)
+                        message = await ctx.response.send_message(view=view, ephemeral=True)
                         self.requested_message[ctx.channel_id] = message
                     except KeyError:
-                        message = await ctx.respond(view=MuteView(ctx.channel), ephemeral=True)
+                        message = await ctx.response.send_message(view=view, ephemeral=True)
                         self.requested_message[ctx.channel_id] = message
                 else:
                     await ctx.response.send_message(
@@ -183,11 +177,15 @@ class InVoiceModeration(commands.Cog):
         This function removes the server applied mute and deafen, as soon as they join any channel with this status.
         Additionaly if the owner leaves the channel, the channel becomes unclaimed and the server applied mute and deafen are removed.
         """
+        # The function should only trigger when a user joins/leaves the channel
+        if before.channel == after.channel:
+            return
+        # Removes mute and deaf from anyone joining a channel
         if after.channel is not None:
-            if before.channel != after.channel:
-                if not member.bot:
-                    await member.edit(deafen=False, mute=False)
+            if not member.bot:
+                await member.edit(deafen=False, mute=False)
 
+        # If the user that claimed the channel leaves the channel becomes unclaimed and all mutes and deafs are removed from user in that channel
         if before.channel is not None:
             if before.channel.id in [*self.claimed]:
                 if member.id == self.claimed[before.channel.id].id and before.channel != after.channel:
@@ -204,22 +202,6 @@ class InVoiceModeration(commands.Cog):
                         if member.bot:
                             continue
                         await member.edit(deafen=False, mute=False)
-
-        # Edit the moderation message when someone enters the channel
-        if after.channel is not None:
-            try:
-                message = self.requested_message[after.channel.id]
-                await message.edit(view=MuteView(after.channel))
-            except KeyError:
-                pass
-
-        # Edit the moderation message when someone leaves the channel
-        if before.channel is not None:
-            try:
-                message = self.requested_message[before.channel.id]
-                await message.edit(view=MuteView(before.channel))
-            except KeyError:
-                pass
 
 
 def setup(client: Bot):
