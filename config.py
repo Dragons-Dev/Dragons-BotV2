@@ -5,7 +5,7 @@ import os
 
 load_dotenv(dotenv_path=".env")
 
-DISCORD_API_KEY = os.getenv("DISCORD_API_KEY")
+DISCORD_API_KEY = os.getenv("DISCORD_API_KEY", "")
 # The token you get from discord for authorizing your bot. https://discord.com/developers/applications
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///data/content.sqlite")
@@ -25,11 +25,11 @@ log_level = DEBUG if os.getenv("log_level") == "DEBUG" else INFO
 discord_log_level = INFO if os.getenv("log_level") == "INFO" else WARNING
 # the log level for discord. Lowering this may lead to huge logs.
 
-IPC_SECRET = os.getenv("IPC_SECRET")
+IPC_SECRET = os.getenv("IPC_SECRET", "")
 # this secret will be used to encrypt the communication between the bot and webinterface
 
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "")
 # get from https://developer.spotify.com/dashboard/
 
 SERVER_TZ = ZoneInfo(os.getenv("SERVER_TZ", "UTC"))
