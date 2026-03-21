@@ -1,0 +1,11 @@
+services:
+  dragons-bot:
+    image: ghcr.io/dragons-dev/dragons-botv2:latest
+    container_name: dragons_bot
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./data:/app/data
