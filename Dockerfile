@@ -3,7 +3,7 @@ RUN useradd -m -d /home/container container
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY --chown=container:container . .
 # RUN chmod -r 777 . test without
 ENV USER=container HOME=/home/container
 USER container
