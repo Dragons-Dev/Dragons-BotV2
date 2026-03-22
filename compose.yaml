@@ -8,4 +8,4 @@ services:
       - .env
 
     volumes:
-      - ./data:/home/container/data
+      - ./data:/app/data
