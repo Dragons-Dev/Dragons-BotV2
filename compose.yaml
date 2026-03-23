@@ -8,4 +8,4 @@ services:
       - .env
 
     volumes:
-      - ./data:/opt/bot/data
+      - ./data:/home/container/data
