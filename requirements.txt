@@ -2,7 +2,7 @@ aiohttp~=3.12.15
 aiosqlite==0.21.0
 beautifulsoup4~=4.13.5
 better-ipc~=2.0.3
-chat_exporter~=2.8.4
+chat_exporter~=3.0.1
 colorama==0.4.6
 feedparser~=6.0.12
 psutil~=7.1.0
