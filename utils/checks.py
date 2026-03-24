@@ -13,6 +13,8 @@ def is_team():
     """
 
     async def predicate(ctx: discord.ApplicationContext):
+        if isinstance(ctx.channel, discord.channel.DMChannel):
+            return True
         team_role = await ctx.bot.db.get_setting(setting=SettingsEnum.TeamRole, guild=ctx.guild)
         if team_role is None:
             if ctx.author.guild_permissions.administrator or ctx.author.guild_permissions.manage_guild:

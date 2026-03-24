@@ -39,22 +39,29 @@ class MessagePurge(commands.Cog):
             await ctx.response.send_message("You can only delete up to 100 messages at a time.", ephemeral=True)
             return
         await ctx.defer(ephemeral=True)
-        if which is None:
-            deleted_messages = await ctx.channel.purge(
-                limit=amount, reason=f"{ctx.author.name} purged {ctx.channel.name}"
-            )
-        elif type(which) is discord.Role:
-            deleted_messages = await ctx.channel.purge(
-                limit=amount,
-                check=lambda message: which.id in [r.id for r in message.author.roles],
-                reason=f"{ctx.author.name} purged {ctx.channel.name}",
-            )
+        # Depending if channel is DMChannel or Guild Channel
+        if isinstance(ctx.channel, discord.channel.DMChannel):
+            deleted_messages: list[discord.Message] = await ctx.channel.history(limit=amount).flatten()
+            for message in deleted_messages:
+                if message.author == self.client.user:
+                    await message.delete()
         else:
-            deleted_messages = await ctx.channel.purge(
-                limit=amount,
-                check=lambda message: message.author.id == which.id,
-                reason=f"{ctx.author.name} purged {ctx.channel.name}",
-            )
+            if which is None:
+                deleted_messages = await ctx.channel.purge(
+                    limit=amount, reason=f"{ctx.author.name} purged {ctx.channel.name}"
+                )
+            elif type(which) is discord.Role:
+                deleted_messages = await ctx.channel.purge(
+                    limit=amount,
+                    check=lambda message: which.id in [r.id for r in message.author.roles],
+                    reason=f"{ctx.author.name} purged {ctx.channel.name}",
+                )
+            else:
+                deleted_messages = await ctx.channel.purge(
+                    limit=amount,
+                    check=lambda message: message.author.id == which.id,
+                    reason=f"{ctx.author.name} purged {ctx.channel.name}",
+                )
         await ctx.followup.send(f"Deleted {len(deleted_messages)} messages.", ephemeral=True)
 
 
