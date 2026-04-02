@@ -701,7 +701,7 @@ class EventReminder(commands.Cog):
         name="delete", description="Delete an event that you created", contexts={discord.InteractionContextType.guild}
     )
     @discord.option(
-        autocomplete=event_choices, name="event", description="Select the event yxou want to edit.", required=True
+        autocomplete=event_choices, name="event", description="Select the event you want to delete.", required=True
     )
     async def delete(self, ctx: discord.ApplicationContext, event: str):
         name = event.split(" | ")[0]
@@ -763,3 +763,11 @@ class EventReminder(commands.Cog):
 
 def setup(client):
     client.add_cog(EventReminder(client))
+
+def path_to_extension(path: str) -> str:
+    res = path[path.find("extensions"):]
+    res = res[:-3]
+    return res.replace("\\", ".")
+
+def teardown(client:Bot):
+    client.remove_cog(path_to_extension(__file__))
