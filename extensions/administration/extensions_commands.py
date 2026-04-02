@@ -3,7 +3,7 @@ import json
 import os
 from discord.ext import commands
 
-from utils import Bot, CustomLogger, is_team
+from utils import Bot, CustomLogger
 
 blacklist = ["extensions_commands", "internal", "__pycache__"]
 
@@ -65,7 +65,9 @@ class ExtensionsCommands(commands.Cog):
 
         self.logger.info(f"Extension {path} has been enabled and will be active after restart.")
         await ctx.response.send_message(
-            f"✅ `{path}` has been marked as activated and will be active after restart.", ephemeral=True, delete_after=5
+            f"✅ `{path}` has been marked as activated and will be active after restart.",
+            ephemeral=True,
+            delete_after=5,
         )
 
     @commands.slash_command(name="deactivate_extension", description="Deactivate a selected Extension")
@@ -93,10 +95,11 @@ class ExtensionsCommands(commands.Cog):
         with open("./assets/disabled.json", "w") as f:
             json.dump(extension_store, f, indent=4)
 
-        
         self.logger.info(f"Extension: {path} has been disabled and will not be loaded on the next restart.")
         await ctx.response.send_message(
-            f"🚫 `{folder}.{extension}` has been marked as deactivated and will not be loaded in the next restart.", ephemeral=True, delete_after=5
+            f"🚫 `{folder}.{extension}` has been marked as deactivated and will not be loaded in the next restart.",
+            ephemeral=True,
+            delete_after=5,
         )
 
 
