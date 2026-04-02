@@ -43,7 +43,7 @@ class ExtensionsCommands(commands.Cog):
     @discord.option(
         autocomplete=extension, name="extension", description="Select the Extension to activate", required=True
     )
-    @is_team()
+    @commands.is_owner()
     async def activate_extension(self, ctx: discord.ApplicationContext, folder: str, extension: str):
         if folder in blacklist or extension in blacklist:
             return await ctx.response.send_message(
@@ -62,8 +62,9 @@ class ExtensionsCommands(commands.Cog):
         with open("./assets/disabled.json", "w") as f:
             json.dump(extension_store, f, indent=4)
 
+        self.logger.info(f"Extension {path} has been enabled and will be active after restart.")
         await ctx.response.send_message(
-            f"✅ `{folder}.{extension}` has been activated.", ephemeral=True, delete_after=5
+            f"✅ `{path}` has been marked as activated and will be active after restart.", ephemeral=True, delete_after=5
         )
 
     @commands.slash_command(name="deactivate_extension", description="Deactivate a selected Extension")
@@ -71,7 +72,7 @@ class ExtensionsCommands(commands.Cog):
     @discord.option(
         autocomplete=extension, name="extension", description="Select the Extension to deactivate", required=True
     )
-    @is_team()
+    @commands.is_owner()
     async def deactivate_extension(self, ctx: discord.ApplicationContext, folder: str, extension: str):
         if folder in blacklist or extension in blacklist:
             return await ctx.response.send_message(
@@ -91,8 +92,10 @@ class ExtensionsCommands(commands.Cog):
         with open("./assets/disabled.json", "w") as f:
             json.dump(extension_store, f, indent=4)
 
+        
+        self.logger.info(f"Extension: {path} has been disabled and will not be loaded on the next restart.")
         await ctx.response.send_message(
-            f"🚫 `{folder}.{extension}` has been deactivated.", ephemeral=True, delete_after=5
+            f"🚫 `{folder}.{extension}` has been marked as deactivated and will not be loaded in the next restart.", ephemeral=True, delete_after=5
         )
 
 
