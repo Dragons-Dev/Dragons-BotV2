@@ -7,6 +7,7 @@ from utils import Bot, CustomLogger, is_team
 
 blacklist = ["extensions_commands", "internal", "__pycache__"]
 
+
 def folder(ctx: discord.AutocompleteContext) -> list[str]:
     folders = [name for name in os.listdir("./extensions") if os.path.isdir(f"./extensions/{name}")]
     for bl in blacklist:
@@ -47,7 +48,7 @@ class ExtensionsCommands(commands.Cog):
     async def activate_extension(self, ctx: discord.ApplicationContext, folder: str, extension: str):
         if folder in blacklist or extension in blacklist:
             return await ctx.response.send_message(
-                f"The selected extension doesn't exist", ephemeral=True, delete_after=5
+                "The selected extension doesn't exist", ephemeral=True, delete_after=5
             )
         path: str = f"extensions.{folder}.{extension}"
         with open("./assets/disabled.json") as f:
@@ -76,7 +77,7 @@ class ExtensionsCommands(commands.Cog):
     async def deactivate_extension(self, ctx: discord.ApplicationContext, folder: str, extension: str):
         if folder in blacklist or extension in blacklist:
             return await ctx.response.send_message(
-                f"The selected extension doesn't exist", ephemeral=True, delete_after=5
+                "The selected extension doesn't exist", ephemeral=True, delete_after=5
             )
         path: str = f"extensions.{folder}.{extension}"
         path = path.replace(".py", "")
