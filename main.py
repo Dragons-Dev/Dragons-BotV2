@@ -29,7 +29,7 @@ bot = Bot(
 
 @bot.listen("on_ready", once=True)
 async def on_boot():
-    #print(bot.cogs)
+    # print(bot.cogs)
     bot.sts = ShortTermStorage(path="data/sts.sqlite")
     await bot.sts.setup(bot.boot_time)
     bot.logger.debug("Initialized sts db")
@@ -77,25 +77,24 @@ if __name__ == "__main__":
     with open("./assets/disabled.json") as f:
         extension_store = json.load(f)
 
-
     for root, dirs, files in os.walk("./extensions"):
         for file in files:
             if file.endswith(".py") and not file.startswith("_"):
-                    rel_path = os.path.relpath(os.path.join(root, file), ".")
-                    ext_name = rel_path.replace(os.sep, ".").removesuffix(".py")
+                rel_path = os.path.relpath(os.path.join(root, file), ".")
+                ext_name = rel_path.replace(os.sep, ".").removesuffix(".py")
 
-                    if ext_name not in extension_store:
-                        extension_store[ext_name] = True
-                    
-                    if extension_store[ext_name]:
-                        try:
-                            bot.load_extension(ext_name)
-                            bot.logger.info(f"{ext_name} loaded successfully!")
-                        except Exception as e:
-                            bot.logger.critical(f"{ext_name}: {str(e)}")  # raise errors and stop connecting to discord
-                            exit_("Error loading extensions!")
-                    else:
-                        bot.logger.warning(f"{ext_name} is disabled!")
+                if ext_name not in extension_store:
+                    extension_store[ext_name] = True
+
+                if extension_store[ext_name]:
+                    try:
+                        bot.load_extension(ext_name)
+                        bot.logger.info(f"{ext_name} loaded successfully!")
+                    except Exception as e:
+                        bot.logger.critical(f"{ext_name}: {str(e)}")  # raise errors and stop connecting to discord
+                        exit_("Error loading extensions!")
+                else:
+                    bot.logger.warning(f"{ext_name} is disabled!")
 
     with open("./assets/disabled.json", "w") as f:
         json.dump(extension_store, f, indent=4)

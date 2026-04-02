@@ -764,10 +764,12 @@ class EventReminder(commands.Cog):
 def setup(client):
     client.add_cog(EventReminder(client))
 
+
 def path_to_extension(path: str) -> str:
-    res = path[path.find("extensions"):]
+    res = path[path.find("extensions") :]
     res = res[:-3]
     return res.replace("\\", ".")
 
-def teardown(client:Bot):
+
+def teardown(client: Bot):
     client.remove_cog(path_to_extension(__file__))
