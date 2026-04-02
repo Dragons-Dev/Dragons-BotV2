@@ -5,11 +5,13 @@ from discord.ext import commands
 
 from utils import Bot, CustomLogger, is_team
 
+blacklist = ["extensions_commands", "internal", "__pycache__"]
 
 def folder(ctx: discord.AutocompleteContext) -> list[str]:
     folders = [name for name in os.listdir("./extensions") if os.path.isdir(f"./extensions/{name}")]
-    if "__pycache__" in folders:
-        folders.remove("__pycache__")
+    for bl in blacklist:
+        if bl in folders:
+            folders.remove(bl)
     return folders
 
 
@@ -20,11 +22,14 @@ def extension(ctx: discord.AutocompleteContext) -> list[str]:
     path = f"extensions/{folder}"
     try:
         onlyfiles = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-    except:
+    except OSError:
         onlyfiles = []
     files = []
     for file in onlyfiles:
         files.append(file.replace(".py", ""))
+    for bl in blacklist:
+        if bl in files:
+            files.remove(bl)
     return files
 
 
@@ -40,6 +45,10 @@ class ExtensionsCommands(commands.Cog):
     )
     @is_team()
     async def activate_extension(self, ctx: discord.ApplicationContext, folder: str, extension: str):
+        if folder in blacklist or extension in blacklist:
+            return await ctx.response.send_message(
+                f"The selected extension doesn't exist", ephemeral=True, delete_after=5
+            )
         path: str = f"extensions.{folder}.{extension}"
         with open("./assets/disabled.json") as f:
             extension_store = json.load(f)
@@ -64,6 +73,10 @@ class ExtensionsCommands(commands.Cog):
     )
     @is_team()
     async def deactivate_extension(self, ctx: discord.ApplicationContext, folder: str, extension: str):
+        if folder in blacklist or extension in blacklist:
+            return await ctx.response.send_message(
+                f"The selected extension doesn't exist", ephemeral=True, delete_after=5
+            )
         path: str = f"extensions.{folder}.{extension}"
         path = path.replace(".py", "")
         with open("./assets/disabled.json") as f:
