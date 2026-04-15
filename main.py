@@ -29,7 +29,6 @@ bot = Bot(
 
 @bot.listen("on_ready", once=True)
 async def on_boot():
-    # print(bot.cogs)
     bot.sts = ShortTermStorage(path="data/sts.sqlite")
     await bot.sts.setup(bot.boot_time)
     bot.logger.debug("Initialized sts db")

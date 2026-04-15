@@ -13,7 +13,7 @@ def folder(ctx: discord.AutocompleteContext) -> list[str]:
     for bl in blacklist:
         if bl in folders:
             folders.remove(bl)
-    return folders
+    return sorted(folders)
 
 
 def extension(ctx: discord.AutocompleteContext) -> list[str]:
