@@ -49,6 +49,14 @@ class ErrorHandler(commands.Cog):
                 ),
                 ephemeral=True,
             )
+        elif isinstance(exc, commands.NotOwner):
+            await ctx.response.send_message(
+                embed=error_embed(
+                    title="You are not the owner",
+                    description=str(exc),
+                ),
+                ephemeral=True,
+            )
         else:
             raise exc
 

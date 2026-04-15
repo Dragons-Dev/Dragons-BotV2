@@ -73,27 +73,34 @@ if __name__ == "__main__":
     sqlalchemy_logger.setLevel(logging.WARNING)
     sqlalchemy_logger.addHandler(console_handle)
 
-    extensions = bot.load_extensions("extensions", recursive=True, store=True)  # load every extension
     with open("./assets/disabled.json") as f:
         extension_store = json.load(f)
-    for extension, status in extensions.items():  # go through every extension and save not registered
-        if extension not in extension_store:
-            extension_store[extension] = True
-        if status is True:
-            if not extension_store[extension]:
-                bot.unload_extension(extension)  # unload extensions marked with false in /assets/disabled.json
-                bot.logger.warning(f"{extension} is disabled!")
-            else:
-                bot.logger.info(f"{extension} loaded successfully!")
-        else:
-            bot.logger.critical(f"{extension}: {str(status)}")  # raise errors and stop connecting to discord
-            exit_("Error loading extensions!")
+
+    for root, dirs, files in os.walk("./extensions"):
+        for file in files:
+            if file.endswith(".py") and not file.startswith("_"):
+                rel_path = os.path.relpath(os.path.join(root, file), ".")
+                ext_name = rel_path.replace(os.sep, ".").removesuffix(".py")
+
+                if ext_name not in extension_store:
+                    extension_store[ext_name] = True
+
+                if extension_store[ext_name]:
+                    try:
+                        bot.load_extension(ext_name)
+                        bot.logger.info(f"{ext_name} loaded successfully!")
+                    except Exception as e:
+                        bot.logger.critical(f"{ext_name}: {str(e)}")  # raise errors and stop connecting to discord
+                        exit_("Error loading extensions!")
+                else:
+                    bot.logger.warning(f"{ext_name} is disabled!")
+
     with open("./assets/disabled.json", "w") as f:
         json.dump(extension_store, f, indent=4)
+
     if DISCORD_API_KEY == "":
         bot.logger.critical("No token has been passed to the bot.")
         exit_(1)
-
     pid = os.getpid()
     try:
         bot.run(DISCORD_API_KEY)

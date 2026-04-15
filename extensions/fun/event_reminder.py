@@ -701,7 +701,7 @@ class EventReminder(commands.Cog):
         name="delete", description="Delete an event that you created", contexts={discord.InteractionContextType.guild}
     )
     @discord.option(
-        autocomplete=event_choices, name="event", description="Select the event yxou want to edit.", required=True
+        autocomplete=event_choices, name="event", description="Select the event you want to delete.", required=True
     )
     async def delete(self, ctx: discord.ApplicationContext, event: str):
         name = event.split(" | ")[0]
