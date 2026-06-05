@@ -1,4 +1,4 @@
-aiohttp~=3.12.15
+aiohttp~=3.13.5
 aiosqlite==0.21.0
 beautifulsoup4~=4.13.5
 better-ipc~=2.0.3
@@ -6,8 +6,9 @@ chat_exporter~=2.8.4
 colorama==0.4.6
 feedparser~=6.0.12
 psutil~=7.1.0
-py-cord<=2.7.1
+py-cord<=2.8.0
 pycord-multicog~=2.1.1
 python-dotenv~=1.2.2
 SQLAlchemy~=2.0.43
 tzdata~=2025.3
+aiocache==0.12.3
