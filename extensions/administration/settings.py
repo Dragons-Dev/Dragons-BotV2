@@ -94,7 +94,7 @@ class SettingsCog(commands.Cog):
             settings_value = discord.utils.find(lambda c: c.name == value, ctx.guild.channels)
         await self.client.db.update_setting(setting=db_setting, value=settings_value.id, guild=ctx.guild)
 
-        await ctx.response.send_message(
+        return await ctx.response.send_message(
             embed=discord.Embed(
                 title="Success",
                 description=f"Changed {setting} to {settings_value.mention}!",
@@ -113,7 +113,7 @@ class SettingsCog(commands.Cog):
         embed = discord.Embed(title="Guild Settings", color=discord.Color.dark_orange())
         for enum_value in SettingsEnum:
             enum = SettingsEnum(enum_value)
-            setting_value = await self.client.db.get_setting(setting=enum, guild=ctx.guild)
+            setting_value = await self.client.db.get_setting(setting=enum, guild=ctx.interaction.guild)
             if setting_value is None:
                 continue
             elif isinstance(setting_value, Sequence):

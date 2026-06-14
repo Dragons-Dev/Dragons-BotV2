@@ -190,7 +190,7 @@ class ModMail(commands.Cog):
         mail = await self.client.db.get_modmail(ctx.author, None)
         if mail.user_id is None:
             return await ctx.response.send_message("You are not chatting with any guild!", ephemeral=True)
-        guild: discord.Guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)
+        guild: discord.Guild = await self.client.get_or_fetch(discord.Guild, mail.guild_id, default=None)
         view = ButtonConfirm(cancel_title=f"You continue to mail with **{escape_markdown(guild.name)}**!")
         msg = await ctx.response.send_message(
             f"Do you really want to stop mailing with **{escape_markdown(guild.name)}**!", view=view, ephemeral=True
@@ -236,8 +236,8 @@ class ModMail(commands.Cog):
             modmail_channel_id = await self.client.db.get_setting(SettingsEnum.ModmailChannel, msg.guild)
             if modmail_channel_id is None:
                 return
-            modmail_channel: discord.TextChannel = await get_or_fetch(
-                msg.guild, "channel", modmail_channel_id.value, default=None
+            modmail_channel: discord.TextChannel = await msg.guild.get_or_fetch(
+                discord.TextChannel, modmail_channel_id.value, default=None
             )
             # getting modmail channel
             if modmail_channel is None:
