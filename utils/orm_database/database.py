@@ -68,11 +68,11 @@ class ORMDataBase:
             async with session.begin():
                 query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
                 response = await session.execute(query)
-                results = response.scalar_one_or_none()
-        if not results:
+                result = response.scalar_one_or_none()
+        if not result:
             return None
         else:
-            return results
+            return result
 
     async def get_all_settings(self, setting: SettingsEnum) -> Sequence[Settings] | None:
         async with self.AsyncSessionLocal() as session:
