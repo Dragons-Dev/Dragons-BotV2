@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime, timedelta, date
-from warnings import deprecated
+import typing as t
 
 import discord
 from sqlalchemy import select, and_, func, delete
@@ -633,7 +633,7 @@ class ORMDataBase:
             return False
 
     async def create_event(
-        self, *, host: int, name: str, time: datetime, invites: list[discord.User], mode: str
+        self, *, host: int, name: str, time: datetime, invites: list[discord.User], mode: t.Literal["OPEN", "CLOSED", "INVITE_ONLY"]
     ) -> str:
         """
         Creates a new event
