@@ -1,13 +1,113 @@
+# type: ignore
+import enum
 import json
 from random import choice
 
 import discord
-from discord import ui
+from discord import DiscordException, Interaction, ui
 from discord.ext import commands
 
-import utils
-from utils import Bot, CustomLogger, Settings, SettingsEnum
+from utils import Bot, CallbackButton, CustomLogger, Settings, SettingsEnum
 
+
+class ButtonEnum(enum.Enum):
+    SET_USER_LIMIT = enum.auto()
+    CLAIM_OWNERSHIP = enum.auto()
+    BAN_ROLE = enum.auto()
+    UNBAN_ROLE = enum.auto()
+    BAN_USER = enum.auto()
+    UNBAN_USER = enum.auto()
+    CHANGE_BITRATE = enum.auto()
+    RESET_PERMISSIONS = enum.auto()
+
+
+async def _send_modal(interaction: discord.Interaction = None):
+    if interaction is None or interaction.user is None:
+        raise DiscordException("Interaction triggered without interaction context.")
+    elif isinstance(interaction.user, discord.User):
+        raise DiscordException("Interaction triggered out of guild context.")
+    elif interaction.user.voice:
+        channel = interaction.user.voice.channel
+        await interaction.response.send_modal(SetUserLimit(client=interaction.client, channel=channel))
+    else:
+        raise DiscordException("Interaction without context.")
+
+
+class SetUserLimit(ui.DesignerModal):
+    def __init__(self, client: Bot, channel: discord.VoiceChannel):
+        super().__init__(title="Set user limit")
+        self.client = client
+        self.channel = channel
+        self.add_item(
+            ui.Label("Set member limit").set_input_text(placeholder="0-99"),
+        )
+
+    async def callback(self, interaction: Interaction):
+        label: ui.Label = self.children[0]
+        component: ui.InputText = label.item
+        client: Bot = interaction.client
+        if interaction.user.voice.channel != interaction.channel:
+            await interaction.respond("You must be in the same channel to change its settings.", ephemeral=True)
+            return
+        try:
+            if component.value is not None:
+                new_limit = int(component.value)
+                if new_limit < 0 or new_limit > 99:
+                    raise ValueError
+                if new_limit == 0:
+                    new_limit = None
+
+                await client.db.get_temp_voice()
+
+                channel: discord.VoiceChannel = interaction.channel
+                await channel.edit(
+                    user_limit=new_limit,
+                    reason=f"[J2C] {interaction.user.global_name} changed user limit to {new_limit or 'no limit'}.",
+                )
+                await interaction.respond(f"Changed user limit to {new_limit or 'no limit'}.", ephemeral=True)
+            else:
+                raise ValueError
+        except ValueError:
+            await interaction.respond("Please enter a valid number between 0-99 (0 is unlimited).", ephemeral=True)
+
+
+class VoiceBoard(ui.DesignerView):
+    def __init__(self, client: Bot, voice_owner: discord.Member):
+        super().__init__(timeout=None)
+        self.logger = CustomLogger("Join2Create/VoiceBoard", client.boot_time)
+        self.voice_owner = voice_owner
+
+        container = ui.Container(color=client.user.color)
+        if self.voice_owner.display_avatar and self.voice_owner.display_avatar.url:
+            container.add_section(
+                ui.TextDisplay(
+                    f"## Voice Board\nHere can {self.voice_owner.display_name} change settings for this channel."
+                ),
+                accessory=ui.Thumbnail(self.voice_owner.display_avatar.url),
+            )
+        else:
+            container.add_text(f"## Voice Board\nHere can {self.voice_owner.mention} change settings for this channel.")
+
+        limit = CallbackButton(
+            label="Set User Limit", style=discord.ButtonStyle.blurple, emoji=":1234:", callback=_send_modal
+        )
+        owner = CallbackButton(label="Claim Ownership", style=discord.ButtonStyle.blurple, emoji=":crown:")
+        container.add_row(limit, owner)
+
+        r_ban = CallbackButton(label="Ban role", style=discord.ButtonStyle.blurple, emoji=":no_entry_sign:")
+        r_unban = CallbackButton(label="Unban role", style=discord.ButtonStyle.blurple, emoji=":ticket:")
+        container.add_row(r_ban, r_unban)
+
+        u_ban = CallbackButton(label="Ban user", style=discord.ButtonStyle.blurple, emoji=":hammer:")
+        u_unban = CallbackButton(label="Unban user", style=discord.ButtonStyle.blurple, emoji=":love_letter:")
+        container.add_row(u_ban, u_unban)
+
+        bitrate = CallbackButton(label="Change Bitrate", style=discord.ButtonStyle.blurple, emoji=":space_invader:")
+        reset = CallbackButton(
+            label="Reset permissions", style=discord.ButtonStyle.blurple, emoji=":arrows_counterclockwise:"
+        )
+        container.add_row(bitrate, reset)
+        self.add_item(container)
 
 
 class Join2Create(commands.Cog):
@@ -102,6 +202,7 @@ class Join2Create(commands.Cog):
                 except (discord.Forbidden, discord.HTTPException) as e:
                     self.logger.error(f"Couldn't move member | {e}")
                     return
+                await channel.send(view=VoiceBoard(client=self.client, voice_owner=member))
                 # Here was the voice board created before
                 # TODO: Reimplement VoiceBoard
 
@@ -111,7 +212,6 @@ class Join2Create(commands.Cog):
                     await self.client.db.delete_temp_voice(before.channel)
                     self.logger.debug(f"{before.channel.name} was deleted on {member.guild}")
                     await before.channel.delete(reason="Join2Delete")
-
 
     @commands.Cog.listener("on_ready", once=True)
     async def on_ready(self):

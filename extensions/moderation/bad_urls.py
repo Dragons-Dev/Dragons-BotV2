@@ -281,7 +281,7 @@ class SafebrowsingCog(commands.Cog):
                 try:
                     await msg.author.send(
                         embeds=[em, link_bed],
-                        view=ButtonInfo(f"You were warned due to the message above."),
+                        view=ButtonInfo("You were warned due to the message above."),
                         )
                 except discord.Forbidden:
                     pass  # ignore closed dms

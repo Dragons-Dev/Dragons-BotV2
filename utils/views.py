@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Callable
 
 import discord
 
@@ -208,3 +209,39 @@ class ContainerPaginator(discord.ui.DesignerView):
         self.add_item(self.pages[self.current_page])
         self._add_pagination_buttons()
         return self
+
+
+class CallbackButton(discord.ui.Button):
+    def __init__(
+        self,
+        *,
+        style=("secondary", 2),
+        label=None,
+        disabled=False,
+        custom_id=None,
+        url=None,
+        emoji=None,
+        sku_id=None,
+        row=None,
+        id=None,
+        callback: Callable = None,
+    ):
+        """
+        callback: t.Callable - A function that is called when the button is pressed. It must be an async function and take one argument, which is the interaction that triggered the callback.
+        The callback function must be passed as a keyword argument when creating the button, and it will be called with the interaction as its argument when the button is pressed.
+        Example:
+         async def my_callback(interaction: discord.Interaction):
+             await interaction.response.send_message("Button was pressed!")
+        """
+        super().__init__(
+            label=label,
+            style=style,
+            disabled=disabled,
+            custom_id=custom_id,
+            url=url,
+            emoji=emoji,
+            sku_id=sku_id,
+            row=row,
+            id=id,
+        )
+        self.callback = callback

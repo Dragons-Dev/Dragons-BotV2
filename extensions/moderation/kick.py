@@ -4,7 +4,7 @@ from datetime import datetime
 import discord
 import pycord.multicog as pycog
 from discord.ext import commands
-from discord.utils import format_dt, get_or_fetch
+from discord.utils import format_dt
 
 from extensions.internal.error_handler import error_embed
 from utils import (
