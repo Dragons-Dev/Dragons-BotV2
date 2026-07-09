@@ -633,7 +633,13 @@ class ORMDataBase:
             return False
 
     async def create_event(
-        self, *, host: int, name: str, time: datetime, invites: list[discord.User], mode: t.Literal["OPEN", "CLOSED", "INVITE_ONLY"]
+        self,
+        *,
+        host: int,
+        name: str,
+        time: datetime,
+        invites: list[discord.User],
+        mode: t.Literal["OPEN", "CLOSED", "INVITE_ONLY"],
     ) -> str:
         """
         Creates a new event

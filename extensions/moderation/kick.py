@@ -70,11 +70,11 @@ class Kick(commands.Cog):
             setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
             if setting:
                 if isinstance(setting, (tuple, list, t.Sequence)):
-                    log_channel: discord.TextChannel | None= await ctx.guild.get_or_fetch(
+                    log_channel: discord.TextChannel | None = await ctx.guild.get_or_fetch(
                         discord.TextChannel, setting[0].value, default=None
                     )
                 else:
-                    log_channel: discord.TextChannel | None= await ctx.guild.get_or_fetch(
+                    log_channel: discord.TextChannel | None = await ctx.guild.get_or_fetch(
                         discord.TextChannel, setting.value, default=None
                     )
                 if log_channel:
