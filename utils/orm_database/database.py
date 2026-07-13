@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime, timedelta, date
+import typing as t
 
 import discord
 from sqlalchemy import select, and_, func, delete
@@ -62,31 +63,25 @@ class ORMDataBase:
         self.logger.warning("Closing database connection")
         await self.engine.dispose()
 
-    async def get_setting(
-        self, setting: SettingsEnum, guild: discord.Guild | None
-    ) -> None | Settings | Sequence[Settings]:
-        """
-        Retrieves a setting from the database.
-
-        Args:
-            setting (SettingsEnum): The setting to retrieve.
-            guild (discord.Guild | None): The guild associated with the setting. If None, retrieves the setting for all guilds.
-
-        Returns:
-            Sequence[Settings] | None: The retrieved setting(s) or None if not found.
-        """
+    async def get_setting(self, setting: SettingsEnum, guild: discord.Guild) -> Settings | None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                if guild is None:
-                    query = select(Settings).where(Settings.setting == setting.value)
-                else:
-                    query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
+                query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
+                response = await session.execute(query)
+                result = response.scalar_one_or_none()
+        if not result:
+            return None
+        else:
+            return result
+
+    async def get_all_settings(self, setting: SettingsEnum) -> Sequence[Settings] | None:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(Settings).where(Settings.setting == setting.value)
                 response = await session.execute(query)
                 results = response.scalars().fetchall()
         if not results:
             return None
-        elif len(results) == 1:
-            return results[0]
         else:
             return results
 
@@ -638,7 +633,13 @@ class ORMDataBase:
             return False
 
     async def create_event(
-        self, *, host: int, name: str, time: datetime, invites: list[discord.User], mode: str
+        self,
+        *,
+        host: int,
+        name: str,
+        time: datetime,
+        invites: list[discord.User],
+        mode: t.Literal["OPEN", "CLOSED", "INVITE_ONLY"],
     ) -> str:
         """
         Creates a new event

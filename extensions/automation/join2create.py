@@ -1,454 +1,266 @@
+# type: ignore
+import enum
 import json
+import typing
+from functools import partial
 from random import choice
 
 import discord
-from discord import ui
+from discord import DiscordException, Interaction, ui
 from discord.ext import commands
 
-import utils
-from utils import Bot, CustomLogger, Settings, SettingsEnum
+from utils import Bot, CallbackButton, CustomLogger, Settings, SettingsEnum
 
 
-class InputModal(ui.Modal):
-    def __init__(self, title: str, channel_ctx: discord.VoiceChannel, interaction: discord.Interaction):
-        self.title = title
-        self.channel = channel_ctx or interaction.user.voice.channel
-        if self.title == "Set User Limit":
-            items = [
-                ui.InputText(
-                    label="User Limit", placeholder="0-99 is allowed, 0 means unlimited!", min_length=1, max_length=2
-                )
-            ]
-        elif self.title == "Reset permissions":
-            items = [ui.TextDisplay(content="Resets all set permissions for this channel")]
-        elif self.title == "Unban roles":
-            channel_overwrites = self.channel.overwrites
-            options = []
-            for overwrite_key in [*channel_overwrites.keys()]:
-                if isinstance(overwrite_key, discord.Role):
-                    permission = channel_overwrites[overwrite_key]
-                    if not permission.view_channel and permission.view_channel is not None:
-                        options.append(discord.SelectOption(label=overwrite_key.name, value=str(overwrite_key.id)))
-            options.sort(key=lambda option: option.label.lower())
-            if len(options) == 0:
-                items = [ui.TextDisplay(content="No role has been banned")]
-            elif 100 >= len(options):
-                items = [
-                    ui.TextDisplay(
-                        content="This will unban a role from this channel.\nUnbanning does show the channel to them."
-                    )
-                ]
-                required_selects = len(options) // 25 + (1 if len(options) % 25 != 0 else 0)
-                parts = [options[i * 25 : (i + 1) * 25] for i in range(required_selects)]
-                for i in range(required_selects):
-                    items.append(
-                        ui.Select(
-                            label="Role to unban from this channel",
-                            placeholder="Select role to unban",
-                            options=parts[i],
-                            select_type=discord.ComponentType.string_select,
-                            min_values=1,
-                            max_values=len(parts[i]),
-                            required=False,
-                        )
-                    )
-            else:
-                items = [ui.TextDisplay(content="Too many roles have been banned, please unban them manually")]
-        elif self.title == "Ban roles":
-            items = [
-                ui.TextDisplay(
-                    content="This will ban a role from this channel.\n"
-                    "Banning the role hides the channel from user with the role."
-                ),
-                ui.Select(
-                    label="User to ban from this channel",
-                    placeholder="Select a user to ban",
-                    select_type=discord.ComponentType.role_select,
-                    min_values=1,
-                    max_values=25,
-                ),
-            ]
-        elif self.title == "Unban a user":
-            channel_overwrites = self.channel.overwrites
-            options = []
-            for overwrite_key in [*channel_overwrites.keys()]:
-                if not isinstance(overwrite_key, discord.Role):
-                    permission = channel_overwrites[overwrite_key]
-                    if not permission.view_channel and permission.view_channel is not None:
-                        options.append(discord.SelectOption(label=overwrite_key.name, value=str(overwrite_key.id)))
-            options.sort(key=lambda option: option.label.lower())
-            if len(options) == 0:
-                items = [ui.TextDisplay(content="No user has been banned")]
-            elif 100 >= len(options):
-                items = [
-                    ui.TextDisplay(
-                        content="This will unban a user from this channel.\n"
-                        "Unbanning them does show the channel to them."
-                    )
-                ]
-                required_selects = len(options) // 25 + (1 if len(options) % 25 != 0 else 0)
-                parts = [options[i * 25 : (i + 1) * 25] for i in range(required_selects)]
-                for i in range(required_selects):
-                    items.append(
-                        ui.Select(
-                            label="User to unban from this channel",
-                            placeholder="Select user to unban",
-                            options=parts[i],
-                            select_type=discord.ComponentType.string_select,
-                            min_values=1,
-                            max_values=len(parts[i]),
-                            required=False,
-                        )
-                    )
-            else:
-                items = [ui.TextDisplay(content="Too many user have been banned, please unban them manually")]
-        elif self.title == "Ban a user":
-            items = [
-                ui.TextDisplay(
-                    content="This will ban a user from this channel.\n"
-                    "Banning them does hide the channel from them, and kicks them if they are in it."
-                ),
-                ui.Select(
-                    label="User to ban from this channel",
-                    placeholder="Select a user to ban",
-                    select_type=discord.ComponentType.user_select,
-                    min_values=1,
-                    max_values=25,
-                ),
-            ]
-        elif self.title == "Change bitrate":
-            voice_quality_options = [
-                discord.SelectOption(label="8 kbps", value="8000"),
-                discord.SelectOption(label="16 kbps", value="16000"),
-                discord.SelectOption(label="32 kbps", value="32000"),
-                discord.SelectOption(label="64 kbps (Discords Default)", value="64000"),
-                discord.SelectOption(label="96 kbps", value="96000"),
-            ]
-            if self.channel.guild.bitrate_limit >= 128000:
-                voice_quality_options.append(discord.SelectOption(label="128 kbps", value="128000"))
-            if self.channel.guild.bitrate_limit >= 256000:
-                voice_quality_options.append(discord.SelectOption(label="256 kbps", value="256000"))
-            if self.channel.guild.bitrate_limit >= 384000:
-                voice_quality_options.append(discord.SelectOption(label="384 kbps", value="384000"))
-            items = [
-                ui.Select(
-                    label="Bitrate",
-                    placeholder="Select a bitrate",
-                    options=voice_quality_options,
-                    min_values=1,
-                    max_values=1,
-                ),
-                ui.TextDisplay(
-                    f"The higher the bitrate the better the quality but also the higher the data usage.\n"
-                    f"It's currently set to `{self.channel.bitrate // 1000}` kbps"
-                ),
-            ]
-        else:
-            items = [ui.TextDisplay("The Bot ran into an error, please contact the developer!")]
-
-        super().__init__(*items, title=self.title, timeout=300)
-
-    async def callback(self, interaction: discord.Interaction):
-        client: utils.Bot = interaction.client  # type: ignore # mypy is dumb
-        voice_channel = await client.db.get_temp_voice(interaction.user.voice.channel)
-        if voice_channel is None:
-            await interaction.respond("This is not a join2create channel", ephemeral=True)
-        else:
-            if interaction.user.id == voice_channel.owner_id:
-                if self.title == "Set User Limit":
-                    user_limit = int(self.children[0].value[0])
-                    if user_limit < 0 or user_limit > 99:
-                        await interaction.respond("User limit must be between 0 and 99", ephemeral=True)
-                        return
-                    await interaction.user.voice.channel.edit(
-                        user_limit=user_limit, reason=f"Changed by {interaction.user.display_name} via VoiceBoard"
-                    )
-                    await interaction.respond(
-                        f"User Limit changed to {user_limit} by {interaction.user.display_name}", ephemeral=True
-                    )
-
-                elif self.title == "Reset permissions":
-                    channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
-                        client, "channel", voice_channel.channel, default=None
-                    )  # get the full j2c object
-                    if channel_obj is None:
-                        await interaction.respond("This channel does not exist anymore", ephemeral=True)
-                        return
-
-                    new_overwrite = {}
-                    channel_overwrites = channel_obj.overwrites  # gather all permissions
-                    for overwrite_key in [*channel_overwrites.keys()]:
-                        overwrite = self.channel.overwrites_for(overwrite_key)
-                        overwrite.view_channel = None
-                        overwrite.connect = None  # reset view and connect permissions
-                        new_overwrite[overwrite_key] = overwrite
-                    await self.channel.edit(overwrites=new_overwrite)
-                    await interaction.respond(
-                        "Permissions resetted to default.",
-                        ephemeral=True,
-                    )
-
-                elif self.title == "Unban roles":
-                    try:
-                        unban_select = []
-                        for component in range(1, len(self.children)):
-                            if isinstance(self.children[component], ui.Select):
-                                for value in [*self.children[component].values]:
-                                    unban_select.append(value)
-                    except IndexError:
-                        return
-                    channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
-                        client, "channel", voice_channel.channel, default=None
-                    )  # get the full j2c object
-                    if channel_obj is None:
-                        await interaction.respond("This channel does not exist anymore", ephemeral=True)
-                        return
-                    if len(unban_select) == 0:
-                        return await interaction.respond("No roles selected", ephemeral=True)
-                    unban_role_list = []
-                    new_overwrite = self.channel.overwrites  # get all permissions
-                    for option in unban_select:
-                        unban_role = interaction.guild.get_role(int(option))
-                        unban_role_list.append(unban_role)
-                        overwrite = channel_obj.overwrites_for(unban_role)
-                        overwrite.view_channel = None
-                        overwrite.connect = None
-                        new_overwrite[unban_role] = overwrite  # reset their permissions to the default
-                    await self.channel.edit(overwrites=new_overwrite)  # set the new permissions
-
-                    await interaction.respond(
-                        f"Unbanned {', '.join([f'`{r.name}`' for r in unban_role_list if r.id != interaction.user.id])} from this channel",
-                        ephemeral=True,
-                    )
-
-                elif self.title == "Ban roles":
-                    try:
-                        roles = self.children[1].values
-                    except IndexError:
-                        return
-                    channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
-                        client, "channel", voice_channel.channel, default=None
-                    )  # get the full j2c object
-                    if channel_obj is None:
-                        await interaction.respond("This channel does not exist anymore", ephemeral=True)
-                        return
-                    new_overwrite = self.channel.overwrites
-                    for role in roles:  # iterate through all selected roles
-                        overwrite = channel_obj.overwrites_for(role)
-                        overwrite.view_channel = False
-                        overwrite.connect = False
-                        new_overwrite[role] = overwrite
-                    await self.channel.edit(overwrites=new_overwrite)  # set the new permissions
-
-                    await interaction.respond(
-                        f"Banned {', '.join([f'`{r.name}`' for r in roles if r.id != interaction.user.id])} from this channel",
-                        ephemeral=True,
-                    )
-
-                elif self.title == "Unban a user":
-                    try:
-                        unban_select = []
-                        for component in range(1, len(self.children)):
-                            if isinstance(self.children[component], ui.Select):
-                                for value in [*self.children[component].values]:
-                                    unban_select.append(value)
-                    except IndexError:
-                        return
-                    channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
-                        client, "channel", voice_channel.channel, default=None
-                    )  # get the full j2c object
-                    if channel_obj is None:
-                        await interaction.respond("This channel does not exist anymore", ephemeral=True)
-                        return
-                    if len(unban_select) == 0:
-                        return await interaction.respond("No user selected", ephemeral=True)
-                    new_overwrite = self.channel.overwrites  # get all permissions
-                    unban_user_list = []
-                    for option in unban_select:  # iterate through all selected users
-                        unban_user = await client.get_or_fetch_user(int(option))
-                        unban_user_list.append(unban_user)
-                        overwrite = channel_obj.overwrites_for(unban_user)
-                        overwrite.view_channel = None
-                        overwrite.connect = None  # reset their permissions to the default
-                        new_overwrite[unban_user] = overwrite
-                    await self.channel.edit(overwrites=new_overwrite)  # set the new permissions
-
-                    await interaction.respond(
-                        f"Unbanned {', '.join([f'`{m.name}`' for m in unban_user_list])} from this channel",
-                        ephemeral=True,
-                    )
-
-                elif self.title == "Ban a user":
-                    try:
-                        users = self.children[1].values
-                    except IndexError:
-                        return
-                    channel_obj: discord.VoiceChannel | None = await discord.utils.get_or_fetch(
-                        client, "channel", voice_channel.channel, default=None
-                    )
-                    if channel_obj is None:
-                        await interaction.respond("This channel does not exist anymore", ephemeral=True)
-                        return
-                    new_overwrite = self.channel.overwrites
-                    for user in users:
-                        if user.id == interaction.user.id:  # prevent the user banning himself
-                            continue
-                        if user.id == client.user.id:  # prevent ourselves getting banned
-                            continue
-                        overwrite = channel_obj.overwrites_for(user)
-                        overwrite.view_channel = False
-                        overwrite.connect = False
-                        new_overwrite[user] = overwrite
-                        if user in channel_obj.members:
-                            try:
-                                await user.move_to(None, reason=f"Banned from {channel_obj.name} by {interaction.user}")
-                            except (discord.Forbidden, discord.HTTPException):
-                                pass
-                    await self.channel.edit(overwrites=new_overwrite)
-                    await interaction.respond(
-                        f"Banned {', '.join([f'`{m.display_name}`' for m in users if m.id != interaction.user.id or m.id != client.user.id])} from this channel",
-                        ephemeral=True,
-                    )
-
-                elif self.title == "Change bitrate":
-                    try:
-                        bitrate = int(self.children[0].values[0])
-                        if bitrate < 8000 or bitrate > interaction.user.voice.channel.guild.bitrate_limit:
-                            await interaction.respond(
-                                f"Bitrate must be between 8 and {interaction.user.voice.channel.guild.bitrate_limit} kbps",
-                                ephemeral=True,
-                            )
-                            return
-                        await interaction.user.voice.channel.edit(
-                            bitrate=bitrate, reason=f"Changed by {interaction.user.display_name} via VoiceBoard"
-                        )
-                        await interaction.respond(f"Changed bitrate to {bitrate // 1000} kbps", ephemeral=True)
-                    except ValueError:
-                        await interaction.respond("Invalid bitrate", ephemeral=True)
-            else:
-                await interaction.respond(
-                    f"You are not the owner of this channel <@{voice_channel.owner_id}> is the owner!", ephemeral=True
-                )
+class ButtonEnum(enum.Enum):
+    SET_USER_LIMIT = enum.auto()
+    CLAIM_OWNERSHIP = enum.auto()
+    BAN_ROLE = enum.auto()
+    UNBAN_ROLE = enum.auto()
+    BAN_USER = enum.auto()
+    UNBAN_USER = enum.auto()
+    CHANGE_BITRATE = enum.auto()
+    RESET_PERMISSIONS = enum.auto()
 
 
-class VoiceBoard(ui.View):
-    def __init__(self, channel: discord.VoiceChannel = None):
-        super().__init__(timeout=None)
-        self.channel = channel
+async def _send_modal(interaction: discord.Interaction = None, next_function: ButtonEnum = None):
+    """
+    Gate function that validates the user can use the button before sending a modal.
 
-        self.button_names = {
-            "j2c__user_limit_button": "Set User Limit",
-            "j2c__claim_ownership_button": "Claim Ownership",
-            "j2c__reset_permission_button": "Reset permissions",
-            "j2c__role_unban_button": "Unban roles",
-            "j2c__role_ban_button": "Ban roles",
-            "j2c__unban_button": "Unban a user",
-            "j2c__ban_button": "Ban a user",
-            "j2c__bitrate_button": "Change bitrate",
-        }
+    This function handles common validation checks (interaction context, guild context, voice channel)
+    and then dispatches to the appropriate modal based on the next_function parameter.
 
-        buttons = [
-            discord.ui.Button(
-                label="Set User Limit",
-                emoji="🔢",
-                style=discord.ButtonStyle.primary,
-                custom_id="j2c__user_limit_button",
-                row=0,
-            ),
-            discord.ui.Button(
-                label="Claim Ownership",
-                emoji="👑",
-                style=discord.ButtonStyle.primary,
-                custom_id="j2c__claim_ownership_button",
-                row=0,
-            ),
-            discord.ui.Button(
-                label="Reset Permission",
-                emoji="🔄",
-                style=discord.ButtonStyle.primary,
-                custom_id="j2c__reset_permission_button",
-                row=1,
-            ),
-            discord.ui.Button(
-                label="Unban Roles",
-                emoji="🎫",
-                style=discord.ButtonStyle.primary,
-                custom_id="j2c__role_unban_button",
-                row=1,
-            ),
-            discord.ui.Button(
-                label="Ban Roles",
-                emoji="🚫",
-                style=discord.ButtonStyle.primary,
-                custom_id="j2c__role_ban_button",
-                row=2,
-            ),
-            discord.ui.Button(
-                label="Unban a user",
-                emoji="💌",
-                style=discord.ButtonStyle.primary,
-                custom_id="j2c__unban_button",
-                row=2,
-            ),
-            discord.ui.Button(
-                label="Ban a user",
-                emoji="🔨",
-                style=discord.ButtonStyle.primary,
-                custom_id="j2c__ban_button",
-                row=3,
-            ),
-            discord.ui.Button(
-                label="Change Bitrate",
-                emoji="👾",
-                style=discord.ButtonStyle.primary,
-                custom_id="j2c__bitrate_button",
-                row=3,
-            ),
-        ]
+    Args:
+        interaction (discord.Interaction): The interaction that triggered the callback.
+        next_function (ButtonEnum): The type of modal to display. Options: ``ButtonEnum.SET_USER_LIMIT``, ``ButtonEnum.CHANGE_BITRATE``, etc.
 
-        for button in buttons:
-            button.callback = self.set_callback
-            self.add_item(button)
+    Raises:
+        DiscordException: If validation fails (no interaction, not in guild, or not in voice channel).
+    """
+    # Validate interaction exists
+    if interaction is None or interaction.user is None:
+        raise DiscordException("Interaction triggered without interaction context.")
 
-    async def set_callback(self, interaction: discord.Interaction):
-        if interaction.custom_id == "j2c__claim_ownership_button":
-            await self._claim_channel(interaction)
-        else:
-            await self._send_modal(interaction)
+    # Validate user is in a guild (not a DM)
+    elif isinstance(interaction.user, discord.User):
+        raise DiscordException("Interaction triggered out of guild context.")
 
-    async def _claim_channel(self, interaction: discord.Interaction):
-        client: utils.Bot = interaction.client  # type: ignore # mypy is dumb
-        voice_channel = await client.db.get_temp_voice(interaction.user.voice.channel)
-        if voice_channel is None:
-            await interaction.respond("This is not a join2create channel", ephemeral=True)
-        else:
-            if voice_channel.owner_id == interaction.user.id:
-                await interaction.response.send_message("You are already the owner of this channel", ephemeral=True)
-                return
-            if voice_channel.owner_id in [member.id for member in interaction.user.voice.channel.members]:
-                await interaction.response.send_message(
-                    "The owner is still in the channel, you cannot claim it!", ephemeral=True
-                )
-                return
-            voice_channel.owner_id = interaction.user.id
-            await client.db.update_temp_voice(
-                interaction.guild.get_channel(voice_channel.channel),
-                interaction.user,
-                voice_channel.locked,
-                voice_channel.ghosted,
-            )
-            await interaction.response.send_message(f"Channel ownership transferred to {interaction.user.mention}!")
+    # Validate user is in a voice channel
+    elif interaction.user.voice:
+        channel = interaction.user.voice.channel
+
+        if interaction.user.voice.channel != interaction.channel:
+            await interaction.respond("You must be in the same channel to change its settings.", ephemeral=True)
             return
 
-    async def _send_modal(self, interaction: discord.Interaction):
-        if interaction.custom_id in self.button_names.keys():
-            await interaction.response.send_modal(
-                InputModal(
-                    f"{self.button_names[interaction.custom_id]}", channel_ctx=self.channel, interaction=interaction
+        # Dispatch to appropriate modal based on next_function parameter
+        match next_function:
+            case ButtonEnum.SET_USER_LIMIT:
+                await interaction.response.send_modal(SetUserLimit(client=interaction.client, channel=channel))
+            case ButtonEnum.CLAIM_OWNERSHIP:
+                await transfer_ownership(interaction, channel)
+            case ButtonEnum.BAN_ROLE:
+                await interaction.response.send_modal(BanRole(client=interaction.client, channel=channel))
+            case ButtonEnum.UNBAN_ROLE:
+                ...
+            case ButtonEnum.BAN_USER:
+                ...
+            case ButtonEnum.UNBAN_USER:
+                ...
+            case ButtonEnum.CHANGE_BITRATE:
+                ...
+            case ButtonEnum.RESET_PERMISSIONS:
+                ...
+            case _:
+                raise DiscordException(f"Unknown modal function: {next_function}")
+
+    else:
+        raise DiscordException("Interaction without context.")
+
+
+class SetUserLimit(ui.DesignerModal):
+    def __init__(self, client: Bot, channel: discord.VoiceChannel):
+        super().__init__(title="Set user limit")
+        self.client = client
+        self.channel = channel
+        self.add_item(
+            ui.Label("Set member limit").set_input_text(placeholder="0-99"),
+        )
+
+    async def callback(self, interaction: Interaction):
+        label: ui.Label = self.children[0]
+        component: ui.InputText = label.item
+        client: Bot = interaction.client
+        try:
+            if component.value is not None:
+                new_limit = int(component.value)
+                if new_limit < 0 or new_limit > 99:
+                    raise ValueError
+                if new_limit == 0:
+                    new_limit = None
+
+                channel: discord.VoiceChannel = interaction.channel
+                await client.db.get_temp_voice(channel)
+
+                await channel.edit(
+                    user_limit=new_limit,
+                    reason=f"[J2C] {interaction.user.global_name} changed user limit to {new_limit or 'no limit'}.",
                 )
+                await interaction.respond(f"Changed user limit to {new_limit or 'no limit'}.", ephemeral=True)
+            else:
+                raise ValueError
+        except ValueError:
+            await interaction.respond("Please enter a valid number between 0-99 (0 is unlimited).", ephemeral=True)
+
+
+async def transfer_ownership(interaction: Interaction, channel: discord.VoiceChannel):
+    """
+    Transfers ownership of the temporary voice channel to the interaction user.
+
+    Args:
+        interaction (discord.Interaction): The interaction that triggered the callback.
+        channel (discord.VoiceChannel): The voice channel to transfer ownership of.
+
+    Raises:
+        DiscordException: If the user is not in the voice channel or if the channel is not a temporary voice channel.
+    """
+    client: Bot = interaction.client
+    temp_voice = await client.db.get_temp_voice(channel)
+    if temp_voice is None:
+        await interaction.respond("This channel is not a temporary voice channel.", ephemeral=True)
+        return
+
+    if interaction.user not in channel.members:
+        await interaction.respond("You must be in the voice channel to claim ownership.", ephemeral=True)
+        return
+
+    if not [m.id == temp_voice.owner_id for m in channel.members]:
+        # Transfer ownership in the database
+        await client.db.update_temp_voice(channel, interaction.user)
+
+        await interaction.respond(f"You are now the owner of {channel.name}.", ephemeral=True)
+
+
+class BanRole(ui.DesignerModal):
+    def __init__(self, client: Bot, channel: discord.VoiceChannel):
+        super().__init__(title="Ban Role")
+        self.client = client
+        self.channel = channel
+        self.add_item(
+            ui.Label(
+                "Select roles to ban",
+                ui.Select(
+                    select_type=discord.ComponentType.role_select, placeholder="Select a role to ban", max_values=10
+                ),
+            )
+        )
+
+    async def callback(self, interaction: Interaction):
+        label: ui.Label = self.children[0]
+        select: ui.Select = label.item
+        selected_roles: list[discord.Role] | None = select.values if select.values else None
+        if not selected_roles:
+            return  # await interaction.response.defer(invisible=True, ephemeral=True)
+        permission_overwrites = {}
+        channel: discord.VoiceChannel = interaction.channel
+        for selected_role in selected_roles:
+            permission_overwrites[selected_role] = discord.PermissionOverwrite.from_pair(
+                allow=discord.Permissions.none(), deny=discord.Permissions.all()
+            )
+        print(permission_overwrites)
+        await channel.edit(overwrites=permission_overwrites)
+        await interaction.respond(
+            f"Banned {'\n'.join([role.mention for role in selected_roles])} from {channel.mention}.", ephemeral=True
+        )
+
+
+class VoiceBoard(ui.DesignerView):
+    """
+    Interactive view for voice channel owners to manage their temporary voice channel settings.
+
+    Uses CallbackButtons with functools.partial to pass custom arguments (next_function) to the
+    _send_modal gate function. This allows a single validation gate to dispatch to different
+    modals based on which button was pressed.
+
+    Example:
+        Each button is created with partial(_send_modal, next_function="action_name") so when
+        clicked, _send_modal receives both the interaction and the action_name parameter.
+    """
+
+    def __init__(self, client: Bot, voice_owner: discord.Member):
+        super().__init__(timeout=None)
+        self.logger = CustomLogger("Join2Create/VoiceBoard", client.boot_time)
+        self.voice_owner = voice_owner
+
+        container = ui.Container(color=client.user.color)
+        if self.voice_owner.display_avatar and self.voice_owner.display_avatar.url:
+            container.add_section(
+                ui.TextDisplay(
+                    f"## Voice Board\nHere can {self.voice_owner.display_name} change settings for this channel."
+                ),
+                accessory=ui.Thumbnail(self.voice_owner.display_avatar.url),
             )
         else:
-            await interaction.respond("This button is not yet keyed to an interaction.", ephemeral=True)
+            container.add_text(f"## Voice Board\nHere can {self.voice_owner.mention} change settings for this channel.")
+
+        # User Limit Button: Uses partial to pass "set_user_limit" as next_function parameter
+        # When clicked, _send_modal will validate the user, then dispatch to SetUserLimit modal
+        limit = CallbackButton(
+            label="Set User Limit",
+            style=discord.ButtonStyle.blurple,
+            emoji=":1234:",
+            callback=partial(_send_modal, next_function=ButtonEnum.SET_USER_LIMIT),
+        )
+        owner = CallbackButton(
+            label="Claim Ownership",
+            style=discord.ButtonStyle.blurple,
+            emoji=":crown:",
+            callback=partial(_send_modal, next_function=ButtonEnum.CLAIM_OWNERSHIP),
+        )
+        container.add_row(limit, owner)
+
+        r_ban = CallbackButton(
+            label="Ban role",
+            style=discord.ButtonStyle.blurple,
+            emoji=":no_entry_sign:",
+            callback=partial(_send_modal, next_function=ButtonEnum.BAN_ROLE),
+        )
+        r_unban = CallbackButton(
+            label="Unban role",
+            style=discord.ButtonStyle.blurple,
+            emoji=":ticket:",
+            callback=partial(_send_modal, next_function=ButtonEnum.UNBAN_ROLE),
+        )
+        container.add_row(r_ban, r_unban)
+
+        u_ban = CallbackButton(
+            label="Ban user",
+            style=discord.ButtonStyle.blurple,
+            emoji=":hammer:",
+            callback=partial(_send_modal, next_function=ButtonEnum.BAN_USER),
+        )
+        u_unban = CallbackButton(
+            label="Unban user",
+            style=discord.ButtonStyle.blurple,
+            emoji=":love_letter:",
+            callback=partial(_send_modal, next_function=ButtonEnum.UNBAN_USER),
+        )
+        container.add_row(u_ban, u_unban)
+
+        bitrate = CallbackButton(
+            label="Change Bitrate",
+            style=discord.ButtonStyle.blurple,
+            emoji=":space_invader:",
+            callback=partial(_send_modal, next_function=ButtonEnum.CHANGE_BITRATE),
+        )
+        reset = CallbackButton(
+            label="Reset permissions",
+            style=discord.ButtonStyle.blurple,
+            emoji=":arrows_counterclockwise:",
+            callback=partial(_send_modal, next_function=ButtonEnum.RESET_PERMISSIONS),
+        )
+        container.add_row(bitrate, reset)
+        self.add_item(container)
 
 
 class Join2Create(commands.Cog):
@@ -543,11 +355,9 @@ class Join2Create(commands.Cog):
                 except (discord.Forbidden, discord.HTTPException) as e:
                     self.logger.error(f"Couldn't move member | {e}")
                     return
-                try:
-                    await channel.send(view=VoiceBoard(channel=channel))
-                except (discord.Forbidden, discord.HTTPException) as e:
-                    self.logger.error(f"Couldn't create VoiceBoard{e}")
-                    return
+                await channel.send(view=VoiceBoard(client=self.client, voice_owner=member))
+                # Here was the voice board created before
+                # TODO: Reimplement VoiceBoard
 
         if before.channel is not None:
             if await self.client.db.get_temp_voice(before.channel):
@@ -556,14 +366,9 @@ class Join2Create(commands.Cog):
                     self.logger.debug(f"{before.channel.name} was deleted on {member.guild}")
                     await before.channel.delete(reason="Join2Delete")
 
-    @commands.slash_command(name="join2create_debug", description="Debug info for join2create")
-    async def join2create_debug(self, ctx: discord.ApplicationContext):
-        await ctx.respond(
-            view=VoiceBoard(channel=ctx.author.voice.channel if ctx.author.voice else ctx.channel), ephemeral=True
-        )
-
     @commands.Cog.listener("on_ready", once=True)
     async def on_ready(self):
+        return
         self.client.add_view(VoiceBoard())
         self.logger.info("Added persistent view for VoiceBoard")
 

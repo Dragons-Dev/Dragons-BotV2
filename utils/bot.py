@@ -20,7 +20,7 @@ class Bot(
 ):  # subclass of both MulticogBot and commands.Bot to allow slash commands across multiple cogs
     def __init__(self, version, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.client_version: VersionInfo = version
+        self.version: VersionInfo = version
         self.api: aiohttp.ClientSession = None  # type: ignore
         self.boot_time = datetime.now()
         self.db: ORMDataBase = None  # type: ignore

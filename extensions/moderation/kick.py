@@ -4,7 +4,7 @@ from datetime import datetime
 import discord
 import pycord.multicog as pycog
 from discord.ext import commands
-from discord.utils import format_dt, get_or_fetch
+from discord.utils import format_dt
 
 from extensions.internal.error_handler import error_embed
 from utils import (
@@ -70,12 +70,12 @@ class Kick(commands.Cog):
             setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
             if setting:
                 if isinstance(setting, (tuple, list, t.Sequence)):
-                    log_channel: discord.TextChannel = await get_or_fetch(
-                        ctx.guild, "channel", setting[0].value, default=None
+                    log_channel: discord.TextChannel | None = await ctx.guild.get_or_fetch(
+                        discord.TextChannel, setting[0].value, default=None
                     )
                 else:
-                    log_channel: discord.TextChannel = await get_or_fetch(
-                        ctx.guild, "channel", setting.value, default=None
+                    log_channel: discord.TextChannel | None = await ctx.guild.get_or_fetch(
+                        discord.TextChannel, setting.value, default=None
                     )
                 if log_channel:
                     await log_channel.send(embed=member_em)

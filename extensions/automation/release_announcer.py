@@ -26,20 +26,18 @@ class ReleaseAnnouncer(commands.Cog):
                 if github_version.mayor == -1 or github_version.minor == -1 or github_version.patch == -1:
                     return
                 try:
-                    if self.client.client_version >= github_version:
+                    if self.client.version >= github_version:
                         pass
                     else:
                         self.logger.info(f"Newer release on github. Pls update. Version: {github_version}")
                         owner = (await self.client.application_info()).owner
                         if owner is None:
-                            self.logger.critical(
-                                "Fuck something is terible wrong pls nuke everything and begin from the start."
-                            )
+                            self.logger.critical("Owner is none, discord did an oopsie poopsie!")
                             return
                         em = discord.Embed(title="🚨 UPDATE YOUR BOT", color=discord.Color.brand_red())
                         em.add_field(
                             name="",
-                            value=f"Your bot is no longer on the newest verion `{github_version}`.\nYour bot is on version `{self.client.client_version}`.",
+                            value=f"Your bot is no longer on the newest version `{github_version}`.\nYour bot is on version `{self.client.version}`.",
                         )
                         await owner.send(embed=em)
                 except Exception as e:
