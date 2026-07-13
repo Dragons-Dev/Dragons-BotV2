@@ -1,11 +1,14 @@
 # type: ignore
 import enum
 import json
+import typing
+from functools import partial
 from random import choice
 
 import discord
 from discord import DiscordException, Interaction, ui
 from discord.ext import commands
+from discord.ui import role_select
 
 from utils import Bot, CallbackButton, CustomLogger, Settings, SettingsEnum
 
@@ -21,14 +24,57 @@ class ButtonEnum(enum.Enum):
     RESET_PERMISSIONS = enum.auto()
 
 
-async def _send_modal(interaction: discord.Interaction = None):
+async def _send_modal(interaction: discord.Interaction = None, next_function: ButtonEnum = None):
+    """
+    Gate function that validates the user can use the button before sending a modal.
+
+    This function handles common validation checks (interaction context, guild context, voice channel)
+    and then dispatches to the appropriate modal based on the next_function parameter.
+
+    Args:
+        interaction (discord.Interaction): The interaction that triggered the callback.
+        next_function (ButtonEnum): The type of modal to display. Options: ``ButtonEnum.SET_USER_LIMIT``, ``ButtonEnum.CHANGE_BITRATE``, etc.
+
+    Raises:
+        DiscordException: If validation fails (no interaction, not in guild, or not in voice channel).
+    """
+    # Validate interaction exists
     if interaction is None or interaction.user is None:
         raise DiscordException("Interaction triggered without interaction context.")
+
+    # Validate user is in a guild (not a DM)
     elif isinstance(interaction.user, discord.User):
         raise DiscordException("Interaction triggered out of guild context.")
+
+    # Validate user is in a voice channel
     elif interaction.user.voice:
         channel = interaction.user.voice.channel
-        await interaction.response.send_modal(SetUserLimit(client=interaction.client, channel=channel))
+
+        if interaction.user.voice.channel != interaction.channel:
+            await interaction.respond("You must be in the same channel to change its settings.", ephemeral=True)
+            return
+
+        # Dispatch to appropriate modal based on next_function parameter
+        match next_function:
+            case ButtonEnum.SET_USER_LIMIT:
+                await interaction.response.send_modal(SetUserLimit(client=interaction.client, channel=channel))
+            case ButtonEnum.CLAIM_OWNERSHIP:
+                await transfer_ownership(interaction, channel)
+            case ButtonEnum.BAN_ROLE:
+                await interaction.response.send_modal(BanRole(client=interaction.client, channel=channel))
+            case ButtonEnum.UNBAN_ROLE:
+                ...
+            case ButtonEnum.BAN_USER:
+                ...
+            case ButtonEnum.UNBAN_USER:
+                ...
+            case ButtonEnum.CHANGE_BITRATE:
+                ...
+            case ButtonEnum.RESET_PERMISSIONS:
+                ...
+            case _:
+                raise DiscordException(f"Unknown modal function: {next_function}")
+
     else:
         raise DiscordException("Interaction without context.")
 
@@ -46,9 +92,6 @@ class SetUserLimit(ui.DesignerModal):
         label: ui.Label = self.children[0]
         component: ui.InputText = label.item
         client: Bot = interaction.client
-        if interaction.user.voice.channel != interaction.channel:
-            await interaction.respond("You must be in the same channel to change its settings.", ephemeral=True)
-            return
         try:
             if component.value is not None:
                 new_limit = int(component.value)
@@ -57,9 +100,9 @@ class SetUserLimit(ui.DesignerModal):
                 if new_limit == 0:
                     new_limit = None
 
-                await client.db.get_temp_voice()
-
                 channel: discord.VoiceChannel = interaction.channel
+                await client.db.get_temp_voice(channel)
+
                 await channel.edit(
                     user_limit=new_limit,
                     reason=f"[J2C] {interaction.user.global_name} changed user limit to {new_limit or 'no limit'}.",
@@ -71,7 +114,80 @@ class SetUserLimit(ui.DesignerModal):
             await interaction.respond("Please enter a valid number between 0-99 (0 is unlimited).", ephemeral=True)
 
 
+async def transfer_ownership(interaction: Interaction, channel: discord.VoiceChannel):
+    """
+    Transfers ownership of the temporary voice channel to the interaction user.
+
+    Args:
+        interaction (discord.Interaction): The interaction that triggered the callback.
+        channel (discord.VoiceChannel): The voice channel to transfer ownership of.
+
+    Raises:
+        DiscordException: If the user is not in the voice channel or if the channel is not a temporary voice channel.
+    """
+    client: Bot = interaction.client
+    temp_voice = await client.db.get_temp_voice(channel)
+    if temp_voice is None:
+        await interaction.respond("This channel is not a temporary voice channel.", ephemeral=True)
+        return
+
+    if interaction.user not in channel.members:
+        await interaction.respond("You must be in the voice channel to claim ownership.", ephemeral=True)
+        return
+
+    if not [m.id == temp_voice.owner_id for m in channel.members]:
+        # Transfer ownership in the database
+        await client.db.update_temp_voice(channel, interaction.user)
+
+        await interaction.respond(f"You are now the owner of {channel.name}.", ephemeral=True)
+
+
+class BanRole(ui.DesignerModal):
+    def __init__(self, client: Bot, channel: discord.VoiceChannel):
+        super().__init__(title="Ban Role")
+        self.client = client
+        self.channel = channel
+        self.add_item(
+            ui.Label(
+                "Select roles to ban",
+                ui.Select(
+                    select_type=discord.ComponentType.role_select,
+                    placeholder="Select a role to ban",
+                    max_values=10
+                )
+            )
+        )
+
+    async def callback(self, interaction: Interaction):
+        label: ui.Label = self.children[0]
+        select: ui.Select = label.item
+        selected_roles: typing.List[discord.Role] | None = select.values if select.values else None
+        if not selected_roles:
+            return  # await interaction.response.defer(invisible=True, ephemeral=True)
+        permission_overwrites = {}
+        channel: discord.VoiceChannel = interaction.channel
+        for selected_role in selected_roles:
+            permission_overwrites[selected_role] = discord.PermissionOverwrite.from_pair(
+                allow=discord.Permissions.none(), deny=discord.Permissions.all())
+        print(permission_overwrites)
+        await channel.edit(overwrites=permission_overwrites)
+        await interaction.respond(
+            f"Banned {'\n'.join([role.mention for role in selected_roles])} from {channel.mention}.", ephemeral=True)
+
+
 class VoiceBoard(ui.DesignerView):
+    """
+    Interactive view for voice channel owners to manage their temporary voice channel settings.
+
+    Uses CallbackButtons with functools.partial to pass custom arguments (next_function) to the
+    _send_modal gate function. This allows a single validation gate to dispatch to different
+    modals based on which button was pressed.
+
+    Example:
+        Each button is created with partial(_send_modal, next_function="action_name") so when
+        clicked, _send_modal receives both the interaction and the action_name parameter.
+    """
+
     def __init__(self, client: Bot, voice_owner: discord.Member):
         super().__init__(timeout=None)
         self.logger = CustomLogger("Join2Create/VoiceBoard", client.boot_time)
@@ -88,23 +204,61 @@ class VoiceBoard(ui.DesignerView):
         else:
             container.add_text(f"## Voice Board\nHere can {self.voice_owner.mention} change settings for this channel.")
 
+        # User Limit Button: Uses partial to pass "set_user_limit" as next_function parameter
+        # When clicked, _send_modal will validate the user, then dispatch to SetUserLimit modal
         limit = CallbackButton(
-            label="Set User Limit", style=discord.ButtonStyle.blurple, emoji=":1234:", callback=_send_modal
+            label="Set User Limit",
+            style=discord.ButtonStyle.blurple,
+            emoji=":1234:",
+            callback=partial(_send_modal, next_function=ButtonEnum.SET_USER_LIMIT),
         )
-        owner = CallbackButton(label="Claim Ownership", style=discord.ButtonStyle.blurple, emoji=":crown:")
+        owner = CallbackButton(
+            label="Claim Ownership",
+            style=discord.ButtonStyle.blurple,
+            emoji=":crown:",
+            callback=partial(_send_modal, next_function=ButtonEnum.CLAIM_OWNERSHIP),
+        )
         container.add_row(limit, owner)
 
-        r_ban = CallbackButton(label="Ban role", style=discord.ButtonStyle.blurple, emoji=":no_entry_sign:")
-        r_unban = CallbackButton(label="Unban role", style=discord.ButtonStyle.blurple, emoji=":ticket:")
+        r_ban = CallbackButton(
+            label="Ban role",
+            style=discord.ButtonStyle.blurple,
+            emoji=":no_entry_sign:",
+            callback=partial(_send_modal, next_function=ButtonEnum.BAN_ROLE),
+        )
+        r_unban = CallbackButton(
+            label="Unban role",
+            style=discord.ButtonStyle.blurple,
+            emoji=":ticket:",
+            callback=partial(_send_modal, next_function=ButtonEnum.UNBAN_ROLE),
+        )
         container.add_row(r_ban, r_unban)
 
-        u_ban = CallbackButton(label="Ban user", style=discord.ButtonStyle.blurple, emoji=":hammer:")
-        u_unban = CallbackButton(label="Unban user", style=discord.ButtonStyle.blurple, emoji=":love_letter:")
+        u_ban = CallbackButton(
+            label="Ban user",
+            style=discord.ButtonStyle.blurple,
+            emoji=":hammer:",
+            callback=partial(_send_modal, next_function=ButtonEnum.BAN_USER),
+        )
+        u_unban = CallbackButton(
+            label="Unban user",
+            style=discord.ButtonStyle.blurple,
+            emoji=":love_letter:",
+            callback=partial(_send_modal, next_function=ButtonEnum.UNBAN_USER),
+        )
         container.add_row(u_ban, u_unban)
 
-        bitrate = CallbackButton(label="Change Bitrate", style=discord.ButtonStyle.blurple, emoji=":space_invader:")
+        bitrate = CallbackButton(
+            label="Change Bitrate",
+            style=discord.ButtonStyle.blurple,
+            emoji=":space_invader:",
+            callback=partial(_send_modal, next_function=ButtonEnum.CHANGE_BITRATE),
+        )
         reset = CallbackButton(
-            label="Reset permissions", style=discord.ButtonStyle.blurple, emoji=":arrows_counterclockwise:"
+            label="Reset permissions",
+            style=discord.ButtonStyle.blurple,
+            emoji=":arrows_counterclockwise:",
+            callback=partial(_send_modal, next_function=ButtonEnum.RESET_PERMISSIONS),
         )
         container.add_row(bitrate, reset)
         self.add_item(container)
