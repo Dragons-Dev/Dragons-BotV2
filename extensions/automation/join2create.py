@@ -8,7 +8,6 @@ from random import choice
 import discord
 from discord import DiscordException, Interaction, ui
 from discord.ext import commands
-from discord.ui import role_select
 
 from utils import Bot, CallbackButton, CustomLogger, Settings, SettingsEnum
 
@@ -151,28 +150,28 @@ class BanRole(ui.DesignerModal):
             ui.Label(
                 "Select roles to ban",
                 ui.Select(
-                    select_type=discord.ComponentType.role_select,
-                    placeholder="Select a role to ban",
-                    max_values=10
-                )
+                    select_type=discord.ComponentType.role_select, placeholder="Select a role to ban", max_values=10
+                ),
             )
         )
 
     async def callback(self, interaction: Interaction):
         label: ui.Label = self.children[0]
         select: ui.Select = label.item
-        selected_roles: typing.List[discord.Role] | None = select.values if select.values else None
+        selected_roles: list[discord.Role] | None = select.values if select.values else None
         if not selected_roles:
             return  # await interaction.response.defer(invisible=True, ephemeral=True)
         permission_overwrites = {}
         channel: discord.VoiceChannel = interaction.channel
         for selected_role in selected_roles:
             permission_overwrites[selected_role] = discord.PermissionOverwrite.from_pair(
-                allow=discord.Permissions.none(), deny=discord.Permissions.all())
+                allow=discord.Permissions.none(), deny=discord.Permissions.all()
+            )
         print(permission_overwrites)
         await channel.edit(overwrites=permission_overwrites)
         await interaction.respond(
-            f"Banned {'\n'.join([role.mention for role in selected_roles])} from {channel.mention}.", ephemeral=True)
+            f"Banned {'\n'.join([role.mention for role in selected_roles])} from {channel.mention}.", ephemeral=True
+        )
 
 
 class VoiceBoard(ui.DesignerView):
