@@ -12,6 +12,7 @@ def is_team():
     Decorator to check if the member executing the command has the configured team role.
     if no team role is set it checks the discord permissions
     """
+
     async def predicate(ctx: discord.ApplicationContext):
         if isinstance(ctx.channel, discord.DMChannel):
             return True

@@ -24,6 +24,7 @@ THREAT_TYPES = {
     4: "POTENTIALLY_HARMFUL_APPLICATION",
 }
 
+
 # these functions were entirely written by AI but still reviewed by human.
 def read_varint(data: bytes, index: int) -> tuple[int, int]:
     """Read a protobuf varint starting at `index`.
@@ -148,9 +149,7 @@ def parse_search_urls_response(data: bytes) -> dict:
             matches.append(
                 {
                     "url": threat_url,
-                    "threat_types": [
-                        THREAT_TYPES.get(t, f"UNKNOWN({t})") for t in threat_types
-                    ],
+                    "threat_types": [THREAT_TYPES.get(t, f"UNKNOWN({t})") for t in threat_types],
                 }
             )
         elif field_num == 2 and wire_type == 2:
@@ -189,9 +188,7 @@ async def fetch_safebrowsing(urls: list[str], cog_logger: CustomLogger) -> dict 
             "https://safebrowsing.googleapis.com/v5/urls:search",
             params=params,
         ) as request:
-            cog_logger.debug(
-                f"Checking URLs: {urls_to_check} | API Response Status: {request.status}"
-            )
+            cog_logger.debug(f"Checking URLs: {urls_to_check} | API Response Status: {request.status}")
             if request.status == 200:
                 body = await request.read()
                 return parse_search_urls_response(body)
@@ -240,7 +237,6 @@ class SafebrowsingCog(commands.Cog):
                 else:
                     urls_to_fetch.append(url)  # url needs to be fetched
 
-
             if len(urls_to_fetch) > 0:
                 api_result = await fetch_safebrowsing(urls_to_fetch, self.logger)  # urls not cached need to be fetched
                 if api_result is not None:
@@ -253,8 +249,9 @@ class SafebrowsingCog(commands.Cog):
                         for url in urls_to_fetch:
                             await self.url_cache.set(url, False, ttl=3600)  # every url which was not returned is safe
                 else:
-                    self.logger.warning(f"Failed to fetch Safe Browsing results for URLs: {urls_to_fetch} | "
-                                        f"API Result: {api_result}")
+                    self.logger.warning(
+                        f"Failed to fetch Safe Browsing results for URLs: {urls_to_fetch} | API Result: {api_result}"
+                    )
                     return
 
             if len(filtered_urls) > 0:
@@ -282,7 +279,7 @@ class SafebrowsingCog(commands.Cog):
                     await msg.author.send(
                         embeds=[em, link_bed],
                         view=ButtonInfo("You were warned due to the message above."),
-                        )
+                    )
                 except discord.Forbidden:
                     pass  # ignore closed dms
                 except discord.HTTPException:
@@ -302,7 +299,6 @@ class SafebrowsingCog(commands.Cog):
 
                     if log_channel:
                         await log_channel.send(embed=em)
-
 
     @commands.Cog.listener("on_start_done")
     async def bad_urls_done(self):

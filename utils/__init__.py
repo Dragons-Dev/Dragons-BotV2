@@ -28,5 +28,5 @@ __all__ = [
     "ButtonInfo",
     "ContainerPaginator",
     "Event",
-    "CallbackButton"
+    "CallbackButton",
 ]

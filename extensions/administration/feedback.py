@@ -51,6 +51,6 @@ class Feedback(commands.Cog):
         await ctx.response.send_modal(FeedbackModal(ctx.guild, self.client, title="Feedback Modal"))
 
 
-def setup(client:Bot) -> None:
+def setup(client: Bot) -> None:
     client.logger.warning(f"{Feedback.__qualname__} should be reviewed and rewritten in future.")
     client.add_cog(Feedback(client))
