@@ -25,7 +25,7 @@ class MessagePurge(commands.Cog):
     )
     @is_team()
     async def purge(
-        self, ctx: discord.ApplicationContext, which: discord.User | discord.Role | None = None, amount: int = 100
+            self, ctx: discord.ApplicationContext, which: discord.User | discord.Role | None = None, amount: int = 100
     ):
         """
         Purges messages from a channel
@@ -39,7 +39,7 @@ class MessagePurge(commands.Cog):
             await ctx.response.send_message("You can only delete up to 100 messages at a time.", ephemeral=True)
             return
         await ctx.defer(ephemeral=True)
-        # Depending if channel is DMChannel or Guild Channel
+        # depends if channel is DMChannel or Guild Channel
         if isinstance(ctx.channel, discord.channel.DMChannel):
             deleted_messages: list[discord.Message] = await ctx.channel.history(limit=amount).flatten()
             for message in deleted_messages:

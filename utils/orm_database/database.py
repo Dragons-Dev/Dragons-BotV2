@@ -1,8 +1,8 @@
-from collections.abc import Sequence
-from datetime import datetime, timedelta, date
-import typing as t
-
 import discord
+import typing as t
+from collections.abc import Sequence
+from config import DATABASE_URL, SERVER_TZ
+from datetime import datetime, timedelta, date
 from sqlalchemy import select, and_, func, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
@@ -12,10 +12,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from config import DATABASE_URL, SERVER_TZ
-
-from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
-from ..logger import CustomLogger
 from .models import (
     Base,
     BotStatus,
@@ -29,6 +25,8 @@ from .models import (
     ConfirmationDB,
 )
 from ..classes import Event, Confirmation
+from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
+from ..logger import CustomLogger
 
 
 class ORMDataBase:
@@ -132,7 +130,7 @@ class ORMDataBase:
             return result
 
     async def update_temp_voice(
-        self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool, ghosted: bool
+            self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool, ghosted: bool
     ):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -159,7 +157,7 @@ class ORMDataBase:
                 await session.commit()
 
     async def create_infraction(
-        self, user: discord.User | discord.Member, infraction: InfractionsEnum, reason: str, guild: discord.Guild
+            self, user: discord.User | discord.Member, infraction: InfractionsEnum, reason: str, guild: discord.Guild
     ) -> int:
         """
         Creates a new infraction record in the database.
@@ -186,7 +184,7 @@ class ORMDataBase:
         raise NotImplementedError("In the past this had no use!")
 
     async def get_infraction(
-        self, case_id: int | None, user: discord.Member | discord.User | None, guild: discord.Guild | None = None
+            self, case_id: int | None, user: discord.Member | discord.User | None, guild: discord.Guild | None = None
     ) -> None | Infractions | Sequence[Infractions]:
         """
         Retrieves infraction(s) from the database based on case ID or user.
@@ -219,7 +217,7 @@ class ORMDataBase:
         return infractions
 
     async def create_modmail(
-        self, user: discord.User | discord.Member, guild: discord.Guild, uuid: str, anonymous: bool
+            self, user: discord.User | discord.Member, guild: discord.Guild, uuid: str, anonymous: bool
     ):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -255,7 +253,7 @@ class ORMDataBase:
                 await session.commit()
 
     async def update_user_stat(
-        self, user: discord.User | discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild
+            self, user: discord.User | discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild
     ):
         """
         Upsert a stat for the user. Automatically creates a new date if necessary.
@@ -289,7 +287,7 @@ class ORMDataBase:
                     result.value += value
 
     async def get_user_stat_days(
-        self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild, days_back: int
+            self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild, days_back: int
     ) -> Sequence[UserStats]:
         """
         Returns the stats for the specified date range
@@ -317,7 +315,7 @@ class ORMDataBase:
             return result
 
     async def get_user_stat_total(
-        self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild
+            self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild
     ) -> int:
         """
         Returns an int consisting of all values this user has for the stat.
@@ -336,7 +334,7 @@ class ORMDataBase:
             return result or 0
 
     async def delete_user_stats(
-        self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None
+            self, user: discord.User | discord.Member | None, stat_type: StatTypeEnum, guild: discord.Guild | None
     ) -> None:
         """
         Deletes all stats of a user for a specific stat type and guild.
@@ -380,11 +378,11 @@ class ORMDataBase:
                 await session.commit()
 
     async def edit_bot_status(
-        self,
-        id_: int,
-        activity_type: discord.ActivityType = None,
-        status: discord.Status = None,
-        activity_name: str = None,
+            self,
+            id_: int,
+            activity_type: discord.ActivityType = None,
+            status: discord.Status = None,
+            activity_name: str = None,
     ) -> None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -479,7 +477,7 @@ class ORMDataBase:
                 return new_state
 
     async def create_confirmation(
-        self, *, event_id: str, guest: int, confirmation: bool | None, reminders: list[int]
+            self, *, event_id: str, guest: int, confirmation: bool | None, reminders: list[int]
     ) -> None:
         """
         Creates a new confirmation for an event
@@ -501,7 +499,7 @@ class ORMDataBase:
                 self.logger.info(f"Confirmation for {event_id} and user {guest} created")
 
     async def update_confirmation(
-        self, *, event_id: str, guest: int, confirmation: bool | None = None, reminders: list[int] | None = None
+            self, *, event_id: str, guest: int, confirmation: bool | None = None, reminders: list[int] | None = None
     ) -> bool:
         """
         Creates a new confirmation for an event
@@ -633,13 +631,13 @@ class ORMDataBase:
             return False
 
     async def create_event(
-        self,
-        *,
-        host: int,
-        name: str,
-        time: datetime,
-        invites: list[discord.User],
-        mode: t.Literal["OPEN", "CLOSED", "INVITE_ONLY"],
+            self,
+            *,
+            host: int,
+            name: str,
+            time: datetime,
+            invites: list[discord.User],
+            mode: t.Literal["OPEN", "CLOSED", "INVITE_ONLY"],
     ) -> str:
         """
         Creates a new event
@@ -667,7 +665,7 @@ class ORMDataBase:
         Args:
 
         Returns:
-            An event as dict (so i dont have to rewrite the reminder logic ^^)
+            An event as dict (so I don't have to rewrite the reminder logic ^^)
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -693,7 +691,7 @@ class ORMDataBase:
         Args:
 
         Returns:
-            All events as a dict (so i dont have to rewrite the reminder logic ^^)
+            All events as a dict (so I don't have to rewrite the reminder logic ^^)
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -715,13 +713,13 @@ class ORMDataBase:
         return events_r
 
     async def update_event(
-        self,
-        *,
-        id: str,
-        host: int | None = None,
-        name: str | None = None,
-        time: datetime | None = None,
-        mode: str | None = None,
+            self,
+            *,
+            id: str,
+            host: int | None = None,
+            name: str | None = None,
+            time: datetime | None = None,
+            mode: str | None = None,
     ) -> bool:
         """
         Updates an event
