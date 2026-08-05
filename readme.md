@@ -57,17 +57,17 @@ The compose setup stores persistent data in `./data`.
 
 Environment variables are loaded from `.env` via `python-dotenv`.
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `DISCORD_API_KEY` | Yes | Discord bot token |
-| `DATABASE_URL` | No | SQLAlchemy database URL (default: sqlite in `/data`) |
-| `GOOGLE_API_KEY` | No | Used for harmful URL checks |
-| `log_level` | No | Bot log level (`DEBUG` or `INFO`) |
-| `discord_log_level` | No | Discord logger verbosity |
-| `IPC_SECRET` | No | Secret for bot ↔ web interface communication |
-| `SPOTIFY_CLIENT_ID` | No | Spotify API client id |
-| `SPOTIFY_CLIENT_SECRET` | No | Spotify API client secret |
-| `SERVER_TZ` | No | Server timezone (e.g. `Europe/Berlin`) |
+| Variable                | Required | Description                                          |
+|-------------------------|----------|------------------------------------------------------|
+| `DISCORD_API_KEY`       | Yes      | Discord bot token                                    |
+| `DATABASE_URL`          | No       | SQLAlchemy database URL (default: sqlite in `/data`) |
+| `GOOGLE_API_KEY`        | No       | Used for harmful URL checks                          |
+| `log_level`             | No       | Bot log level (`DEBUG` or `INFO`)                    |
+| `discord_log_level`     | No       | Discord logger verbosity                             |
+| `IPC_SECRET`            | No       | Secret for bot ↔ web interface communication         |
+| `SPOTIFY_CLIENT_ID`     | No       | Spotify API client id                                |
+| `SPOTIFY_CLIENT_SECRET` | No       | Spotify API client secret                            |
+| `SERVER_TZ`             | No       | Server timezone (e.g. `Europe/Berlin`)               |
 
 ## Repository structure
 
