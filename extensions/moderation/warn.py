@@ -11,12 +11,12 @@ from utils import (
     Bot,
     ButtonConfirm,
     ButtonInfo,
+    CommandDisabledError,
     CustomLogger,
     InfractionsEnum,
     SettingsEnum,
     is_team,
 )
-from utils import CommandDisabledError
 
 
 class Warn(commands.Cog):
@@ -78,8 +78,8 @@ class Warn(commands.Cog):
             setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
             if setting:
                 if isinstance(setting, (tuple, list, t.Sequence)):
-                    log_channel: discord.TextChannel = await get_or_fetch(
-                        ctx.guild, "channel", setting[0].value, default=None
+                    log_channel: discord.TextChannel = await ctx.guild.get_or_fetch(
+                        discord.TextChannel, setting[0].value, default=None
                     )
                 else:
                     log_channel: discord.TextChannel = await get_or_fetch(

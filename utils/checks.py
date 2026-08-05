@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord.utils import get_or_fetch
 
+from . import Bot
 from .classes import InsufficientPermission
 from .enums import SettingsEnum
 
@@ -13,9 +14,12 @@ def is_team():
     """
 
     async def predicate(ctx: discord.ApplicationContext):
-        if isinstance(ctx.channel, discord.channel.DMChannel):
+        if isinstance(ctx.channel, discord.DMChannel):
             return True
-        team_role = await ctx.bot.db.get_setting(setting=SettingsEnum.TeamRole, guild=ctx.guild)
+        client: Bot = ctx.bot
+        if ctx.guild is None:
+            return False
+        team_role = await client.db.get_setting(setting=SettingsEnum.TeamRole, guild=ctx.guild)
         if team_role is None:
             if ctx.author.guild_permissions.administrator or ctx.author.guild_permissions.manage_guild:
                 return True
