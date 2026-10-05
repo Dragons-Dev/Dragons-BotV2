@@ -2,7 +2,7 @@ import discord
 from discord import SlashCommandGroup
 from discord.ext import commands
 
-from utils import Bot, CustomLogger, CommandDisabledError, is_team
+from utils import Bot, CommandDisabledError, CustomLogger, is_team
 
 
 def strip_emoji(command_name: str) -> str:

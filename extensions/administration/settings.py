@@ -1,6 +1,7 @@
+from collections.abc import Sequence
+
 import discord
 from discord.ext import commands
-from collections.abc import Sequence
 
 from utils import Bot, CustomLogger, SettingsEnum, checks, is_team
 
@@ -114,9 +115,7 @@ class SettingsCog(commands.Cog):
         for enum_value in SettingsEnum:
             enum = SettingsEnum(enum_value)
             setting_value = await self.client.db.get_setting(setting=enum, guild=ctx.guild)
-            if setting_value is None:
-                continue
-            elif isinstance(setting_value, Sequence):
+            if setting_value is None or isinstance(setting_value, Sequence):
                 continue
             else:
                 embed.add_field(

@@ -1,7 +1,8 @@
+import os
 from logging import DEBUG, INFO, WARNING
 from zoneinfo import ZoneInfo
+
 from dotenv import load_dotenv
-import os
 
 load_dotenv(dotenv_path=".env")
 

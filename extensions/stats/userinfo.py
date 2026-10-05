@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord.utils import format_dt
 from pycord import multicog as pycog
 
-from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum, ContainerPaginator
+from utils import Bot, ContainerPaginator, CustomLogger, SettingsEnum, StatTypeEnum, sec_to_readable
 from utils.orm_database import Infractions, Settings
 
 

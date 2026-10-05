@@ -224,8 +224,6 @@ class ModMail(commands.Cog):
                     )
                     await thread.edit(locked=True)
                     return
-            else:
-                pass
 
     @commands.Cog.listener("on_message")
     async def on_modmail(self, msg: discord.Message):
@@ -337,11 +335,10 @@ class ModMail(commands.Cog):
                         await thread.send(embed=embed, files=(None if len(files) == 0 else files))
                         return
                 # if no known thread matches, create a new thread and send the message
-                else:
-                    title = f"Thread for {escape_markdown(embed.author.name)}"
-                    start_msg = await modmail_channel_.send(f"Creating {escape_markdown(title)}")
-                    new_thread = await start_msg.create_thread(name=title, auto_archive_duration=4320)
-                    await new_thread.send(embed=embed, files=(None if len(files) == 0 else files))
+                title = f"Thread for {escape_markdown(embed.author.name)}"
+                start_msg = await modmail_channel_.send(f"Creating {escape_markdown(title)}")
+                new_thread = await start_msg.create_thread(name=title, auto_archive_duration=4320)
+                await new_thread.send(embed=embed, files=(None if len(files) == 0 else files))
 
 
 def setup(client: Bot):

@@ -1,8 +1,8 @@
 from collections.abc import Sequence
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 
 import discord
-from sqlalchemy import select, and_, func, delete
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -13,21 +13,21 @@ from sqlalchemy.ext.asyncio import (
 
 from config import DATABASE_URL, SERVER_TZ
 
+from ..classes import Confirmation, Event
 from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from ..logger import CustomLogger
 from .models import (
     Base,
     BotStatus,
+    ConfirmationDB,
+    EnabledCommands,
+    Events,
     Infractions,
     Join2Create,
     Modmail,
     Settings,
     UserStats,
-    EnabledCommands,
-    Events,
-    ConfirmationDB,
 )
-from ..classes import Event, Confirmation
 
 
 class ORMDataBase:
@@ -75,14 +75,13 @@ class ORMDataBase:
         Returns:
             Sequence[Settings] | None: The retrieved setting(s) or None if not found.
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                if guild is None:
-                    query = select(Settings).where(Settings.setting == setting.value)
-                else:
-                    query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
-                response = await session.execute(query)
-                results = response.scalars().fetchall()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            if guild is None:
+                query = select(Settings).where(Settings.setting == setting.value)
+            else:
+                query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
+            response = await session.execute(query)
+            results = response.scalars().fetchall()
         if not results:
             return None
         elif len(results) == 1:
@@ -117,15 +116,14 @@ class ORMDataBase:
             setting (SettingsEnum): The setting to delete.
             guild (discord.Guild): The guild associated with the setting.
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
-                db_setting = (await session.execute(query)).scalar_one_or_none()
-                if db_setting is None:
-                    return None
-                else:
-                    await session.delete(db_setting)
-                await session.commit()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
+            db_setting = (await session.execute(query)).scalar_one_or_none()
+            if db_setting is None:
+                return
+            else:
+                await session.delete(db_setting)
+            await session.commit()
 
     async def create_temp_voice(self, channel: discord.VoiceChannel, owner: discord.Member) -> Join2Create | None:
         async with self.AsyncSessionLocal() as session:
@@ -139,29 +137,26 @@ class ORMDataBase:
     async def update_temp_voice(
         self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool, ghosted: bool
     ):
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(Join2Create).where(Join2Create.channel == channel.id)
-                _channel = (await session.execute(query)).scalar_one_or_none()
-                _channel.owner_id = owner.id
-                _channel.locked = locked
-                _channel.ghosted = ghosted
-                await session.commit()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(Join2Create).where(Join2Create.channel == channel.id)
+            _channel = (await session.execute(query)).scalar_one_or_none()
+            _channel.owner_id = owner.id
+            _channel.locked = locked
+            _channel.ghosted = ghosted
+            await session.commit()
 
     async def get_temp_voice(self, channel: discord.VoiceChannel) -> None | Join2Create:
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(Join2Create).where(Join2Create.channel == channel.id)
-                temp_channel = (await session.execute(query)).scalar_one_or_none()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(Join2Create).where(Join2Create.channel == channel.id)
+            temp_channel = (await session.execute(query)).scalar_one_or_none()
         return temp_channel
 
     async def delete_temp_voice(self, channel: discord.VoiceChannel):
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(Join2Create).where(Join2Create.channel == channel.id)
-                temp_channel = (await session.execute(query)).scalar_one_or_none()
-                await session.delete(temp_channel)
-                await session.commit()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(Join2Create).where(Join2Create.channel == channel.id)
+            temp_channel = (await session.execute(query)).scalar_one_or_none()
+            await session.delete(temp_channel)
+            await session.commit()
 
     async def create_infraction(
         self, user: discord.User | discord.Member, infraction: InfractionsEnum, reason: str, guild: discord.Guild
@@ -178,14 +173,13 @@ class ORMDataBase:
         Returns:
             int: The case ID of the created infraction.
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                infraction = Infractions(
-                    user_id=user.id, infraction=infraction.value, reason=reason, date=datetime.now(), guild=guild.id
-                )
-                session.add(infraction)
-                await session.commit()
-                return infraction.case_id
+        async with self.AsyncSessionLocal() as session, session.begin():
+            infraction = Infractions(
+                user_id=user.id, infraction=infraction.value, reason=reason, date=datetime.now(), guild=guild.id
+            )
+            session.add(infraction)
+            await session.commit()
+            return infraction.case_id
 
     async def update_infraction(self):
         raise NotImplementedError("In the past this had no use!")
@@ -208,15 +202,14 @@ class ORMDataBase:
         Raises:
             LookupError: If both case_id and user are None.
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                if case_id:
-                    query = select(Infractions).where(Infractions.case_id == case_id)
-                elif user:
-                    query = select(Infractions).where(Infractions.user_id == user.id)
-                else:
-                    raise LookupError("Both arguments are 'None'. At least one must have a value!")
-                infractions = (await session.execute(query)).scalars().all()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            if case_id:
+                query = select(Infractions).where(Infractions.case_id == case_id)
+            elif user:
+                query = select(Infractions).where(Infractions.user_id == user.id)
+            else:
+                raise LookupError("Both arguments are 'None'. At least one must have a value!")
+            infractions = (await session.execute(query)).scalars().all()
         if len(infractions) == 0:
             return None
         if len(infractions) == 1:
@@ -226,38 +219,35 @@ class ORMDataBase:
     async def create_modmail(
         self, user: discord.User | discord.Member, guild: discord.Guild, uuid: str, anonymous: bool
     ):
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                session.add(
-                    Modmail(
-                        user_id=user.id,
-                        guild_id=guild.id,
-                        uuid=uuid,
-                        anon=anonymous,
-                    )
+        async with self.AsyncSessionLocal() as session, session.begin():
+            session.add(
+                Modmail(
+                    user_id=user.id,
+                    guild_id=guild.id,
+                    uuid=uuid,
+                    anon=anonymous,
                 )
+            )
 
     async def get_modmail(self, user: discord.User | discord.Member | None, uuid: str | None) -> None | Modmail:
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                if user:
-                    query = select(Modmail).where(Modmail.user_id == user.id)
-                elif uuid:
-                    query = select(Modmail).where(Modmail.uuid == uuid)
-                else:
-                    raise LookupError("Both arguments are 'None'. At least one must have a value!")
-                modmail = (await session.execute(query)).scalar_one_or_none()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            if user:
+                query = select(Modmail).where(Modmail.user_id == user.id)
+            elif uuid:
+                query = select(Modmail).where(Modmail.uuid == uuid)
+            else:
+                raise LookupError("Both arguments are 'None'. At least one must have a value!")
+            modmail = (await session.execute(query)).scalar_one_or_none()
         return modmail
 
     async def delete_modmail(self, user: discord.User | discord.Member) -> None:
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(Modmail).where(Modmail.user_id == user.id)
-                result = (await session.execute(query)).scalar()
-                if result is None:
-                    return
-                await session.delete(result)
-                await session.commit()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(Modmail).where(Modmail.user_id == user.id)
+            result = (await session.execute(query)).scalar()
+            if result is None:
+                return
+            await session.delete(result)
+            await session.commit()
 
     async def update_user_stat(
         self, user: discord.User | discord.Member, stat_type: StatTypeEnum, value: int, guild: discord.Guild
@@ -271,27 +261,26 @@ class ORMDataBase:
         :return: ``None``
         """
         today = datetime.today()
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(UserStats).where(
-                    and_(
-                        UserStats.user_id == user.id,
-                        UserStats.stat_type == stat_type.value,
-                        UserStats.guild_id == guild.id,
-                    )
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(UserStats).where(
+                and_(
+                    UserStats.user_id == user.id,
+                    UserStats.stat_type == stat_type.value,
+                    UserStats.guild_id == guild.id,
                 )
-                result: UserStats | None = (await session.execute(query)).scalar_one_or_none()
-                if result is None:
-                    new_stat = UserStats(
-                        user_id=user.id,
-                        stat_type=stat_type.value,
-                        value=value,
-                        guild_id=guild.id,
-                        day=today,
-                    )
-                    session.add(new_stat)
-                else:
-                    result.value += value
+            )
+            result: UserStats | None = (await session.execute(query)).scalar_one_or_none()
+            if result is None:
+                new_stat = UserStats(
+                    user_id=user.id,
+                    stat_type=stat_type.value,
+                    value=value,
+                    guild_id=guild.id,
+                    day=today,
+                )
+                session.add(new_stat)
+            else:
+                result.value += value
 
     async def get_user_stat_days(
         self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild, days_back: int
@@ -350,39 +339,35 @@ class ORMDataBase:
         :param guild: the specific guild to delete the stats for
         :return: ``None``
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                if user and guild:
-                    query = select(UserStats).where(
-                        and_(
-                            UserStats.user_id == user.id,
-                            UserStats.stat_type == stat_type.value,
-                            UserStats.guild_id == guild.id,
-                        )
+        async with self.AsyncSessionLocal() as session, session.begin():
+            if user and guild:
+                query = select(UserStats).where(
+                    and_(
+                        UserStats.user_id == user.id,
+                        UserStats.stat_type == stat_type.value,
+                        UserStats.guild_id == guild.id,
                     )
-                if user and not guild:
-                    query = select(UserStats).where(
-                        and_(
-                            UserStats.user_id == user.id,
-                            UserStats.stat_type == stat_type.value,
-                        )
+                )
+            if user and not guild:
+                query = select(UserStats).where(
+                    and_(
+                        UserStats.user_id == user.id,
+                        UserStats.stat_type == stat_type.value,
                     )
-                if not user and guild:
-                    query = select(UserStats).where(
-                        and_(UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id)
-                    )
-                result = (await session.execute(query)).scalars().all()
-                for stat in result:
-                    await session.delete(stat)
-                await session.commit()
+                )
+            if not user and guild:
+                query = select(UserStats).where(
+                    and_(UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id)
+                )
+            result = (await session.execute(query)).scalars().all()
+            for stat in result:
+                await session.delete(stat)
+            await session.commit()
 
     async def create_bot_status(self, activity_type: discord.ActivityType, status: discord.Status, activity_name: str):
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                session.add(
-                    BotStatus(activity_type=int(activity_type), status=str(status), activity_name=activity_name)
-                )
-                await session.commit()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            session.add(BotStatus(activity_type=int(activity_type), status=str(status), activity_name=activity_name))
+            await session.commit()
 
     async def edit_bot_status(
         self,
@@ -391,16 +376,15 @@ class ORMDataBase:
         status: discord.Status = None,
         activity_name: str = None,
     ) -> None:
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(BotStatus).where(BotStatus.id == id_)
-                result = (await session.execute(query)).scalar_one_or_none()
-                if result is None:
-                    return None
-                result.activity_type = int(activity_type) if activity_type else result.activity_type
-                result.status = str(status) if status else result.status
-                result.activity_name = activity_name if activity_name else result.activity_name
-                await session.commit()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(BotStatus).where(BotStatus.id == id_)
+            result = (await session.execute(query)).scalar_one_or_none()
+            if result is None:
+                return
+            result.activity_type = int(activity_type) if activity_type else result.activity_type
+            result.status = str(status) if status else result.status
+            result.activity_name = activity_name if activity_name else result.activity_name
+            await session.commit()
 
     async def get_bot_status(self, id_: int | None) -> BotStatus | Sequence[BotStatus] | None:
         """
@@ -412,13 +396,12 @@ class ORMDataBase:
             A BotStatus object, a list of it or None. The BotStatus object uses py-cords enums for activity_type and
             status. You will have to convert them to the correct type, to use them effectively.
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                if id_:
-                    query = select(BotStatus).where(BotStatus.id == id_)
-                else:
-                    query = select(BotStatus)
-                bot_status = (await session.execute(query)).scalars().all()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            if id_:
+                query = select(BotStatus).where(BotStatus.id == id_)
+            else:
+                query = select(BotStatus)
+            bot_status = (await session.execute(query)).scalars().all()
         if len(bot_status) == 0:
             return None
         if len(bot_status) == 1:
@@ -426,14 +409,13 @@ class ORMDataBase:
         return bot_status
 
     async def delete_bot_status(self, id_: int):
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(BotStatus).where(BotStatus.id == id_)
-                result = (await session.execute(query)).scalar_one_or_none()
-                if result is None:
-                    return
-                await session.delete(result)
-                await session.commit()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(BotStatus).where(BotStatus.id == id_)
+            result = (await session.execute(query)).scalar_one_or_none()
+            if result is None:
+                return
+            await session.delete(result)
+            await session.commit()
 
     async def is_command_enabled(self, guild: discord.Guild, command_name: str) -> bool:
         """
@@ -447,15 +429,14 @@ class ORMDataBase:
             True if the command is enabled for the guild, or if no record exists (default enabled).
             False if the command is explicitly disabled.
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(EnabledCommands).where(
-                    EnabledCommands.guild_id == guild.id, EnabledCommands.command_name == command_name
-                )
-                result: EnabledCommands | None = (await session.execute(query)).scalar_one_or_none()
-                if result is None:
-                    return True
-                return bool(result.enabled)
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(EnabledCommands).where(
+                EnabledCommands.guild_id == guild.id, EnabledCommands.command_name == command_name
+            )
+            result: EnabledCommands | None = (await session.execute(query)).scalar_one_or_none()
+            if result is None:
+                return True
+            return bool(result.enabled)
 
     async def toggle_command(self, guild: discord.Guild, command_name: str) -> bool:
         """
@@ -466,22 +447,21 @@ class ORMDataBase:
 
         Returns: The new state of the command (enabled/disabled).
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(EnabledCommands).where(
-                    EnabledCommands.guild_id == guild.id, EnabledCommands.command_name == command_name
-                )
-                result: EnabledCommands | None = (await session.execute(query)).scalar_one_or_none()
-                new_state: bool
-                if result is None:
-                    obj = EnabledCommands(guild_id=guild.id, command_name=command_name, enabled=False)
-                    session.add(obj)
-                    new_state = False  # Command not in DB means it was enabled; now disabling it
-                else:
-                    result.enabled = not bool(result.enabled)
-                    new_state = bool(result.enabled)
-                await session.commit()
-                return new_state
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(EnabledCommands).where(
+                EnabledCommands.guild_id == guild.id, EnabledCommands.command_name == command_name
+            )
+            result: EnabledCommands | None = (await session.execute(query)).scalar_one_or_none()
+            new_state: bool
+            if result is None:
+                obj = EnabledCommands(guild_id=guild.id, command_name=command_name, enabled=False)
+                session.add(obj)
+                new_state = False  # Command not in DB means it was enabled; now disabling it
+            else:
+                result.enabled = not bool(result.enabled)
+                new_state = bool(result.enabled)
+            await session.commit()
+            return new_state
 
     async def create_confirmation(
         self, *, event_id: str, guest: int, confirmation: bool | None, reminders: list[int]
@@ -496,14 +476,13 @@ class ORMDataBase:
 
         Returns: None
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                reminders_db = ",".join(map(str, reminders))
-                session.add(
-                    ConfirmationDB(event_id=event_id, user_id=guest, confirmation=confirmation, reminders=reminders_db)
-                )
-                await session.commit()
-                self.logger.info(f"Confirmation for {event_id} and user {guest} created")
+        async with self.AsyncSessionLocal() as session, session.begin():
+            reminders_db = ",".join(map(str, reminders))
+            session.add(
+                ConfirmationDB(event_id=event_id, user_id=guest, confirmation=confirmation, reminders=reminders_db)
+            )
+            await session.commit()
+            self.logger.info(f"Confirmation for {event_id} and user {guest} created")
 
     async def update_confirmation(
         self, *, event_id: str, guest: int, confirmation: bool | None = None, reminders: list[int] | None = None
@@ -546,22 +525,21 @@ class ORMDataBase:
 
         Returns: The confirmation for this event and that user
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                confirm: ConfirmationDB | None = await session.get(ConfirmationDB, (event_id, guest))
-                if confirm is None:
-                    self.logger.error(f"Confirmation not found by evnt_id {event_id} and user {guest}")
-                    return None
-                if confirm.reminders == "":
-                    reminders_t = []
-                else:
-                    reminders_t = list(map(int, confirm.reminders.split(",")))
-                return Confirmation(
-                    event_id=confirm.event_id,
-                    guest=confirm.user_id,
-                    confirmation=confirm.confirmation,
-                    reminders=reminders_t,
-                )
+        async with self.AsyncSessionLocal() as session, session.begin():
+            confirm: ConfirmationDB | None = await session.get(ConfirmationDB, (event_id, guest))
+            if confirm is None:
+                self.logger.error(f"Confirmation not found by evnt_id {event_id} and user {guest}")
+                return None
+            if confirm.reminders == "":
+                reminders_t = []
+            else:
+                reminders_t = list(map(int, confirm.reminders.split(",")))
+            return Confirmation(
+                event_id=confirm.event_id,
+                guest=confirm.user_id,
+                confirmation=confirm.confirmation,
+                reminders=reminders_t,
+            )
 
     async def get_confirmations_for_event(self, *, event_id: str) -> list[int]:
         """
@@ -571,13 +549,12 @@ class ORMDataBase:
 
         Returns: List of all users that accepted the invitation
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(ConfirmationDB.user_id).where(
-                    ConfirmationDB.event_id == event_id, ConfirmationDB.confirmation.is_(True)
-                )
-                users_ids = (await session.execute(query)).scalars().all()
-                return users_ids
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(ConfirmationDB.user_id).where(
+                ConfirmationDB.event_id == event_id, ConfirmationDB.confirmation.is_(True)
+            )
+            users_ids = (await session.execute(query)).scalars().all()
+            return users_ids
 
     async def get_complete_confirmations_for_event(self, *, event_id: str) -> list[Confirmation]:
         """
@@ -613,11 +590,10 @@ class ORMDataBase:
 
         Returns: List of all users that were invited
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(ConfirmationDB.user_id).where(ConfirmationDB.event_id == event_id)
-                users_ids = (await session.execute(query)).scalars().all()
-                return users_ids
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(ConfirmationDB.user_id).where(ConfirmationDB.event_id == event_id)
+            users_ids = (await session.execute(query)).scalars().all()
+            return users_ids
 
     async def delete_confirmation_of_event(self, event_id: str) -> bool:
         """
@@ -628,12 +604,11 @@ class ORMDataBase:
         Returns: Bool if everything was deleted
         """
         try:
-            async with self.AsyncSessionLocal() as session:
-                async with session.begin():
-                    await session.execute(delete(ConfirmationDB).where(ConfirmationDB.event_id == event_id))
-                    await session.commit()
-                    self.logger.info(f"Deleted all confirmations for event: {event_id}")
-                    return True
+            async with self.AsyncSessionLocal() as session, session.begin():
+                await session.execute(delete(ConfirmationDB).where(ConfirmationDB.event_id == event_id))
+                await session.commit()
+                self.logger.info(f"Deleted all confirmations for event: {event_id}")
+                return True
         except SQLAlchemyError:
             return False
 
@@ -668,10 +643,9 @@ class ORMDataBase:
         Returns:
             An event as dict (so i dont have to rewrite the reminder logic ^^)
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                event = await session.get(Events, id)
-                users = await self.get_confirmations_for_event(event_id=id)
+        async with self.AsyncSessionLocal() as session, session.begin():
+            event = await session.get(Events, id)
+            users = await self.get_confirmations_for_event(event_id=id)
         if event is None:
             self.logger.error(f"Event not found by id {id}")
             return None
@@ -694,10 +668,9 @@ class ORMDataBase:
         Returns:
             All events as a dict (so i dont have to rewrite the reminder logic ^^)
         """
-        async with self.AsyncSessionLocal() as session:
-            async with session.begin():
-                query = select(Events)
-                events = (await session.execute(query)).scalars().all()
+        async with self.AsyncSessionLocal() as session, session.begin():
+            query = select(Events)
+            events = (await session.execute(query)).scalars().all()
         events_r = []
         for event in events:
             users = await self.get_confirmations_for_event(event_id=event.id)
@@ -734,20 +707,19 @@ class ORMDataBase:
         Returns: The event_id to identify the event.
         """
         try:
-            async with self.AsyncSessionLocal() as session:
-                async with session.begin():
-                    event = await session.get(Events, id)
-                    if event is None:
-                        return False
-                    if host is not None:
-                        event.host = host
-                    if name is not None:
-                        event.name = name
-                    if time is not None:
-                        event.time = time
-                    if mode is not None:
-                        event.mode = mode
-                    await session.commit()
+            async with self.AsyncSessionLocal() as session, session.begin():
+                event = await session.get(Events, id)
+                if event is None:
+                    return False
+                if host is not None:
+                    event.host = host
+                if name is not None:
+                    event.name = name
+                if time is not None:
+                    event.time = time
+                if mode is not None:
+                    event.mode = mode
+                await session.commit()
             self.logger.info(f"Event {id} updated")
             return True
         except SQLAlchemyError:
@@ -755,15 +727,14 @@ class ORMDataBase:
 
     async def delete_event(self, id: str) -> bool:
         try:
-            async with self.AsyncSessionLocal() as session:
-                async with session.begin():
-                    conf_deletion = await self.delete_confirmation_of_event(event_id=id)
-                    if conf_deletion:
-                        await session.execute(delete(Events).where(Events.id == id))
-                        await session.commit()
-                        self.logger.info(f"Event {id} deleted")
-                        return True
-                    else:
-                        return conf_deletion
+            async with self.AsyncSessionLocal() as session, session.begin():
+                conf_deletion = await self.delete_confirmation_of_event(event_id=id)
+                if conf_deletion:
+                    await session.execute(delete(Events).where(Events.id == id))
+                    await session.commit()
+                    self.logger.info(f"Event {id} deleted")
+                    return True
+                else:
+                    return conf_deletion
         except SQLAlchemyError:
             return False
