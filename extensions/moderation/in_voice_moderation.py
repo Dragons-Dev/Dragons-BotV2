@@ -1,8 +1,8 @@
 import discord
-from discord.ext import commands
 import pycord.multicog as pycog
+from discord.ext import commands
 
-from utils import Bot, CustomLogger, ContainerPaginator
+from utils import Bot, ContainerPaginator, CustomLogger
 
 
 class Mute(discord.ui.Button):

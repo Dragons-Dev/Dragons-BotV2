@@ -11,12 +11,12 @@ from utils import (
     Bot,
     ButtonConfirm,
     ButtonInfo,
+    CommandDisabledError,
     CustomLogger,
     InfractionsEnum,
     SettingsEnum,
     is_team,
 )
-from utils import CommandDisabledError
 
 
 class Kick(commands.Cog):

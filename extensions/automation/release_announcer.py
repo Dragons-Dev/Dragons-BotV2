@@ -1,9 +1,11 @@
-import discord
-import aiohttp
-from discord.ext import commands, tasks
-from utils import Bot, CustomLogger, VersionInfo
 from datetime import time
+
+import aiohttp
+import discord
+from discord.ext import commands, tasks
+
 from config import SERVER_TZ
+from utils import Bot, CustomLogger, VersionInfo
 
 
 class ReleaseAnnouncer(commands.Cog):

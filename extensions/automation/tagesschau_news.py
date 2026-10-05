@@ -121,9 +121,7 @@ class TagesschauFeed(commands.Cog):
                 await self.client.sts.enter_tagesschau_id(
                     uuid=ent["id"], updated=ent["updated"], expires=datetime.now() + timedelta(5)
                 )
-            if em is None:
-                pass
-            elif "Liveblog" in em.title:
+            if em is None or "Liveblog" in em.title:
                 pass
             else:
                 new.append((em, WebhookType.Tagesschau))

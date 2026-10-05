@@ -1,6 +1,6 @@
+import aiohttp
 import discord
 from discord.ext import commands
-import aiohttp
 
 from utils import Bot, CustomLogger
 
@@ -18,16 +18,15 @@ class Noooo(commands.Cog):
         input_type=discord.SlashCommandOptionType.mentionable,
     )
     async def noooo(self, ctx: discord.ApplicationContext, who: discord.User):
-        async with aiohttp.ClientSession() as session:
-            async with session.get("https://naas.isalman.dev/no") as response:
-                html = await response.json()
-                em = discord.Embed(title="Kind Declination", color=discord.Color.brand_green())
-                em.add_field(name="", value=html["reason"])
-                em.set_author(name=ctx.author, icon_url=ctx.author.avatar)
-                await who.send(embed=em)
-                em = discord.Embed(title="Kind Declination delivered", color=discord.Color.brand_green())
-                em.add_field(name="", value=html["reason"])
-                await ctx.response.send_message(embed=em, ephemeral=True)
+        async with aiohttp.ClientSession() as session, session.get("https://naas.isalman.dev/no") as response:
+            html = await response.json()
+            em = discord.Embed(title="Kind Declination", color=discord.Color.brand_green())
+            em.add_field(name="", value=html["reason"])
+            em.set_author(name=ctx.author, icon_url=ctx.author.avatar)
+            await who.send(embed=em)
+            em = discord.Embed(title="Kind Declination delivered", color=discord.Color.brand_green())
+            em.add_field(name="", value=html["reason"])
+            await ctx.response.send_message(embed=em, ephemeral=True)
 
 
 def setup(client):

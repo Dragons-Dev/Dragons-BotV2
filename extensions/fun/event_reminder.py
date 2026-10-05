@@ -1,11 +1,12 @@
-import discord
-from discord.ext import commands, tasks
 from datetime import datetime, timedelta
-from config import SERVER_TZ
 from enum import Enum
-from utils import Event
-from utils import Bot, CustomLogger, sec_to_readable
+
+import discord
 import pycord.multicog as pycog
+from discord.ext import commands, tasks
+
+from config import SERVER_TZ
+from utils import Bot, CustomLogger, Event, sec_to_readable
 
 
 async def event_choices(ctx: discord.AutocompleteContext) -> list[str]:
@@ -248,7 +249,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                 ephemeral=True,
                 delete_after=5,
             )
-            pass  # DMs geschlossen
+            # DMs geschlossen
 
 
 class EventInviteModal(discord.ui.DesignerModal):
@@ -325,7 +326,6 @@ class EventInviteModal(discord.ui.DesignerModal):
                 ephemeral=True,
                 delete_after=5,
             )
-            pass
 
 
 class EventCreateModal(discord.ui.DesignerModal):

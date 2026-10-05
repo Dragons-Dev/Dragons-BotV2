@@ -52,9 +52,7 @@ class VersionInfo:
             if self.minor < other.minor:
                 return True
             elif self.minor == other.minor:
-                if self.patch < other.patch:
-                    return True
-                elif self.patch == other.patch:
+                if self.patch < other.patch or self.patch == other.patch:
                     return True
                 else:
                     return False
@@ -89,9 +87,7 @@ class VersionInfo:
             if self.minor > other.minor:
                 return True
             elif self.minor == other.minor:
-                if self.patch > other.patch:
-                    return True
-                elif self.patch == other.patch:
+                if self.patch > other.patch or self.patch == other.patch:
                     return True
                 else:
                     return False
@@ -110,8 +106,7 @@ class VersionInfo:
                     patch += char
                 else:
                     break
-            if mayor.startswith("v"):
-                mayor = mayor[1:]
+            mayor = mayor.removeprefix("v")
             if patch == "":
                 patch = "0"
             return VersionInfo(int(mayor), int(minor), int(patch), patch_release.replace(patch, "", 1).strip())
@@ -120,7 +115,7 @@ class VersionInfo:
             return VersionInfo(-1, -1, -1, "")
 
 
-def sec_to_readable(time: int | float) -> str:
+def sec_to_readable(time: float) -> str:
     """
     Takes a time in seconds as float.
     Args:

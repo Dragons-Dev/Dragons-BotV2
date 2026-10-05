@@ -90,7 +90,7 @@ if __name__ == "__main__":
                         bot.load_extension(ext_name)
                         bot.logger.info(f"{ext_name} loaded successfully!")
                     except Exception as e:
-                        bot.logger.critical(f"{ext_name}: {str(e)}")  # raise errors and stop connecting to discord
+                        bot.logger.critical(f"{ext_name}: {e!s}")  # raise errors and stop connecting to discord
                         exit_("Error loading extensions!")
                 else:
                     bot.logger.warning(f"{ext_name} is disabled!")

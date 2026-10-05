@@ -1,27 +1,27 @@
 from .database import ORMDataBase
 from .models import (
     Base,
-    Settings,
+    BotStatus,
+    ConfirmationDB,
+    EnabledCommands,
+    Events,
     Infractions,
     Join2Create,
     Modmail,
+    Settings,
     UserStats,
-    BotStatus,
-    EnabledCommands,
-    Events,
-    ConfirmationDB,
 )
 
 __all__ = [
-    "ORMDataBase",
     "Base",
-    "Settings",
+    "BotStatus",
+    "ConfirmationDB",
+    "EnabledCommands",
+    "Events",
     "Infractions",
     "Join2Create",
     "Modmail",
+    "ORMDataBase",
+    "Settings",
     "UserStats",
-    "BotStatus",
-    "EnabledCommands",
-    "Events",
-    "ConfirmationDB",
 ]
