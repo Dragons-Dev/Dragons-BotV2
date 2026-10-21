@@ -1,8 +1,8 @@
-import discord
 import typing as t
 from collections.abc import Sequence
-from config import DATABASE_URL, SERVER_TZ
 from datetime import datetime, timedelta, date
+
+import discord
 from sqlalchemy import select, and_, func, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from config import DATABASE_URL, SERVER_TZ
 from .models import (
     Base,
     BotStatus,
@@ -26,7 +27,9 @@ from .models import (
 )
 from ..classes import Event, Confirmation
 from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
+from migrations import run_migrations
 from ..logger import CustomLogger
+from ..utils import VersionInfo
 
 
 class ORMDataBase:
@@ -42,7 +45,7 @@ class ORMDataBase:
         self.engine: AsyncEngine = create_async_engine(DATABASE_URL)
         self.AsyncSessionLocal: AsyncSession = async_sessionmaker(self.engine, expire_on_commit=False)  # type: ignore
 
-    async def setup(self, boot: datetime):
+    async def setup(self, boot: datetime, version: VersionInfo | None = None):
         """
         Sets up the database by creating new tables if they don't already exist.
 
@@ -50,6 +53,8 @@ class ORMDataBase:
             boot (datetime): The boot time of the application.
         """
         self.logger = CustomLogger("database", boot)  # type: ignore
+        if version is not None:
+            await run_migrations(self.engine, boot, version)
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             self.logger.info("ContentDB tables created and ready to use!")
@@ -120,35 +125,33 @@ class ORMDataBase:
                     await session.delete(db_setting)
                 await session.commit()
 
-    async def create_temp_voice(self, channel: discord.VoiceChannel, owner: discord.Member) -> Join2Create | None:
+    async def create_join2create(
+        self, channel: discord.VoiceChannel, owner: discord.Member, derived_channel: discord.VoiceChannel
+    ) -> Join2Create | None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                new_entry = Join2Create(channel=channel.id, owner_id=owner.id, locked=False, ghosted=False)
+                new_entry = Join2Create(channel=channel.id, owner_id=owner.id, derived_channel=derived_channel.id)
                 session.add(new_entry)
             await session.refresh(new_entry)
             result = await session.get(Join2Create, channel.id)
             return result
 
-    async def update_temp_voice(
-        self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool, ghosted: bool
-    ):
+    async def update_join2create(self, channel: discord.VoiceChannel, owner: discord.Member):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(Join2Create).where(Join2Create.channel == channel.id)
                 _channel = (await session.execute(query)).scalar_one_or_none()
                 _channel.owner_id = owner.id
-                _channel.locked = locked
-                _channel.ghosted = ghosted
                 await session.commit()
 
-    async def get_temp_voice(self, channel: discord.VoiceChannel) -> None | Join2Create:
+    async def get_join2create(self, channel: discord.VoiceChannel) -> None | Join2Create:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(Join2Create).where(Join2Create.channel == channel.id)
                 temp_channel = (await session.execute(query)).scalar_one_or_none()
         return temp_channel
 
-    async def delete_temp_voice(self, channel: discord.VoiceChannel):
+    async def delete_join2create(self, channel: discord.VoiceChannel):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(Join2Create).where(Join2Create.channel == channel.id)

@@ -1,10 +1,22 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Date, UniqueConstraint, BigInteger, ForeignKey
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
-__all__ = ["Base", "Settings", "Infractions", "Join2Create", "Modmail", "UserStats", "BotStatus", "EnabledCommands"]
+__all__ = [
+    "Base",
+    "Settings",
+    "Infractions",
+    "Join2Create",
+    "Modmail",
+    "UserStats",
+    "BotStatus",
+    "EnabledCommands",
+    "Events",
+    "ConfirmationDB",
+    "MigrationHistory",
+]
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -44,11 +56,12 @@ class Join2Create(Base):
     __tablename__ = "join2create"
     channel = Column(Integer, primary_key=True)
     owner_id = Column(Integer)
-    locked = Column(Boolean)
-    ghosted = Column(Boolean)
+    derived_channel = Column(Integer)
 
     def __repr__(self):
-        return f"<Join2Create(channel={self.channel}, owner_id={self.owner_id}, locked={self.locked}, ghosted={self.ghosted})>"
+        return (
+            f"<Join2Create(channel={self.channel}, owner_id={self.owner_id}, derived_channel={self.derived_channel})>"
+        )
 
 
 class Modmail(Base):
@@ -125,3 +138,13 @@ class ConfirmationDB(Base):
 
     def __repr__(self):
         return f"<{self.__tablename__}(event_id={self.event_id}, user_id={self.user_id}, confirmation={self.confirmation}, reminders={self.reminders})>"
+
+
+class MigrationHistory(Base):
+    __tablename__ = "migration_history"
+    script_name = Column(String, primary_key=True)
+    version = Column(String, nullable=False)
+    applied_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    def __repr__(self):
+        return f"<MigrationHistory(script_name='{self.script_name}', version='{self.version}', applied_at={self.applied_at})>"

@@ -1,6 +1,6 @@
 import discord
-from discord.ext import commands
 import pycord.multicog as pycog
+from discord.ext import commands
 
 from utils import Bot, CustomLogger, ContainerPaginator
 
@@ -116,7 +116,7 @@ class InVoiceModeration(commands.Cog):
         if isinstance(ctx.channel, discord.VoiceChannel):
             try:
                 user_claim = self.claimed[ctx.channel_id]
-                join2create = await self.client.db.get_temp_voice(ctx.channel)
+                join2create = await self.client.db.get_join2create(ctx.channel)
                 is_channel_owner = False
                 if join2create is not None:
                     is_channel_owner = join2create.owner_id == ctx.user.id

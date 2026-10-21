@@ -1,15 +1,16 @@
 from .database import ORMDataBase
 from .models import (
     Base,
-    Settings,
-    Infractions,
-    Join2Create,
-    Modmail,
-    UserStats,
     BotStatus,
+    ConfirmationDB,
     EnabledCommands,
     Events,
-    ConfirmationDB,
+    Infractions,
+    Join2Create,
+    MigrationHistory,
+    Modmail,
+    Settings,
+    UserStats,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "EnabledCommands",
     "Events",
     "ConfirmationDB",
+    "MigrationHistory",
 ]

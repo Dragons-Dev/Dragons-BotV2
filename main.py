@@ -33,7 +33,7 @@ async def on_boot():
     await bot.sts.setup(bot.boot_time)
     bot.logger.debug("Initialized sts db")
     bot.db = ORMDataBase()
-    await bot.db.setup(bot.boot_time)
+    await bot.db.setup(bot.boot_time, bot.version)
     bot.logger.debug("Initialized content db")
     bot.api = aiohttp.ClientSession(
         "https://discord.com",
