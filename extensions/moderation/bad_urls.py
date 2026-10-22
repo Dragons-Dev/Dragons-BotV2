@@ -274,7 +274,7 @@ class SafebrowsingCog(commands.Cog):
                     color=discord.Color.green(),
                 )
                 link_bed.set_author(name=msg.author.display_name, icon_url=msg.author.display_avatar.url)
-                link_bed.set_footer(text="If you believe this is a mistake, please contact an moderator.")
+                link_bed.set_footer(text="If you believe this is a mistake, please contact a moderator.")
                 try:
                     await msg.author.send(
                         embeds=[em, link_bed],
