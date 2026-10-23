@@ -3,7 +3,7 @@ import typing as t
 from datetime import datetime
 from urllib.parse import urlsplit
 
-from aiocache import caches, SimpleMemoryCache
+from aiocache import SimpleMemoryCache
 import aiohttp
 import discord
 from discord.ext import commands
@@ -200,8 +200,7 @@ class SafebrowsingCog(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.url_cache: SimpleMemoryCache = caches.get("default")
-        self.detect_session: aiohttp.ClientSession = None  # type: ignore
+        self.url_cache: SimpleMemoryCache = SimpleMemoryCache()
         self.reg_url = r"(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+"
 
     @commands.Cog.listener("on_message")
@@ -230,7 +229,7 @@ class SafebrowsingCog(commands.Cog):
             for url in urls:
                 cached_result = await self.url_cache.get(url)
                 if cached_result is not None:
-                    if cached_result == "True":  # seems to be that the cache only has strings as value
+                    if cached_result is True:
                         filtered_urls.append(url)  # url is in cache
                     else:
                         pass  # if not true, the url is checked against safebrowsing and returned as safe
@@ -246,8 +245,8 @@ class SafebrowsingCog(commands.Cog):
                             if match["url"] in urls_to_fetch:
                                 urls_to_fetch.remove(match["url"])  # remove bad urls, we use this list to cache as safe
                             filtered_urls.append(match["url"])  # append returned urls to the filter which are bad
-                        for url in urls_to_fetch:
-                            await self.url_cache.set(url, False, ttl=3600)  # every url which was not returned is safe
+                    for url in urls_to_fetch:
+                        await self.url_cache.set(url, False, ttl=3600)  # every url which was not returned is safe
                 else:
                     self.logger.warning(
                         f"Failed to fetch Safe Browsing results for URLs: {urls_to_fetch} | API Result: {api_result}"
@@ -274,7 +273,7 @@ class SafebrowsingCog(commands.Cog):
                     color=discord.Color.green(),
                 )
                 link_bed.set_author(name=msg.author.display_name, icon_url=msg.author.display_avatar.url)
-                link_bed.set_footer(text="If you believe this is a mistake, please contact an moderator.")
+                link_bed.set_footer(text="If you believe this is a mistake, please contact a moderator.")
                 try:
                     await msg.author.send(
                         embeds=[em, link_bed],
@@ -300,9 +299,6 @@ class SafebrowsingCog(commands.Cog):
                     if log_channel:
                         await log_channel.send(embed=em)
 
-    @commands.Cog.listener("on_start_done")
-    async def bad_urls_done(self):
-        self.detect_session = aiohttp.ClientSession(headers={"User-Agent": f"Dragons BotV{self.client.version}"})
 
 
 def setup(client: Bot):

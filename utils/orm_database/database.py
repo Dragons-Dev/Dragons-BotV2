@@ -71,7 +71,7 @@ class ORMDataBase:
             async with session.begin():
                 query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
                 response = await session.execute(query)
-                result = response.scalar_one_or_none()
+                result = response.scalars().first()
         if not result:
             return None
         else:

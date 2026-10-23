@@ -32,6 +32,8 @@ class FeedbackModal(discord.ui.Modal):
         await interaction.response.send_message(
             embeds=[embed], ephemeral=True, view=ButtonInfo("The embed you are seeing is sent to the administrators.")
         )
+        if self.guild is None:
+            return
         feedback_id = await self.client.db.get_setting(SettingsEnum.FeedbackChannel, self.guild)
         if not feedback_id:
             return
@@ -46,7 +48,11 @@ class Feedback(commands.Cog):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
 
-    @commands.slash_command(name="feedback", description="Send feedback to the discord guild.")
+    @commands.slash_command(
+        name="feedback",
+        description="Send feedback to the discord guild.",
+        contexts={discord.InteractionContextType.guild},
+    )
     async def feedback(self, ctx: discord.ApplicationContext):
         await ctx.response.send_modal(FeedbackModal(ctx.guild, self.client, title="Feedback Modal"))
 

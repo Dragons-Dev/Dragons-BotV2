@@ -215,7 +215,7 @@ class CallbackButton(discord.ui.Button):
     def __init__(
         self,
         *,
-        style=("secondary", 2),
+        style: discord.ButtonStyle = discord.ButtonStyle.secondary,
         label=None,
         disabled=False,
         custom_id=None,
@@ -227,7 +227,7 @@ class CallbackButton(discord.ui.Button):
         callback: Callable = None,
     ):
         """
-        callback: t.Callable - A function that is called when the button is pressed. It must be an async function and take one argument, which is the interaction that triggered the callback.
+        callback: Callable - A function that is called when the button is pressed. It must be an async function and take one argument, which is the interaction that triggered the callback.
         The callback function must be passed as a keyword argument when creating the button, and it will be called with the interaction as its argument when the button is pressed.
         Example:
          async def my_callback(interaction: discord.Interaction):
@@ -244,4 +244,6 @@ class CallbackButton(discord.ui.Button):
             row=row,
             id=id,
         )
+        if callback is None:
+            raise ValueError("callback must be provided for CallbackButton")
         self.callback = callback

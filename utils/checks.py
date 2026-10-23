@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord.utils import get_or_fetch
 
-from . import Bot
+from .bot import Bot
 from .classes import InsufficientPermission
 from .enums import SettingsEnum
 
