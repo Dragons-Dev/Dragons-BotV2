@@ -33,11 +33,11 @@ async def on_boot():
     await bot.sts.setup(bot.boot_time)
     bot.logger.debug("Initialized sts db")
     bot.db = ORMDataBase()
-    await bot.db.setup(bot.boot_time)
+    await bot.db.setup(bot.boot_time, bot.version)
     bot.logger.debug("Initialized content db")
     bot.api = aiohttp.ClientSession(
         "https://discord.com",
-        headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{bot.client_version}"},
+        headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{bot.version}"},
     )
     resp = await bot.api.get("/api/v10/gateway/bot")
     data = await resp.json()
@@ -55,7 +55,7 @@ async def on_boot():
     )
     bot.logger.info(
         f"Name: {bot.user.name}#{bot.user.discriminator} | ID: {bot.user.id} | Latency: {round(bot.latency * 1000)}ms | "
-        f"Version: {bot.client_version}"
+        f"Version: {bot.version}"
     )
     bot.logger.info(f"It's on {len(bot.guilds)} servers")
     bot.dispatch("start_done")

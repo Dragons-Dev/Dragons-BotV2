@@ -1,7 +1,17 @@
-from logging import DEBUG, INFO, WARNING
+from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 import os
+
+
+LOG_LEVEL_PARSER = {
+    "debug": DEBUG,
+    "info": INFO,
+    "warning": WARNING,
+    "error": ERROR,
+    "critical": CRITICAL,
+}
+
 
 load_dotenv(dotenv_path=".env")
 
@@ -19,10 +29,10 @@ DEBUG_GUILDS: list[int] = []
 # A debug guild. this is an optional value. this increases the time in which the commands show up after updating, but it
 # will lead to commands not showing up in dm's which disables some features
 
-log_level = DEBUG if os.getenv("log_level") == "DEBUG" else INFO
+log_level = LOG_LEVEL_PARSER.get(os.getenv("log_level", "INFO").lower(), INFO)
 # the log level. this bot has built in logging. by modifying this value with one from the first import you change what's
 # logged
-discord_log_level = INFO if os.getenv("log_level") == "INFO" else WARNING
+discord_log_level = LOG_LEVEL_PARSER.get(os.getenv("discord_log_level", "INFO").lower(), WARNING)
 # the log level for discord. Lowering this may lead to huge logs.
 
 IPC_SECRET = os.getenv("IPC_SECRET", "")

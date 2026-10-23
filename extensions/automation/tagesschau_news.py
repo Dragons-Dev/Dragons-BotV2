@@ -132,7 +132,7 @@ class TagesschauFeed(commands.Cog):
 
     @commands.Cog.listener("on_start_done")
     async def on_start_done(self):
-        self.session = aiohttp.ClientSession(headers={"User-Agent": f"Dragons BotV{self.client.client_version}"})
+        self.session = aiohttp.ClientSession(headers={"User-Agent": f"Dragons BotV{self.client.version}"})
         self.gather_news.start()
 
 

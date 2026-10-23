@@ -1,3 +1,4 @@
+import typing as t
 from collections.abc import Sequence
 from datetime import datetime, timedelta, date
 
@@ -12,9 +13,6 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from config import DATABASE_URL, SERVER_TZ
-
-from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
-from ..logger import CustomLogger
 from .models import (
     Base,
     BotStatus,
@@ -28,6 +26,10 @@ from .models import (
     ConfirmationDB,
 )
 from ..classes import Event, Confirmation
+from ..enums import InfractionsEnum, SettingsEnum, StatTypeEnum
+from migrations import run_migrations
+from ..logger import CustomLogger
+from ..utils import VersionInfo
 
 
 class ORMDataBase:
@@ -43,7 +45,7 @@ class ORMDataBase:
         self.engine: AsyncEngine = create_async_engine(DATABASE_URL)
         self.AsyncSessionLocal: AsyncSession = async_sessionmaker(self.engine, expire_on_commit=False)  # type: ignore
 
-    async def setup(self, boot: datetime):
+    async def setup(self, boot: datetime, version: VersionInfo | None = None):
         """
         Sets up the database by creating new tables if they don't already exist.
 
@@ -51,6 +53,8 @@ class ORMDataBase:
             boot (datetime): The boot time of the application.
         """
         self.logger = CustomLogger("database", boot)  # type: ignore
+        if version is not None:
+            await run_migrations(self.engine, boot, version)
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             self.logger.info("ContentDB tables created and ready to use!")
@@ -62,31 +66,25 @@ class ORMDataBase:
         self.logger.warning("Closing database connection")
         await self.engine.dispose()
 
-    async def get_setting(
-        self, setting: SettingsEnum, guild: discord.Guild | None
-    ) -> None | Settings | Sequence[Settings]:
-        """
-        Retrieves a setting from the database.
-
-        Args:
-            setting (SettingsEnum): The setting to retrieve.
-            guild (discord.Guild | None): The guild associated with the setting. If None, retrieves the setting for all guilds.
-
-        Returns:
-            Sequence[Settings] | None: The retrieved setting(s) or None if not found.
-        """
+    async def get_setting(self, setting: SettingsEnum, guild: discord.Guild) -> Settings | None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                if guild is None:
-                    query = select(Settings).where(Settings.setting == setting.value)
-                else:
-                    query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
+                query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
+                response = await session.execute(query)
+                result = response.scalars().first()
+        if not result:
+            return None
+        else:
+            return result
+
+    async def get_all_settings(self, setting: SettingsEnum) -> Sequence[Settings] | None:
+        async with self.AsyncSessionLocal() as session:
+            async with session.begin():
+                query = select(Settings).where(Settings.setting == setting.value)
                 response = await session.execute(query)
                 results = response.scalars().fetchall()
         if not results:
             return None
-        elif len(results) == 1:
-            return results[0]
         else:
             return results
 
@@ -127,35 +125,33 @@ class ORMDataBase:
                     await session.delete(db_setting)
                 await session.commit()
 
-    async def create_temp_voice(self, channel: discord.VoiceChannel, owner: discord.Member) -> Join2Create | None:
+    async def create_join2create(
+        self, channel: discord.VoiceChannel, owner: discord.Member, derived_channel: discord.VoiceChannel
+    ) -> Join2Create | None:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
-                new_entry = Join2Create(channel=channel.id, owner_id=owner.id, locked=False, ghosted=False)
+                new_entry = Join2Create(channel=channel.id, owner_id=owner.id, derived_channel=derived_channel.id)
                 session.add(new_entry)
             await session.refresh(new_entry)
             result = await session.get(Join2Create, channel.id)
             return result
 
-    async def update_temp_voice(
-        self, channel: discord.VoiceChannel, owner: discord.Member, locked: bool, ghosted: bool
-    ):
+    async def update_join2create(self, channel: discord.VoiceChannel, owner: discord.Member):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(Join2Create).where(Join2Create.channel == channel.id)
                 _channel = (await session.execute(query)).scalar_one_or_none()
                 _channel.owner_id = owner.id
-                _channel.locked = locked
-                _channel.ghosted = ghosted
                 await session.commit()
 
-    async def get_temp_voice(self, channel: discord.VoiceChannel) -> None | Join2Create:
+    async def get_join2create(self, channel: discord.VoiceChannel) -> None | Join2Create:
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(Join2Create).where(Join2Create.channel == channel.id)
                 temp_channel = (await session.execute(query)).scalar_one_or_none()
         return temp_channel
 
-    async def delete_temp_voice(self, channel: discord.VoiceChannel):
+    async def delete_join2create(self, channel: discord.VoiceChannel):
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
                 query = select(Join2Create).where(Join2Create.channel == channel.id)
@@ -638,7 +634,13 @@ class ORMDataBase:
             return False
 
     async def create_event(
-        self, *, host: int, name: str, time: datetime, invites: list[discord.User], mode: str
+        self,
+        *,
+        host: int,
+        name: str,
+        time: datetime,
+        invites: list[discord.User],
+        mode: t.Literal["OPEN", "CLOSED", "INVITE_ONLY"],
     ) -> str:
         """
         Creates a new event
@@ -666,7 +668,7 @@ class ORMDataBase:
         Args:
 
         Returns:
-            An event as dict (so i dont have to rewrite the reminder logic ^^)
+            An event as dict (so I don't have to rewrite the reminder logic ^^)
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():
@@ -692,7 +694,7 @@ class ORMDataBase:
         Args:
 
         Returns:
-            All events as a dict (so i dont have to rewrite the reminder logic ^^)
+            All events as a dict (so I don't have to rewrite the reminder logic ^^)
         """
         async with self.AsyncSessionLocal() as session:
             async with session.begin():

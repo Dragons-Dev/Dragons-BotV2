@@ -43,9 +43,14 @@ repos:
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:
-    -   id: python-no-log-warn
+      - id: python-no-log-warn
 
   - repo: https://github.com/nuztalgia/botstrap
     rev: 0.2.9
     hooks:
       - id: detect-discord-bot-tokens
+
+  - repo: https://github.com/rohaquinlop/complexipy-pre-commit
+    rev: v4.2.0
+    hooks:
+      - id: complexipy
