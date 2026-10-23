@@ -49,7 +49,7 @@ async def create_overwrite_from_select(
     return permission_overwrites
 
 
-async def _send_modal(interaction: discord.Interaction, next_function: ButtonEnum):
+async def _next_button_func(interaction: discord.Interaction, next_function: ButtonEnum):
     """
     Gate function that validates the user can use the button before sending a modal.
 
@@ -398,14 +398,14 @@ class VoiceBoard(ui.DesignerView):
             style=discord.ButtonStyle.blurple,
             emoji=":1234:",
             custom_id="j2c__user_limit_button",
-            callback=partial(_send_modal, next_function=ButtonEnum.SET_USER_LIMIT),
+            callback=partial(_next_button_func, next_function=ButtonEnum.SET_USER_LIMIT),
         )
         owner = CallbackButton(
             label="Claim Ownership",
             style=discord.ButtonStyle.blurple,
             emoji=":crown:",
             custom_id="j2c__claim_ownership_button",
-            callback=partial(_send_modal, next_function=ButtonEnum.CLAIM_OWNERSHIP),
+            callback=partial(_next_button_func, next_function=ButtonEnum.CLAIM_OWNERSHIP),
         )
         container.add_row(limit, owner)
 
@@ -414,14 +414,14 @@ class VoiceBoard(ui.DesignerView):
             style=discord.ButtonStyle.blurple,
             emoji=":no_entry_sign:",
             custom_id="j2c__role_ban_button",
-            callback=partial(_send_modal, next_function=ButtonEnum.BAN_ROLE),
+            callback=partial(_next_button_func, next_function=ButtonEnum.BAN_ROLE),
         )
         r_unban = CallbackButton(
             label="Unban role",
             style=discord.ButtonStyle.blurple,
             emoji=":ticket:",
             custom_id="j2c__role_unban_button",
-            callback=partial(_send_modal, next_function=ButtonEnum.UNBAN_ROLE),
+            callback=partial(_next_button_func, next_function=ButtonEnum.UNBAN_ROLE),
         )
         container.add_row(r_ban, r_unban)
 
@@ -430,14 +430,14 @@ class VoiceBoard(ui.DesignerView):
             style=discord.ButtonStyle.blurple,
             emoji=":hammer:",
             custom_id="j2c__ban_button",
-            callback=partial(_send_modal, next_function=ButtonEnum.BAN_USER),
+            callback=partial(_next_button_func, next_function=ButtonEnum.BAN_USER),
         )
         u_unban = CallbackButton(
             label="Unban user",
             style=discord.ButtonStyle.blurple,
             emoji=":love_letter:",
             custom_id="j2c__unban_button",
-            callback=partial(_send_modal, next_function=ButtonEnum.UNBAN_USER),
+            callback=partial(_next_button_func, next_function=ButtonEnum.UNBAN_USER),
         )
         container.add_row(u_ban, u_unban)
 
@@ -446,14 +446,14 @@ class VoiceBoard(ui.DesignerView):
             style=discord.ButtonStyle.blurple,
             emoji=":space_invader:",
             custom_id="j2c__bitrate_button",
-            callback=partial(_send_modal, next_function=ButtonEnum.CHANGE_BITRATE),
+            callback=partial(_next_button_func, next_function=ButtonEnum.CHANGE_BITRATE),
         )
         reset = CallbackButton(
             label="Reset permissions",
             style=discord.ButtonStyle.blurple,
             emoji=":arrows_counterclockwise:",
             custom_id="j2c__reset_permission_button",
-            callback=partial(_send_modal, next_function=ButtonEnum.RESET_PERMISSIONS),
+            callback=partial(_next_button_func, next_function=ButtonEnum.RESET_PERMISSIONS),
         )
         container.add_row(bitrate, reset)
         self.add_item(container)
