@@ -300,7 +300,6 @@ class SafebrowsingCog(commands.Cog):
                         await log_channel.send(embed=em)
 
 
-
 def setup(client: Bot):
     if re.match(GOOGLE_API_KEY_REGEX, GOOGLE_API_KEY) is None:
         client.logger.error("No Google API key provided, skipping bad url detection")
