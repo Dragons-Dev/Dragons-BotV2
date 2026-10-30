@@ -16,6 +16,8 @@ from config import DISCORD_API_KEY
 from utils import Bot, ORMDataBase, ShortTermStorage, VersionInfo, rem_log
 from utils.logger import CustomFormatter
 
+NON_EXTENSION_FILES = {"models.py", "repository.py"}
+
 bot = Bot(
     command_prefix=commands.when_mentioned,
     case_insensitive=True,
@@ -32,7 +34,8 @@ async def on_boot():
     bot.sts = ShortTermStorage(path="data/sts.sqlite")
     await bot.sts.setup(bot.boot_time)
     bot.logger.debug("Initialized sts db")
-    bot.db = ORMDataBase()
+    if bot.db is None:
+        bot.db = ORMDataBase()
     await bot.db.setup(bot.boot_time, bot.version)
     bot.logger.debug("Initialized content db")
     bot.api = aiohttp.ClientSession(
@@ -78,7 +81,7 @@ if __name__ == "__main__":
 
     for root, dirs, files in os.walk("./extensions"):
         for file in files:
-            if file.endswith(".py") and not file.startswith("_"):
+            if file.endswith(".py") and not file.startswith("_") and file not in NON_EXTENSION_FILES:
                 rel_path = os.path.relpath(os.path.join(root, file), ".")
                 ext_name = rel_path.replace(os.sep, ".").removesuffix(".py")
 

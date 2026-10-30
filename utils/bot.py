@@ -8,10 +8,10 @@ from pycord.multicog import Bot as MulticogBot
 from config import IPC_SECRET
 
 from .logger import CustomLogger
+from .orm_database import ORMDataBase
 
 if TYPE_CHECKING:
     from .database import ShortTermStorage
-    from .orm_database import ORMDataBase
     from .utils import VersionInfo
 
 
@@ -23,7 +23,7 @@ class Bot(
         self.version: VersionInfo = version
         self.api: aiohttp.ClientSession = None  # type: ignore
         self.boot_time = datetime.now()
-        self.db: ORMDataBase = None  # type: ignore
+        self.db: ORMDataBase = ORMDataBase()
         self.sts: ShortTermStorage = None  # type: ignore
         self.ipc = ipc.Server(self, secret_key=IPC_SECRET)
         self.logger = CustomLogger(name="core", start_stamp=self.boot_time)

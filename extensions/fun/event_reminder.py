@@ -1,11 +1,14 @@
+from datetime import datetime, timedelta
+from enum import Enum
+
 import discord
 from discord.ext import commands, tasks
-from datetime import datetime, timedelta
-from config import SERVER_TZ
-from enum import Enum
-from utils import Event
-from utils import Bot, CustomLogger, sec_to_readable
 import pycord.multicog as pycog
+
+from config import SERVER_TZ
+from utils import Bot, CustomLogger, Event, sec_to_readable
+
+from .repository import EventRepository
 
 
 async def event_choices(ctx: discord.AutocompleteContext) -> list[str]:
@@ -18,8 +21,9 @@ async def event_choices(ctx: discord.AutocompleteContext) -> list[str]:
         list[str]: all event ids owned by the ctx.interaction.user
     """
     bot: Bot = ctx.bot
+    repo = EventRepository(bot.db.AsyncSessionLocal, bot.db.logger)
     now = datetime.now(tz=SERVER_TZ)
-    events = await bot.db.get_events()
+    events = await repo.get_events()
     filtered_events = []
     for event in events:
         event_time = event.time.replace(tzinfo=SERVER_TZ)
@@ -46,6 +50,7 @@ class InviteReminderSelectModal(discord.ui.DesignerModal):
     def __init__(self, client: Bot, event: Event, guest: int, status: bool, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
+        self.repo = EventRepository(client.db.AsyncSessionLocal, client.db.logger)
         self.event = event
         self.guest = guest
         self.status = status
@@ -72,7 +77,7 @@ class InviteReminderSelectModal(discord.ui.DesignerModal):
     async def callback(self, interaction):
         new_reminders = self.event_reminders.item.values
 
-        status_update = await self.client.db.update_confirmation(
+        status_update = await self.repo.update_confirmation(
             event_id=self.event.id, guest=interaction.user.id, confirmation=self.status, reminders=[0] + new_reminders
         )
         if status_update:
@@ -89,6 +94,7 @@ class ParticipationView(discord.ui.View):
     def __init__(self, client: Bot, event: Event):
         super().__init__(timeout=None)
         self.client = client
+        self.repo = EventRepository(client.db.AsyncSessionLocal, client.db.logger)
         self.event = event
 
     async def _respond(self, interaction: discord.Interaction, status: bool):
@@ -102,7 +108,7 @@ class ParticipationView(discord.ui.View):
             )
             await interaction.response.send_modal(modal=modal)
         else:
-            status_update = await self.client.db.update_confirmation(
+            status_update = await self.repo.update_confirmation(
                 event_id=self.event.id, guest=interaction.user.id, confirmation=status, reminders=[0]
             )
             if status_update:
@@ -125,20 +131,21 @@ class InviteRequestView(discord.ui.View):
     def __init__(self, client: Bot, event: Event, requester: discord.User):
         super().__init__(timeout=None)
         self.client = client
+        self.repo = EventRepository(client.db.AsyncSessionLocal, client.db.logger)
         self.event = event
         self.requester = requester
 
     async def _respond(self, interaction: discord.Interaction, status: bool):
         if status:
-            already_invites = await self.client.db.get_all_confirmations_for_event(event_id=self.event.id)
+            already_invites = await self.repo.get_all_confirmations_for_event(event_id=self.event.id)
             if self.requester.id not in already_invites:
-                await self.client.db.create_confirmation(
+                await self.repo.create_confirmation(
                     event_id=self.event.id,
                     guest=self.requester.id,
                     confirmation=None,
                     reminders=[0],
                 )
-            event_obj: Event | None = await self.client.db.get_event_by_id(id=self.event.id)
+            event_obj: Event | None = await self.repo.get_event_by_id(id=self.event.id)
             if event_obj is None:
                 await interaction.response.send_message(
                     "Something went wrong. The event no longer exits.", ephemeral=True, delete_after=5
@@ -169,6 +176,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
     def __init__(self, ctx: discord.ApplicationContext, client: Bot, events: list[Event], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
+        self.repo = EventRepository(client.db.AsyncSessionLocal, client.db.logger)
 
         options: list[discord.SelectOption] = []
         self.events = events
@@ -192,14 +200,14 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
 
     async def callback(self, interaction):
         event_id = self.event.item.values[0]
-        event_obj = await self.client.db.get_event_by_id(id=event_id)
+        event_obj = await self.repo.get_event_by_id(id=event_id)
         if event_obj is None:
             await interaction.response.send_message(
                 "Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5
             )
             return
         try:
-            already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
+            already_invites = await self.repo.get_all_confirmations_for_event(event_id=event_id)
 
             if (
                 event_obj.mode == InviteMode.OPEN.value
@@ -207,7 +215,7 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                 or (event_obj.mode == InviteMode.CLOSED.value and interaction.user.id in already_invites)
             ):
                 if interaction.user.id not in already_invites:
-                    await self.client.db.create_confirmation(
+                    await self.repo.create_confirmation(
                         event_id=event_id,
                         guest=interaction.user.id,
                         confirmation=None,
@@ -255,6 +263,7 @@ class EventInviteModal(discord.ui.DesignerModal):
     def __init__(self, ctx: discord.ApplicationContext, client: Bot, events: list[Event], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
+        self.repo = EventRepository(client.db.AsyncSessionLocal, client.db.logger)
 
         options: list[discord.SelectOption] = []
         self.events = events
@@ -289,7 +298,7 @@ class EventInviteModal(discord.ui.DesignerModal):
 
     async def callback(self, interaction):
         event_id = self.event.item.values[0]
-        event_obj: Event | None = await self.client.db.get_event_by_id(id=event_id)
+        event_obj: Event | None = await self.repo.get_event_by_id(id=event_id)
         if event_obj is None:
             await interaction.response.send_message(
                 "Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5
@@ -298,9 +307,9 @@ class EventInviteModal(discord.ui.DesignerModal):
         invites = self.invites.item.values
         try:
             for invite in invites:
-                already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event_id)
+                already_invites = await self.repo.get_all_confirmations_for_event(event_id=event_id)
                 if invite.id not in already_invites:
-                    await self.client.db.create_confirmation(
+                    await self.repo.create_confirmation(
                         event_id=event_id,
                         guest=invite.id,
                         confirmation=None,
@@ -333,6 +342,7 @@ class EventCreateModal(discord.ui.DesignerModal):
         super().__init__(*args, **kwargs)
         self.guild = guild
         self.client = client
+        self.repo = EventRepository(client.db.AsyncSessionLocal, client.db.logger)
         self.host = host
 
         self.event_name = discord.ui.Label(
@@ -405,14 +415,14 @@ class EventCreateModal(discord.ui.DesignerModal):
         else:
             mode = InviteMode.CLOSED.value
 
-        event_id = await self.client.db.create_event(
+        event_id = await self.repo.create_event(
             host=self.host.id,
             name=self.event_name.item.value,
             time=event_time_local,
             invites=guests,
             mode=mode,
         )
-        event_obj = await self.client.db.get_event_by_id(event_id)
+        event_obj = await self.repo.get_event_by_id(event_id)
         if event_obj is None:
             await interaction.response.send_message(
                 "Something went wrong. The event no longer exits. I dont even know how that would happen maybe i should by a lotto ticket."
@@ -437,6 +447,7 @@ class EventEditModal(discord.ui.DesignerModal):
     def __init__(self, ctx: discord.ApplicationContext, client: Bot, event: Event, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
+        self.repo = EventRepository(client.db.AsyncSessionLocal, client.db.logger)
         self.event = event
 
         self.event_name = discord.ui.Label(
@@ -523,8 +534,8 @@ class EventEditModal(discord.ui.DesignerModal):
                 mode = InviteMode.CLOSED.value
             if self.event.mode != mode:
                 updated_mode = mode
-        await self.client.db.update_event(id=self.event.id, name=updated_name, time=updated_time, mode=updated_mode)
-        updated_event = await self.client.db.get_event_by_id(self.event.id)
+        await self.repo.update_event(id=self.event.id, name=updated_name, time=updated_time, mode=updated_mode)
+        updated_event = await self.repo.get_event_by_id(self.event.id)
         if updated_event is None:
             await interaction.response.send_message(
                 "Something went wrong. The event no longer exists.", ephemeral=True, delete_after=5
@@ -553,6 +564,7 @@ class EventDeleteModal(discord.ui.DesignerModal):
     def __init__(self, ctx: discord.ApplicationContext, client: Bot, event: Event, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = client
+        self.repo = EventRepository(client.db.AsyncSessionLocal, client.db.logger)
         self.event = event
 
         self.event_delete = discord.ui.Label(
@@ -582,7 +594,7 @@ class EventDeleteModal(discord.ui.DesignerModal):
                 delete_after=5,
             )
         else:
-            success = await self.client.db.delete_event(self.event.id)
+            success = await self.repo.delete_event(self.event.id)
             if success:
                 invited_user = self.event.invites
                 for user in invited_user:
@@ -610,6 +622,7 @@ class EventReminder(commands.Cog):
     def __init__(self, client: Bot):
         self.client = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.repo = EventRepository(self.client.db.AsyncSessionLocal, self.logger)
         self.persistent_views_added = False
 
     @pycog.subcommand("event")
@@ -622,7 +635,7 @@ class EventReminder(commands.Cog):
     async def start_done(self):
         if not self.persistent_views_added:
             now = datetime.now(tz=SERVER_TZ)
-            events: list[Event] = await self.client.db.get_events()
+            events: list[Event] = await self.repo.get_events()
             for event in events:
                 event_time = event.time.replace(tzinfo=SERVER_TZ)
                 if event_time >= now:
@@ -636,7 +649,7 @@ class EventReminder(commands.Cog):
         name="invite", description="Invite a user to an existing event", contexts={discord.InteractionContextType.guild}
     )
     async def invite(self, ctx: discord.ApplicationContext):
-        events = await self.client.db.get_events()
+        events = await self.repo.get_events()
         now = datetime.now(tz=SERVER_TZ)
         filtered_events = []
         for event in events:
@@ -655,11 +668,11 @@ class EventReminder(commands.Cog):
         contexts={discord.InteractionContextType.guild},
     )
     async def request_invite(self, ctx: discord.ApplicationContext):
-        events = await self.client.db.get_events()
+        events = await self.repo.get_events()
         now = datetime.now(tz=SERVER_TZ)
         filtered_events = []
         for event in events:
-            already_invites = await self.client.db.get_all_confirmations_for_event(event_id=event.id)
+            already_invites = await self.repo.get_all_confirmations_for_event(event_id=event.id)
             if ctx.interaction.user.id in already_invites and event.time.replace(tzinfo=SERVER_TZ) > now:
                 filtered_events.append(event)
             elif event.time.replace(tzinfo=SERVER_TZ) > now:
@@ -681,7 +694,7 @@ class EventReminder(commands.Cog):
     async def edit(self, ctx: discord.ApplicationContext, event: str):
         name = event.split(" | ")[0]
         time = datetime.strptime(event.split(" | ")[1], "%H:%M %d.%m.%Y").replace(tzinfo=SERVER_TZ)
-        events = await self.client.db.get_events()
+        events = await self.repo.get_events()
         selected_event = None
         for event in events:
             if event.name == name and event.time.replace(tzinfo=SERVER_TZ) == time:
@@ -706,7 +719,7 @@ class EventReminder(commands.Cog):
     async def delete(self, ctx: discord.ApplicationContext, event: str):
         name = event.split(" | ")[0]
         time = datetime.strptime(event.split(" | ")[1], "%H:%M %d.%m.%Y").replace(tzinfo=SERVER_TZ)
-        events = await self.client.db.get_events()
+        events = await self.repo.get_events()
         selected_event = None
         for event in events:
             if event.name == name and event.time.replace(tzinfo=SERVER_TZ) == time:
@@ -726,14 +739,14 @@ class EventReminder(commands.Cog):
     @tasks.loop(seconds=30)
     async def reminder_loop(self):
         now = datetime.now(tz=SERVER_TZ)
-        events = await self.client.db.get_events()
+        events = await self.repo.get_events()
 
         for event in events:
             event_time = event.time.replace(tzinfo=SERVER_TZ)
             delta = (event_time - now).total_seconds()
 
             for user_id in event.invites:
-                conf = await self.client.db.get_comfirmation_for_event_and_user(event_id=event.id, guest=user_id)
+                conf = await self.repo.get_confirmation_for_event_and_user(event_id=event.id, guest=user_id)
                 if conf is None:
                     continue
                 deleted = False
@@ -745,7 +758,7 @@ class EventReminder(commands.Cog):
                             em = discord.Embed(title="⏰ **Event**", color=discord.Color.brand_green())
                             if reminder == 0:
                                 em.add_field(name="", value=f"**{event.name}** starts now!")
-                                await self.client.db.delete_event(event.id)
+                                await self.repo.delete_event(event.id)
                                 deleted = True
                             else:
                                 em.add_field(name="", value=f"**{event.name}** starts in {sec_to_readable(reminder)}.")
@@ -756,7 +769,7 @@ class EventReminder(commands.Cog):
                         except discord.Forbidden:
                             pass
                         if not deleted:
-                            await self.client.db.update_confirmation(
+                            await self.repo.update_confirmation(
                                 event_id=event.id, guest=user_id, reminders=conf.reminders
                             )
 

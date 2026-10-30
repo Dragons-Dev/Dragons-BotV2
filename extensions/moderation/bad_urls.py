@@ -3,15 +3,16 @@ import typing as t
 from datetime import datetime
 from urllib.parse import urlsplit
 
-from aiocache import SimpleMemoryCache
 import aiohttp
+from aiocache import SimpleMemoryCache
 import discord
 from discord.ext import commands
 from discord.utils import format_dt, get_or_fetch
 
 from config import GOOGLE_API_KEY
-from utils import Bot, CustomLogger, InfractionsEnum, SettingsEnum, ButtonInfo
+from utils import Bot, ButtonInfo, CustomLogger, InfractionsEnum, SettingsEnum
 
+from .repository import InfractionsRepository
 
 GOOGLE_API_KEY_REGEX = r"AIza[0-9A-Za-z-_]{35}"
 
@@ -200,6 +201,7 @@ class SafebrowsingCog(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.repo = InfractionsRepository(self.client.db.AsyncSessionLocal)
         self.url_cache: SimpleMemoryCache = SimpleMemoryCache()
         self.reg_url = r"(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+"
 
@@ -255,7 +257,7 @@ class SafebrowsingCog(commands.Cog):
 
             if len(filtered_urls) > 0:
                 await msg.delete(reason="Detected as bad url")  # First delete the bad urls
-                case_id = await self.client.db.create_infraction(
+                case_id = await self.repo.create_infraction(
                     user=msg.author, infraction=InfractionsEnum.Warn, reason="Bad URL sent", guild=msg.guild
                 )  # create infraction in db to get an infraction id
 

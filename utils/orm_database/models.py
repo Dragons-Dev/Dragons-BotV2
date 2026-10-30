@@ -1,20 +1,12 @@
-from datetime import date, datetime
+from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
 __all__ = [
     "Base",
     "Settings",
-    "Infractions",
-    "Join2Create",
-    "Modmail",
-    "UserStats",
-    "BotStatus",
-    "EnabledCommands",
-    "Events",
-    "ConfirmationDB",
     "MigrationHistory",
 ]
 
@@ -34,110 +26,6 @@ class Settings(Base):
 
     def __len__(self):
         return 1
-
-
-class Infractions(Base):
-    __tablename__ = "infractions"
-    case_id = Column(Integer, autoincrement=True, primary_key=True)
-    user_id = Column(Integer)
-    infraction = Column(String)
-    reason = Column(String)
-    date = Column(DateTime)
-    guild = Column(Integer)
-
-    def __repr__(self):
-        return f"<Infractions(id={self.case_id}, user_id={self.user_id}, infraction={self.infraction}, reason={self.reason}, date={self.date}, guild={self.guild})>"
-
-    def __len__(self):
-        return 1
-
-
-class Join2Create(Base):
-    __tablename__ = "join2create"
-    channel = Column(Integer, primary_key=True)
-    owner_id = Column(Integer)
-    derived_channel = Column(Integer)
-
-    def __repr__(self):
-        return (
-            f"<Join2Create(channel={self.channel}, owner_id={self.owner_id}, derived_channel={self.derived_channel})>"
-        )
-
-
-class Modmail(Base):
-    __tablename__ = "modmail"
-    user_id = Column(Integer)
-    guild_id = Column(Integer)
-    uuid = Column(String, primary_key=True)
-    anon = Column(Boolean)
-
-    def __repr__(self):
-        return f"<Modmail(user_id={self.user_id}, guild_id={self.guild_id}, uuid={self.uuid}, anon={self.anon})>"
-
-
-class UserStats(Base):
-    __tablename__ = "userstats"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger, nullable=False)
-    guild_id = Column(BigInteger, nullable=False)
-    stat_type = Column(String, nullable=False)
-    value = Column(Integer, default=0)
-    day = Column(Date, default=date.today, nullable=False)
-
-    __table_args__ = (
-        # Prevents duplicate entries for the same day and user
-        UniqueConstraint("user_id", "guild_id", "stat_type", "day", name="_user_guild_stat_day_uc"),
-    )
-
-    def __repr__(self):
-        return f"<UserStats(user_id={self.user_id}, stat_type={self.stat_type}, value={self.value}, guild={self.guild_id})>"
-
-
-class BotStatus(Base):
-    __tablename__ = "botstatus"
-    id = Column(Integer, autoincrement=True, primary_key=True)
-    status = Column(String)
-    activity_type = Column(Integer)
-    activity_name = Column(String)
-    is_active = Column(Boolean)
-
-    def __repr__(self):
-        return (
-            f"<BotStatus(status={self.status}, activity_type={self.activity_type}, activity_name={self.activity_name})>"
-        )
-
-
-class EnabledCommands(Base):
-    __tablename__ = "enabledcommands"
-    guild_id = Column(Integer, primary_key=True)
-    command_name = Column(String, primary_key=True)
-    enabled = Column(Boolean)
-
-    def __repr__(self):
-        return f"<EnabledCommands(guild_id={self.guild_id}, command_name={self.command_name}, enabled={self.enabled})>"
-
-
-class Events(Base):
-    __tablename__ = "Events"
-    id = Column(String, primary_key=True)
-    host = Column(Integer)
-    name = Column(String)
-    time = Column(DateTime(timezone=True))
-    mode = Column(String)
-
-    def __repr__(self):
-        return f"<{self.__tablename__}(id={self.id}, host={self.host}, name={self.name}, time={self.time}, mode={self.mode})>"
-
-
-class ConfirmationDB(Base):
-    __tablename__ = "Confirmation"
-    event_id = Column(String, ForeignKey("Events.id"), primary_key=True)
-    user_id = Column(Integer, primary_key=True)
-    confirmation = Column(Boolean, nullable=True)
-    reminders = Column(String)
-
-    def __repr__(self):
-        return f"<{self.__tablename__}(event_id={self.event_id}, user_id={self.user_id}, confirmation={self.confirmation}, reminders={self.reminders})>"
 
 
 class MigrationHistory(Base):

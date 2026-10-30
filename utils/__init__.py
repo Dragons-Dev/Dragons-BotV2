@@ -4,7 +4,7 @@ from .classes import CommandDisabledError, Event, InsufficientPermission
 from .database import ShortTermStorage
 from .enums import InfractionsEnum, SettingsEnum, StatTypeEnum, WebhookType
 from .logger import CustomLogger, rem_log
-from .orm_database import ORMDataBase, Settings
+from .orm_database import BaseRepository, ORMDataBase, Settings
 from .utils import VersionInfo, sec_to_readable
 from .views import ButtonConfirm, ButtonInfo, CallbackButton, ContainerPaginator
 
@@ -20,6 +20,7 @@ __all__ = [
     "WebhookType",
     "CustomLogger",
     "rem_log",
+    "BaseRepository",
     "ORMDataBase",
     "Settings",
     "VersionInfo",
