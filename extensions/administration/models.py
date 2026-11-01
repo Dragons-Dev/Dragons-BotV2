@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, Integer, String
+from sqlalchemy import Boolean, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from utils.orm_database.models import Base
 
@@ -7,11 +8,11 @@ __all__ = ["BotStatus"]
 
 class BotStatus(Base):
     __tablename__ = "botstatus"
-    id = Column(Integer, autoincrement=True, primary_key=True)
-    status = Column(String)
-    activity_type = Column(Integer)
-    activity_name = Column(String)
-    is_active = Column(Boolean)
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    status: Mapped[str | None] = mapped_column(String, nullable=True)
+    activity_type: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    activity_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_active: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     def __repr__(self):
         return (

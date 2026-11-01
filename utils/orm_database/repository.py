@@ -59,15 +59,13 @@ class SettingsRepository(BaseRepository):
             value (int): The new value of the setting.
             guild (discord.Guild): The guild associated with the setting.
         """
-        async with self._session_maker() as session:
-            async with session.begin():
-                query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
-                db_setting = (await session.execute(query)).scalar_one_or_none()
-                if db_setting is None:
-                    session.add(Settings(setting=setting.value, value=value, guild=guild.id))
-                else:
-                    db_setting.value = value
-            await session.commit()
+        async with self.session() as session:
+            query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
+            db_setting = (await session.execute(query)).scalar_one_or_none()
+            if db_setting is None:
+                session.add(Settings(setting=setting.value, value=value, guild=guild.id))
+            else:
+                db_setting.value = value
 
     async def delete_setting(self, setting: SettingsEnum, guild: discord.Guild) -> None:
         """
@@ -77,11 +75,9 @@ class SettingsRepository(BaseRepository):
             setting (SettingsEnum): The setting to delete.
             guild (discord.Guild): The guild associated with the setting.
         """
-        async with self._session_maker() as session:
-            async with session.begin():
-                query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
-                db_setting = (await session.execute(query)).scalar_one_or_none()
-                if db_setting is None:
-                    return None
-                await session.delete(db_setting)
-                await session.commit()
+        async with self.session() as session:
+            query = select(Settings).where(Settings.setting == setting.value, Settings.guild == guild.id)
+            db_setting = (await session.execute(query)).scalar_one_or_none()
+            if db_setting is None:
+                return None
+            await session.delete(db_setting)

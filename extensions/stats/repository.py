@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import discord
 from sqlalchemy import and_, func, select
@@ -26,13 +26,14 @@ class UserStatsRepository(BaseRepository):
         :param guild: the guild associated with the stat
         :return: ``None``
         """
-        today = datetime.today()
+        today = date.today()
         async with self.session() as session:
             query = select(UserStats).where(
                 and_(
                     UserStats.user_id == user.id,
                     UserStats.stat_type == stat_type.value,
                     UserStats.guild_id == guild.id,
+                    UserStats.day == today,
                 )
             )
             result: UserStats | None = (await session.execute(query)).scalar_one_or_none()
@@ -46,7 +47,7 @@ class UserStatsRepository(BaseRepository):
                 )
                 session.add(new_stat)
             else:
-                result.value += value  # type: ignore
+                result.value += value
 
     async def get_user_stat_days(
         self, user: discord.User | discord.Member, stat_type: StatTypeEnum, guild: discord.Guild, days_back: int
@@ -60,7 +61,7 @@ class UserStatsRepository(BaseRepository):
         :return: ``Sequence[UserStats]`` an iterable with ``UserStats`` objects
         """
         start_date = date.today() - timedelta(days=days_back)
-        async with self._session_maker() as session:
+        async with self.session() as session:
             query = (
                 select(UserStats)
                 .where(
@@ -86,7 +87,7 @@ class UserStatsRepository(BaseRepository):
         :param guild: the specific guild to retrieve the stats for
         :return: ``int`` sum of the values
         """
-        async with self._session_maker() as session:
+        async with self.session() as session:
             query = select(func.sum(UserStats.value)).where(
                 and_(
                     UserStats.user_id == user.id, UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id
@@ -105,30 +106,28 @@ class UserStatsRepository(BaseRepository):
         :param guild: the specific guild to delete the stats for
         :return: ``None``
         """
-        async with self._session_maker() as session:
-            async with session.begin():
-                if user and guild:
-                    query = select(UserStats).where(
-                        and_(
-                            UserStats.user_id == user.id,
-                            UserStats.stat_type == stat_type.value,
-                            UserStats.guild_id == guild.id,
-                        )
+        async with self.session() as session:
+            if user and guild:
+                query = select(UserStats).where(
+                    and_(
+                        UserStats.user_id == user.id,
+                        UserStats.stat_type == stat_type.value,
+                        UserStats.guild_id == guild.id,
                     )
-                elif user and not guild:
-                    query = select(UserStats).where(
-                        and_(
-                            UserStats.user_id == user.id,
-                            UserStats.stat_type == stat_type.value,
-                        )
+                )
+            elif user and not guild:
+                query = select(UserStats).where(
+                    and_(
+                        UserStats.user_id == user.id,
+                        UserStats.stat_type == stat_type.value,
                     )
-                elif not user and guild:
-                    query = select(UserStats).where(
-                        and_(UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id)
-                    )
-                else:
-                    return
-                result = (await session.execute(query)).scalars().all()
-                for stat in result:
-                    await session.delete(stat)
-                await session.commit()
+                )
+            elif not user and guild:
+                query = select(UserStats).where(
+                    and_(UserStats.stat_type == stat_type.value, UserStats.guild_id == guild.id)
+                )
+            else:
+                return
+            result = (await session.execute(query)).scalars().all()
+            for stat in result:
+                await session.delete(stat)

@@ -41,19 +41,17 @@ class EnabledCommandsRepository(BaseRepository):
 
         Returns: The new state of the command (enabled/disabled).
         """
-        async with self._session_maker() as session:
-            async with session.begin():
-                query = select(EnabledCommands).where(
-                    EnabledCommands.guild_id == guild.id, EnabledCommands.command_name == command_name
-                )
-                result: EnabledCommands | None = (await session.execute(query)).scalar_one_or_none()
-                new_state: bool
-                if result is None:
-                    obj = EnabledCommands(guild_id=guild.id, command_name=command_name, enabled=False)
-                    session.add(obj)
-                    new_state = False  # Command not in DB means it was enabled; now disabling it
-                else:
-                    result.enabled = not bool(result.enabled)  # type: ignore
-                    new_state = bool(result.enabled)
-                await session.commit()
-                return new_state
+        async with self.session() as session:
+            query = select(EnabledCommands).where(
+                EnabledCommands.guild_id == guild.id, EnabledCommands.command_name == command_name
+            )
+            result: EnabledCommands | None = (await session.execute(query)).scalar_one_or_none()
+            new_state: bool
+            if result is None:
+                obj = EnabledCommands(guild_id=guild.id, command_name=command_name, enabled=False)
+                session.add(obj)
+                new_state = False  # Command not in DB means it was enabled; now disabling it
+            else:
+                result.enabled = not bool(result.enabled)
+                new_state = bool(result.enabled)
+            return new_state

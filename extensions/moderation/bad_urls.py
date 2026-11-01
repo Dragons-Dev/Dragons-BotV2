@@ -201,7 +201,7 @@ class SafebrowsingCog(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.repo = InfractionsRepository(self.client.db.AsyncSessionLocal)
+        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
         self.url_cache: SimpleMemoryCache = SimpleMemoryCache()
         self.reg_url = r"(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+"
 
@@ -257,7 +257,7 @@ class SafebrowsingCog(commands.Cog):
 
             if len(filtered_urls) > 0:
                 await msg.delete(reason="Detected as bad url")  # First delete the bad urls
-                case_id = await self.repo.create_infraction(
+                case_id = await self.infractions_repo.create_infraction(
                     user=msg.author, infraction=InfractionsEnum.Warn, reason="Bad URL sent", guild=msg.guild
                 )  # create infraction in db to get an infraction id
 

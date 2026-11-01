@@ -30,17 +30,13 @@ class InfractionsRepository(BaseRepository):
         Returns:
             int: The case ID of the created infraction.
         """
-        async with self._session_maker() as session:
-            async with session.begin():
-                record = Infractions(
-                    user_id=user.id, infraction=infraction.value, reason=reason, date=datetime.now(), guild=guild.id
-                )
-                session.add(record)
-                await session.commit()
-                return record.case_id  # type: ignore
-
-    async def update_infraction(self) -> None:
-        raise NotImplementedError("In the past this had no use!")
+        async with self.session() as session:
+            record = Infractions(
+                user_id=user.id, infraction=infraction.value, reason=reason, date=datetime.now(), guild=guild.id
+            )
+            session.add(record)
+            await session.flush()
+            return record.case_id
 
     async def get_infraction(
         self, case_id: int | None, user: discord.Member | discord.User | None, guild: discord.Guild | None = None
@@ -51,7 +47,7 @@ class InfractionsRepository(BaseRepository):
         Args:
             case_id (int | None): The case ID of the infraction to retrieve. If None, retrieves by user.
             user (discord.Member | discord.User | None): The user whose infractions to retrieve. Used if case_id is None.
-            guild (discord.Guild | None): The guild associated with the infraction. Not used in this method.
+            guild (discord.Guild | None): The guild associated with the infraction. Filters infractions to this guild when provided.
 
         Returns:
             None | Infractions | Sequence[Infractions]: Returns None if no infractions are found,
@@ -67,6 +63,8 @@ class InfractionsRepository(BaseRepository):
                 query = select(Infractions).where(Infractions.user_id == user.id)
             else:
                 raise LookupError("Both arguments are 'None'. At least one must have a value!")
+            if guild is not None:
+                query = query.where(Infractions.guild == guild.id)
             infractions = (await session.execute(query)).scalars().all()
         if len(infractions) == 0:
             return None
@@ -103,11 +101,9 @@ class ModmailRepository(BaseRepository):
         return modmail
 
     async def delete_modmail(self, user: discord.User | discord.Member) -> None:
-        async with self._session_maker() as session:
-            async with session.begin():
-                query = select(Modmail).where(Modmail.user_id == user.id)
-                result = (await session.execute(query)).scalar()
-                if result is None:
-                    return
-                await session.delete(result)
-                await session.commit()
+        async with self.session() as session:
+            query = select(Modmail).where(Modmail.user_id == user.id)
+            result = (await session.execute(query)).scalar()
+            if result is None:
+                return
+            await session.delete(result)

@@ -13,10 +13,8 @@ from discord.ext import commands
 
 import config
 from config import DISCORD_API_KEY
-from utils import Bot, ORMDataBase, ShortTermStorage, VersionInfo, rem_log
+from utils import NON_EXTENSION_FILES, Bot, VersionInfo, rem_log
 from utils.logger import CustomFormatter
-
-NON_EXTENSION_FILES = {"models.py", "repository.py"}
 
 bot = Bot(
     command_prefix=commands.when_mentioned,
@@ -31,13 +29,7 @@ bot = Bot(
 
 @bot.listen("on_ready", once=True)
 async def on_boot():
-    bot.sts = ShortTermStorage(path="data/sts.sqlite")
-    await bot.sts.setup(bot.boot_time)
-    bot.logger.debug("Initialized sts db")
-    if bot.db is None:
-        bot.db = ORMDataBase()
-    await bot.db.setup(bot.boot_time, bot.version)
-    bot.logger.debug("Initialized content db")
+    await bot.setup_databases()
     bot.api = aiohttp.ClientSession(
         "https://discord.com",
         headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{bot.version}"},

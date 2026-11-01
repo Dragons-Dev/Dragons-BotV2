@@ -1,6 +1,7 @@
 from datetime import date
 
-from sqlalchemy import BigInteger, Column, Date, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Date, Integer, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
 
 from utils.orm_database.models import Base
 
@@ -9,12 +10,12 @@ __all__ = ["UserStats"]
 
 class UserStats(Base):
     __tablename__ = "userstats"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger, nullable=False)
-    guild_id = Column(BigInteger, nullable=False)
-    stat_type = Column(String, nullable=False)
-    value = Column(Integer, default=0)
-    day = Column(Date, default=date.today, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    stat_type: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[int] = mapped_column(Integer, default=0)
+    day: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)
 
     __table_args__ = (
         # Prevents duplicate entries for the same day and user

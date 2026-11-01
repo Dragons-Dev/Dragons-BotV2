@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime
 import importlib
 from pathlib import Path
+from typing import TypeVar
 
 import discord
 from sqlalchemy.ext.asyncio import (
@@ -18,7 +19,12 @@ from ..enums import SettingsEnum
 from ..logger import CustomLogger
 from ..utils import VersionInfo
 from .models import Base, Settings
-from .repository import SettingsRepository
+from .repository import BaseRepository, SettingsRepository
+
+NON_EXTENSION_MODULES = {"models", "repository"}
+NON_EXTENSION_FILES = {f"{m}.py" for m in NON_EXTENSION_MODULES}
+
+T = TypeVar("T", bound=BaseRepository)
 
 
 class ORMDataBase:
@@ -42,15 +48,21 @@ class ORMDataBase:
         """Returns the async session maker factory."""
         return self.AsyncSessionLocal
 
-    @staticmethod
-    def _discover_models() -> None:
+    def get_repository(self, repo_cls: type[T], *args, **kwargs) -> T:
+        """Instantiates a domain repository bound to this database's session maker."""
+        return repo_cls(self.session_maker, *args, **kwargs)
+
+    def _discover_models(self) -> None:
         """Imports all extension model modules so they register with Base.metadata."""
-        extensions_dir = Path("extensions")
+        project_root = Path(__file__).resolve().parents[2]
+        extensions_dir = project_root / "extensions"
         if not extensions_dir.exists():
             return
         for model_file in extensions_dir.rglob("models.py"):
-            module_name = ".".join(model_file.with_suffix("").parts)
+            module_name = ".".join(model_file.relative_to(project_root).with_suffix("").parts)
             importlib.import_module(module_name)
+            if self.logger:
+                self.logger.debug(f"Discovered models module: {module_name}")
 
     async def setup(self, boot: datetime, version: VersionInfo | None = None):
         """

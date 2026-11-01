@@ -44,14 +44,12 @@ class EventRepository(BaseRepository):
 
         Returns: None
         """
-        async with self._session_maker() as session:
-            async with session.begin():
-                reminders_db = ",".join(map(str, reminders))
-                session.add(
-                    ConfirmationDB(event_id=event_id, user_id=guest, confirmation=confirmation, reminders=reminders_db)
-                )
-                await session.commit()
-                self._log_info(f"Confirmation for {event_id} and user {guest} created")
+        async with self.session() as session:
+            reminders_db = ",".join(map(str, reminders))
+            session.add(
+                ConfirmationDB(event_id=event_id, user_id=guest, confirmation=confirmation, reminders=reminders_db)
+            )
+        self._log_info(f"Confirmation for {event_id} and user {guest} created")
 
     async def update_confirmation(
         self, *, event_id: str, guest: int, confirmation: bool | None = None, reminders: list[int] | None = None
@@ -72,19 +70,19 @@ class EventRepository(BaseRepository):
                 if confirmation_obj is None:
                     return False
                 if confirmation is not None:
-                    confirmation_obj.confirmation = confirmation  # type: ignore
+                    confirmation_obj.confirmation = confirmation
                 if reminders is not None:
-                    confirmation_obj.reminders = ",".join(map(str, reminders))  # type: ignore
-                self._log_info(
-                    f"Confirmation for {event_id} and user {guest} updated to {confirmation} and/or reminders to {confirmation_obj.reminders}"
-                )
-                return True
+                    confirmation_obj.reminders = ",".join(map(str, reminders))
+            self._log_info(
+                f"Confirmation for {event_id} and user {guest} updated to {confirmation} and/or reminders to {confirmation_obj.reminders}"
+            )
+            return True
         except SQLAlchemyError:
             return False
 
     async def get_confirmation_for_event_and_user(self, *, event_id: str, guest: int) -> Confirmation | None:
         """
-        Gets a user that accepted the invitation for the event
+        Gets the confirmation for a user invited to the event
         Args:
             event_id: ID of the event
             guest: ID of the user
@@ -94,17 +92,15 @@ class EventRepository(BaseRepository):
         async with self.session() as session:
             confirm: ConfirmationDB | None = await session.get(ConfirmationDB, (event_id, guest))
             if confirm is None:
-                self._log_error(f"Confirmation not found by evnt_id {event_id} and user {guest}")
+                self._log_error(f"Confirmation not found by event_id {event_id} and user {guest}")
                 return None
-            reminders_t = [] if confirm.reminders == "" else list(map(int, confirm.reminders.split(",")))
+            reminders = [] if confirm.reminders == "" else list(map(int, confirm.reminders.split(",")))
             return Confirmation(
                 event_id=confirm.event_id,
                 guest=confirm.user_id,
                 confirmation=confirm.confirmation,
-                reminders=reminders_t,
+                reminders=reminders,
             )
-
-    get_comfirmation_for_event_and_user = get_confirmation_for_event_and_user
 
     async def get_confirmations_for_event(self, *, event_id: str) -> list[int]:
         """
@@ -129,17 +125,19 @@ class EventRepository(BaseRepository):
 
         Returns: List of all confirmations that accepted the invitation
         """
-        async with self._session_maker() as session:
-            async with session.begin():
-                query = select(ConfirmationDB).where(
-                    ConfirmationDB.event_id == event_id, ConfirmationDB.confirmation.is_(True)
-                )
-            confir = (await session.execute(query)).scalars().all()
+        async with self.session() as session:
+            query = select(ConfirmationDB).where(
+                ConfirmationDB.event_id == event_id, ConfirmationDB.confirmation.is_(True)
+            )
+            confirmations = (await session.execute(query)).scalars().all()
             res = []
-            for conf in confir:
-                reminders_t = [] if conf.reminders == "" else list(map(int, conf.reminders.split(",")))
+            for confirmation in confirmations:
+                reminders = [] if confirmation.reminders == "" else list(map(int, confirmation.reminders.split(",")))
                 new_conf = Confirmation(
-                    event_id=conf.event_id, guest=conf.user_id, confirmation=conf.confirmation, reminders=reminders_t
+                    event_id=confirmation.event_id,
+                    guest=confirmation.user_id,
+                    confirmation=confirmation.confirmation,
+                    reminders=reminders,
                 )
                 res.append(new_conf)
             return res
@@ -166,12 +164,10 @@ class EventRepository(BaseRepository):
         Returns: Bool if everything was deleted
         """
         try:
-            async with self._session_maker() as session:
-                async with session.begin():
-                    await session.execute(delete(ConfirmationDB).where(ConfirmationDB.event_id == event_id))
-                    await session.commit()
-                    self._log_info(f"Deleted all confirmations for event: {event_id}")
-                    return True
+            async with self.session() as session:
+                await session.execute(delete(ConfirmationDB).where(ConfirmationDB.event_id == event_id))
+            self._log_info(f"Deleted all confirmations for event: {event_id}")
+            return True
         except SQLAlchemyError:
             return False
 
@@ -195,15 +191,16 @@ class EventRepository(BaseRepository):
 
         Returns: The id to identify the event.
         """
-        async with self._session_maker() as session:
-            async with session.begin():
-                id = str(host) + str(datetime.now(tz=SERVER_TZ))
-                session.add(Events(id=str(id), host=int(host), name=str(name), time=time, mode=mode))
-                await session.commit()
-                for invite in invites:
-                    await self.create_confirmation(event_id=id, guest=invite.id, confirmation=None, reminders=[0])
-            self._log_info(f"Event created {id}")
-            return id
+        event_id = str(host) + str(datetime.now(tz=SERVER_TZ))
+        async with self.session() as session:
+            session.add(Events(id=str(event_id), host=int(host), name=str(name), time=time, mode=mode))
+            await session.flush()
+            for invite in invites:
+                session.add(
+                    ConfirmationDB(event_id=event_id, user_id=invite.id, confirmation=None, reminders="0")
+                )
+        self._log_info(f"Event created {event_id}")
+        return event_id
 
     async def get_event_by_id(self, id: str) -> Event | None:
         """
@@ -220,7 +217,7 @@ class EventRepository(BaseRepository):
             host=event.host,
             name=event.name,
             time=event.time,
-            invites=users,  # type: ignore
+            invites=users,
             mode=event.mode,
         )
 
@@ -231,19 +228,19 @@ class EventRepository(BaseRepository):
         async with self.session() as session:
             query = select(Events)
             events = (await session.execute(query)).scalars().all()
-        events_r = []
+        result_events = []
         for event in events:
             users = await self.get_confirmations_for_event(event_id=event.id)
-            event_t = Event(
+            event_data = Event(
                 id=event.id,
                 host=event.host,
                 name=event.name,
                 time=event.time,
-                invites=users,  # type: ignore
+                invites=users,
                 mode=event.mode,
             )
-            events_r.append(event_t)
-        return events_r
+            result_events.append(event_data)
+        return result_events
 
     @staticmethod
     def _apply_event_updates(
@@ -292,14 +289,11 @@ class EventRepository(BaseRepository):
 
     async def delete_event(self, id: str) -> bool:
         try:
-            async with self._session_maker() as session:
-                async with session.begin():
-                    conf_deletion = await self.delete_confirmation_of_event(event_id=id)
-                    if conf_deletion:
-                        await session.execute(delete(Events).where(Events.id == id))
-                        await session.commit()
-                        self._log_info(f"Event {id} deleted")
-                        return True
-                    return conf_deletion
+            async with self.session() as session:
+                await session.execute(delete(ConfirmationDB).where(ConfirmationDB.event_id == id))
+                await session.execute(delete(Events).where(Events.id == id))
+            self._log_info(f"Deleted all confirmations for event: {id}")
+            self._log_info(f"Event {id} deleted")
+            return True
         except SQLAlchemyError:
             return False

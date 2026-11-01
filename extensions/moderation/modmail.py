@@ -12,10 +12,10 @@ from .repository import ModmailRepository
 
 class EndModmailView(discord.ui.View):
     # class is displayed if the user runs the command `create_modmail` while having already an open modmail
-    def __init__(self, author: discord.User, client: Bot):
+    def __init__(self, author: discord.User, client: Bot, modmail_repo: ModmailRepository | None = None):
         self.author = author
         self.client = client
-        self.repo = ModmailRepository(client.db.AsyncSessionLocal)
+        self.modmail_repo = modmail_repo or ModmailRepository(client.db.session_maker)
         super().__init__(timeout=30, disable_on_timeout=True)
 
     @discord.ui.button(
@@ -23,16 +23,16 @@ class EndModmailView(discord.ui.View):
         style=discord.ButtonStyle.blurple,
     )
     async def end_modmail(self, button: discord.ui.Button, interaction: discord.Interaction):
-        mail = await self.repo.get_modmail(self.author, None)
+        mail = await self.modmail_repo.get_modmail(self.author, None)
         if mail is None:
             return await interaction.response.send_message("You are not chatting with any guild!", ephemeral=True)
         guild = self.client.get_guild(mail.guild_id)
         if guild is None:
             guild = await self.client.fetch_guild(mail.guild_id)
-        await self.repo.delete_modmail(self.author)
+        await self.modmail_repo.delete_modmail(self.author)
 
         button.label = "Stopped Modmailing"
-        button.disabled = (True,)
+        button.disabled = True
         button.style = discord.ButtonStyle.success
         await interaction.edit(
             content=f"You've stopped mailing with **{escape_markdown(guild.name)}**!",
@@ -42,9 +42,9 @@ class EndModmailView(discord.ui.View):
 
 class GuildSelectDropdown(discord.ui.Select):
     # select to show mutual guilds of the bot and the author
-    def __init__(self, client_: Bot, author: discord.User, anonymous: bool):
+    def __init__(self, client_: Bot, author: discord.User, anonymous: bool, modmail_repo: ModmailRepository | None = None):
         self.client = client_
-        self.repo = ModmailRepository(client_.db.AsyncSessionLocal)
+        self.modmail_repo = modmail_repo or ModmailRepository(client_.db.session_maker)
         self.author = author
         self.anon = anonymous
         options = [discord.SelectOption(label=guild.name, value=str(guild.id)) for guild in author.mutual_guilds]
@@ -57,20 +57,20 @@ class GuildSelectDropdown(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         response = int(self.values[0])
-        mail = await self.repo.get_modmail(self.author, None)
+        mail = await self.modmail_repo.get_modmail(self.author, None)
         if mail:
             response = mail.guild_id
         guild = self.client.get_guild(response)
         if guild is None:
             guild = await self.client.fetch_guild(response)
         if guild and mail and mail.guild_id == guild.id:
-            view = EndModmailView(self.author, self.client)
+            view = EndModmailView(self.author, self.client, self.modmail_repo)
             await interaction.response.send_message(
                 f"You are still chatting with **{escape_markdown(guild.name)}**", view=view
             )
         else:
             uuid = _uuid.uuid4()
-            await self.repo.create_modmail(self.author, guild, str(uuid), self.anon)
+            await self.modmail_repo.create_modmail(self.author, guild, str(uuid), self.anon)
             await interaction.response.send_message(
                 f"You are now chatting with **{escape_markdown(guild.name)}**!", ephemeral=True
             )
@@ -78,9 +78,9 @@ class GuildSelectDropdown(discord.ui.Select):
 
 class GuildSelectView(discord.ui.View):
     # View class to display the advanced Select `GuildSelectDropdown`
-    def __init__(self, client: Bot, author: discord.User, anonymous: bool):
+    def __init__(self, client: Bot, author: discord.User, anonymous: bool, modmail_repo: ModmailRepository | None = None):
         super().__init__(timeout=30, disable_on_timeout=True)
-        self.add_item(GuildSelectDropdown(client, author, anonymous))
+        self.add_item(GuildSelectDropdown(client, author, anonymous, modmail_repo))
 
 
 def _first_int(uuid: str):
@@ -137,7 +137,7 @@ class ModMail(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.repo = ModmailRepository(self.client.db.AsyncSessionLocal)
+        self.modmail_repo = ModmailRepository(self.client.db.session_maker)
 
     modmail_group = discord.SlashCommandGroup(
         "modmail",
@@ -153,47 +153,47 @@ class ModMail(commands.Cog):
         name="anonymous", description="Do you want to be anonymous in this modmail?", input_type=bool, default=False
     )
     async def create_modmail(self, ctx: discord.ApplicationContext, anonymous: bool):
-        mail = await self.repo.get_modmail(ctx.author, None)
+        mail = await self.modmail_repo.get_modmail(ctx.author, None)
         if ctx.guild:  # if the command is run inside a guild
             if mail:  # if any guild id is in the database
                 guild: discord.Guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)
                 if ctx.guild.id == mail.guild_id:  # if the guild id the command is run is the same as in the database
-                    view = EndModmailView(ctx.author, self.client)
+                    view = EndModmailView(ctx.author, self.client, self.modmail_repo)
                     return await ctx.response.send_message(
                         "You are still chatting with this guild!", view=view, ephemeral=True
                     )
 
                 else:
-                    view = EndModmailView(ctx.author, self.client)
+                    view = EndModmailView(ctx.author, self.client, self.modmail_repo)
                     return await ctx.response.send_message(
                         f"You are still chatting with **{escape_markdown(guild.name)}**!", view=view, ephemeral=True
                     )
 
             else:  # if no id is in the database for this user, a modmail with this guild will be created
                 uuid = str(_uuid.uuid4())
-                await self.repo.create_modmail(ctx.author, ctx.guild, uuid, anonymous)
+                await self.modmail_repo.create_modmail(ctx.author, ctx.guild, uuid, anonymous)
                 return await ctx.response.send_message(
                     "A new modmail will be created. Please check your DM's", ephemeral=True
                 )
 
         elif mail:  # if the command is run outside a guild but with an id in the database the user will be shown the
             # `EndModmailView`
-            view = EndModmailView(ctx.author, self.client)
+            view = EndModmailView(ctx.author, self.client, self.modmail_repo)
             guild: discord.Guild = await get_or_fetch(self.client, "guild", mail.guild_id, default=None)  # type: ignore
             return await ctx.response.send_message(
                 f"You are still chatting with **{escape_markdown(guild.name)}**!", view=view, ephemeral=True
             )
 
         else:  # if the command is run outside a guild and no id is in the db, provide `GuildSelectView`
-            view = GuildSelectView(self.client, ctx.author, anonymous)
+            view = GuildSelectView(self.client, ctx.author, anonymous, self.modmail_repo)
             return await ctx.response.send_message(
                 "With which guild do you want to modmail?", ephemeral=True, view=view
             )
 
     @modmail_group.command(name="end", description="Stop a modmail chat.")
     async def end_modmail(self, ctx: discord.ApplicationContext):
-        mail = await self.repo.get_modmail(ctx.author, None)
-        if mail.user_id is None:
+        mail = await self.modmail_repo.get_modmail(ctx.author, None)
+        if mail is None or mail.user_id is None:
             return await ctx.response.send_message("You are not chatting with any guild!", ephemeral=True)
         guild: discord.Guild = await self.client.get_or_fetch(discord.Guild, mail.guild_id, default=None)
         view = ButtonConfirm(cancel_title=f"You continue to mail with **{escape_markdown(guild.name)}**!")
@@ -205,7 +205,7 @@ class ModMail(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
-            await self.repo.delete_modmail(ctx.author)
+            await self.modmail_repo.delete_modmail(ctx.author)
             await ctx.followup.send(
                 f"You've stopped mailing with **{escape_markdown(guild.name)}**!",
                 ephemeral=True,
@@ -262,7 +262,7 @@ class ModMail(commands.Cog):
                     async for message in thread.history():
                         if message.embeds:
                             unique_id = message.embeds[0].footer.text.strip("UUID: ")
-                    mail = await self.repo.get_modmail(user=None, uuid=unique_id)
+                    mail = await self.modmail_repo.get_modmail(user=None, uuid=unique_id)
                     if mail is None:
                         return await msg.reply("This thread is closed, no user found!")
                     user_id = mail.user_id
@@ -292,7 +292,7 @@ class ModMail(commands.Cog):
             else:
                 return
         else:
-            mail = await self.repo.get_modmail(msg.author, None)
+            mail = await self.modmail_repo.get_modmail(msg.author, None)
             # at this point it's made sure it was a dm to the bot in a modmail context
             if mail is None:
                 return await msg.author.send(

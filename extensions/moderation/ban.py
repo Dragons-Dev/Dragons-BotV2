@@ -25,7 +25,7 @@ class Ban(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.repo = InfractionsRepository(self.client.db.AsyncSessionLocal)
+        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
 
     @pycog.subcommand("mod")
     @commands.slash_command(name="ban", description="Bans a given member")
@@ -59,7 +59,7 @@ class Ban(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
-            case_id = await self.repo.create_infraction(
+            case_id = await self.infractions_repo.create_infraction(
                 user=member, infraction=InfractionsEnum.Ban, reason=reason, guild=ctx.guild
             )
             em.set_footer(text=f"Case ID: {case_id}")

@@ -4,9 +4,9 @@ import os
 import discord
 from discord.ext import commands
 
-from utils import Bot, CustomLogger
+from utils import NON_EXTENSION_MODULES, Bot, CustomLogger
 
-blacklist = ["extensions_commands", "internal", "__pycache__", "models", "repository"]
+blacklist = ["extensions_commands", "internal", "__pycache__", *NON_EXTENSION_MODULES]
 
 
 def folder(ctx: discord.AutocompleteContext) -> list[str]:

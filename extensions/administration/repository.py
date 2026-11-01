@@ -16,12 +16,10 @@ class BotStatusRepository(BaseRepository):
     async def create_bot_status(
         self, activity_type: discord.ActivityType, status: discord.Status, activity_name: str
     ) -> None:
-        async with self._session_maker() as session:
-            async with session.begin():
-                session.add(
-                    BotStatus(activity_type=int(activity_type), status=str(status), activity_name=activity_name)
-                )
-                await session.commit()
+        async with self.session() as session:
+            session.add(
+                BotStatus(activity_type=int(activity_type), status=str(status), activity_name=activity_name)
+            )
 
     async def edit_bot_status(
         self,
@@ -30,16 +28,17 @@ class BotStatusRepository(BaseRepository):
         status: discord.Status | None = None,
         activity_name: str | None = None,
     ) -> None:
-        async with self._session_maker() as session:
-            async with session.begin():
-                query = select(BotStatus).where(BotStatus.id == id_)
-                result = (await session.execute(query)).scalar_one_or_none()
-                if result is None:
-                    return None
-                result.activity_type = int(activity_type) if activity_type else result.activity_type  # type: ignore
-                result.status = str(status) if status else result.status  # type: ignore
-                result.activity_name = activity_name if activity_name else result.activity_name  # type: ignore
-                await session.commit()
+        async with self.session() as session:
+            query = select(BotStatus).where(BotStatus.id == id_)
+            result = (await session.execute(query)).scalar_one_or_none()
+            if result is None:
+                return None
+            if activity_type is not None:
+                result.activity_type = int(activity_type)
+            if status is not None:
+                result.status = str(status)
+            if activity_name is not None:
+                result.activity_name = activity_name
 
     async def get_bot_status(self, id_: int | None) -> BotStatus | Sequence[BotStatus] | None:
         """
@@ -64,11 +63,9 @@ class BotStatusRepository(BaseRepository):
         return bot_status
 
     async def delete_bot_status(self, id_: int) -> None:
-        async with self._session_maker() as session:
-            async with session.begin():
-                query = select(BotStatus).where(BotStatus.id == id_)
-                result = (await session.execute(query)).scalar_one_or_none()
-                if result is None:
-                    return
-                await session.delete(result)
-                await session.commit()
+        async with self.session() as session:
+            query = select(BotStatus).where(BotStatus.id == id_)
+            result = (await session.execute(query)).scalar_one_or_none()
+            if result is None:
+                return
+            await session.delete(result)
