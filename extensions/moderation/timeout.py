@@ -2,17 +2,20 @@
 from datetime import datetime, timedelta
 
 import discord
-import pycord.multicog as pycog
 from discord.ext import commands
 from discord.utils import format_dt, get_or_fetch
+import pycord.multicog as pycog
 
 from utils import Bot, ButtonInfo, CustomLogger, InfractionsEnum, SettingsEnum, is_team
+
+from .repository import InfractionsRepository
 
 
 class Timeout(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
 
     @pycog.subcommand("mod")
     @commands.slash_command(name="timeout", description="Timeouts a given member for a given time")
@@ -74,14 +77,9 @@ class Timeout(commands.Cog):
                 until = timedelta(seconds=1)
                 self.logger.critical(f"Invalid duration provided: {length}")
             await member.timeout_for(duration=until, reason=reason)
-            await self.client.db.create_infraction(
+            case = await self.infractions_repo.create_infraction(
                 user=member, infraction=InfractionsEnum.Timeout, reason=reason, guild=ctx.guild
             )
-            infractions = await self.client.db.get_infraction(case_id=None, user=member)
-            if len(infractions) == 1:
-                case = infractions.case_id
-            else:
-                case = infractions[-1].case_id
             em = discord.Embed(title="Timeout successful", color=discord.Color.brand_green())
             em.add_field(name="User", value=member.mention, inline=False)
             em.add_field(name="Moderator", value=ctx.author.mention, inline=False)

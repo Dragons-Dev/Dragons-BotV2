@@ -1,11 +1,12 @@
-import discord
 import json
 import os
+
+import discord
 from discord.ext import commands
 
-from utils import Bot, CustomLogger
+from utils import NON_EXTENSION_MODULES, Bot, CustomLogger
 
-blacklist = ["extensions_commands", "internal", "__pycache__"]
+blacklist = ["extensions_commands", "internal", "__pycache__", *NON_EXTENSION_MODULES]
 
 
 def folder(ctx: discord.AutocompleteContext) -> list[str]:
@@ -22,7 +23,11 @@ def extension(ctx: discord.AutocompleteContext) -> list[str]:
         return ["Please select a folder first"]
     path = f"extensions/{folder}"
     try:
-        onlyfiles = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+        onlyfiles = [
+            f
+            for f in os.listdir(path)
+            if os.path.isfile(os.path.join(path, f)) and f.endswith(".py") and not f.startswith("_")
+        ]
     except OSError:
         onlyfiles = []
     files = []

@@ -1,28 +1,31 @@
-import typing as t
 from datetime import datetime
+import typing as t
 
 import discord
-import pycord.multicog as pycog
 from discord.ext import commands
-from discord.utils import format_dt, get_or_fetch
+from discord.utils import format_dt
+import pycord.multicog as pycog
 
 from extensions.internal.error_handler import error_embed
 from utils import (
     Bot,
     ButtonConfirm,
     ButtonInfo,
+    CommandDisabledError,
     CustomLogger,
     InfractionsEnum,
     SettingsEnum,
     is_team,
 )
-from utils import CommandDisabledError
+
+from .repository import InfractionsRepository
 
 
 class Kick(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
 
     @pycog.subcommand("mod")
     @commands.slash_command(name="kick", description="Kicks a given member")
@@ -52,7 +55,7 @@ class Kick(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
-            case_id = await self.client.db.create_infraction(
+            case_id = await self.infractions_repo.create_infraction(
                 user=member, infraction=InfractionsEnum.Kick, reason=reason, guild=ctx.guild
             )
             em.set_footer(text=f"Case ID: {case_id}")
@@ -70,12 +73,12 @@ class Kick(commands.Cog):
             setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
             if setting:
                 if isinstance(setting, (tuple, list, t.Sequence)):
-                    log_channel: discord.TextChannel = await get_or_fetch(
-                        ctx.guild, "channel", setting[0].value, default=None
+                    log_channel: discord.TextChannel | None = await ctx.guild.get_or_fetch(
+                        discord.TextChannel, setting[0].value, default=None
                     )
                 else:
-                    log_channel: discord.TextChannel = await get_or_fetch(
-                        ctx.guild, "channel", setting.value, default=None
+                    log_channel: discord.TextChannel | None = await ctx.guild.get_or_fetch(
+                        discord.TextChannel, setting.value, default=None
                     )
                 if log_channel:
                     await log_channel.send(embed=member_em)

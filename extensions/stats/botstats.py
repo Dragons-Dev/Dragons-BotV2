@@ -6,6 +6,8 @@ from discord.ext import commands, tasks
 import utils
 from utils import Bot, CustomLogger
 
+from .repository import UserStatsRepository
+
 
 class TimedUser:
     def __init__(self, user: discord.Member, guild: discord.Guild):
@@ -21,6 +23,7 @@ class BotStats(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.user_stats_repo = UserStatsRepository(self.client.db.session_maker)
         self.pings = []
         self.avg_ping.start()
         self.save_voice_to_db.start()
@@ -100,7 +103,7 @@ class BotStats(commands.Cog):
         """
         if not cmd.guild:
             return
-        await self.client.db.update_user_stat(cmd.author, utils.StatTypeEnum.CommandsUsed, 1, cmd.guild)
+        await self.user_stats_repo.update_user_stat(cmd.author, utils.StatTypeEnum.CommandsUsed, 1, cmd.guild)
 
     @commands.Cog.listener("on_message")
     async def on_msg(self, msg: discord.Message) -> None:
@@ -116,7 +119,7 @@ class BotStats(commands.Cog):
             return
         if not msg.guild:
             return
-        await self.client.db.update_user_stat(msg.author, utils.StatTypeEnum.MessagesSent, 1, msg.guild)
+        await self.user_stats_repo.update_user_stat(msg.author, utils.StatTypeEnum.MessagesSent, 1, msg.guild)
 
     @tasks.loop(minutes=5)
     async def save_voice_to_db(self) -> None:
@@ -147,7 +150,7 @@ class BotStats(commands.Cog):
         if timed_user is None:
             return
         db_time = int((datetime.now() - timed_user.time).total_seconds())
-        await self.client.db.update_user_stat(
+        await self.user_stats_repo.update_user_stat(
             user=member, stat_type=utils.StatTypeEnum.VoiceTime, value=db_time, guild=guild
         )
         if not update:

@@ -39,7 +39,7 @@ class MessagePurge(commands.Cog):
             await ctx.response.send_message("You can only delete up to 100 messages at a time.", ephemeral=True)
             return
         await ctx.defer(ephemeral=True)
-        # Depending if channel is DMChannel or Guild Channel
+        # depends if channel is DMChannel or Guild Channel
         if isinstance(ctx.channel, discord.channel.DMChannel):
             deleted_messages: list[discord.Message] = await ctx.channel.history(limit=amount).flatten()
             for message in deleted_messages:
