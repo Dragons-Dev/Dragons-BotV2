@@ -5,8 +5,11 @@ from discord.ext import commands
 from discord.utils import format_dt
 from pycord import multicog as pycog
 
-from utils import Bot, CustomLogger, StatTypeEnum, sec_to_readable, SettingsEnum, ContainerPaginator
-from utils.orm_database import Infractions, Settings
+from extensions.moderation.models import Infractions
+from extensions.moderation.repository import InfractionsRepository
+from utils import Bot, ContainerPaginator, CustomLogger, Settings, SettingsEnum, StatTypeEnum, sec_to_readable
+
+from .repository import UserStatsRepository
 
 
 def _build_infraction_container(
@@ -40,14 +43,15 @@ def _build_infraction_container(
 
 
 class InfractionButton(discord.ui.Button):
-    def __init__(self, client: Bot, target: discord.Member):
+    def __init__(self, client: Bot, target: discord.Member, infractions_repo: InfractionsRepository | None = None):
         self.client = client
+        self.infractions_repo = infractions_repo or InfractionsRepository(client.db.session_maker)
         self.target = target
         super().__init__(label="View Infraction", style=discord.ButtonStyle.red)
 
     async def callback(self, interaction: discord.Interaction):
         # Fetch the infraction details from the database using the infraction_id
-        infraction = await self.client.db.get_infraction(None, self.target, self.target.guild)
+        infraction = await self.infractions_repo.get_infraction(None, self.target, self.target.guild)
         if infraction is None:
             await interaction.response.send_message(
                 "Something went wrong. There are no infractions for the selected target and guild",
@@ -66,6 +70,8 @@ class UserInfo(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.stats_repo = UserStatsRepository(self.client.db.session_maker)
+        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
 
     @pycog.subcommand("user")
     @commands.slash_command(
@@ -106,10 +112,10 @@ class UserInfo(commands.Cog):
         ):
             container.add_separator()
             # Database calls
-            voice_time = await self.client.db.get_user_stat_total(target, StatTypeEnum.VoiceTime, ctx.guild)
-            messages_sent = await self.client.db.get_user_stat_total(target, StatTypeEnum.MessagesSent, ctx.guild)
-            commands_used = await self.client.db.get_user_stat_total(target, StatTypeEnum.CommandsUsed, ctx.guild)
-            infractions = await self.client.db.get_infraction(None, target, ctx.guild)
+            voice_time = await self.stats_repo.get_user_stat_total(target, StatTypeEnum.VoiceTime, ctx.guild)
+            messages_sent = await self.stats_repo.get_user_stat_total(target, StatTypeEnum.MessagesSent, ctx.guild)
+            commands_used = await self.stats_repo.get_user_stat_total(target, StatTypeEnum.CommandsUsed, ctx.guild)
+            infractions = await self.infractions_repo.get_infraction(None, target, ctx.guild)
             container.add_text(
                 f"Voice time 🎤: {sec_to_readable(voice_time or 0)}\n"
                 f"Messages sent 💬: {messages_sent or '0'}\n"
@@ -119,7 +125,9 @@ class UserInfo(commands.Cog):
             if infractions:
                 container.add_section(
                     discord.ui.TextDisplay(content="See all infractions for this user"),
-                    accessory=InfractionButton(client=self.client, target=target),
+                    accessory=InfractionButton(
+                        client=self.client, target=target, infractions_repo=self.infractions_repo
+                    ),
                 )
         container.add_text(
             f"User: {member.mention}\n"

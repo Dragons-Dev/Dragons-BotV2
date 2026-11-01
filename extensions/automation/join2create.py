@@ -10,6 +10,8 @@ from discord.ext import commands
 
 from utils import Bot, CallbackButton, CustomLogger, Settings, SettingsEnum
 
+from .repository import Join2CreateRepository
+
 
 class ButtonEnum(enum.Enum):
     SET_USER_LIMIT = enum.auto()
@@ -28,7 +30,8 @@ async def create_overwrite_from_select(
     permission_overwrites = channel.overwrites
     derived_overwrites = {}
     if not banning:
-        current_join2create = await bot.db.get_join2create(channel)
+        join2create_repo = Join2CreateRepository(bot.db.session_maker)
+        current_join2create = await join2create_repo.get(channel)
         if current_join2create is not None:
             derived_channel: discord.VoiceChannel | None = await bot.get_or_fetch(
                 discord.VoiceChannel, current_join2create.derived_channel
@@ -80,7 +83,8 @@ async def _next_button_func(interaction: discord.Interaction, next_function: But
             return
 
         client: Bot = interaction.client
-        temp_voice = await client.db.get_join2create(channel)
+        join2create_repo = Join2CreateRepository(client.db.session_maker)
+        temp_voice = await join2create_repo.get(channel)
         if temp_voice is None:
             await interaction.respond("This channel is not a temporary voice channel.", ephemeral=True)
             return
@@ -167,8 +171,9 @@ async def transfer_ownership(interaction: discord.Interaction, channel: discord.
         return
 
     client: Bot = interaction.client
+    join2create_repo = Join2CreateRepository(client.db.session_maker)
     # Transfer ownership in the database
-    await client.db.update_join2create(channel, interaction.user)
+    await join2create_repo.update(channel, interaction.user)
     if interaction.message:
         await interaction.message.edit(view=VoiceBoard(client=client, voice_owner=interaction.user))
     await interaction.respond(f"You are now the owner of {channel.name}.", ephemeral=True)
@@ -463,6 +468,7 @@ class Join2Create(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.join2create_repo = Join2CreateRepository(self.client.db.session_maker)
         with open("assets/suffix.json") as f:
             self.status = json.load(f)
             self.suffixes = [*self.status]
@@ -507,7 +513,7 @@ class Join2Create(commands.Cog):
                     status = choice(self.status[channel_name]["status"])
                     await channel.set_status(status=status, reason="Join2Create")
 
-                check = await self.client.db.create_join2create(channel, member, derived_channel=after.channel)
+                check = await self.join2create_repo.create(channel, member, derived_channel=after.channel)
                 if not check:
                     await channel.delete(reason="Join2Create-Failed")
                     self.logger.error("Database entry for temp voice channel could not be created")
@@ -521,9 +527,9 @@ class Join2Create(commands.Cog):
                 await channel.send(view=VoiceBoard(client=self.client, voice_owner=member))
 
         if before.channel is not None:
-            if await self.client.db.get_join2create(before.channel):
+            if await self.join2create_repo.get(before.channel):
                 if len([m for m in before.channel.members if not m.bot]) == 0:
-                    await self.client.db.delete_join2create(before.channel)
+                    await self.join2create_repo.delete(before.channel)
                     self.logger.debug(f"{before.channel.name} was deleted on {member.guild}")
                     await before.channel.delete(reason="Join2Delete")
 

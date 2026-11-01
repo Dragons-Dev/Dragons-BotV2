@@ -2,7 +2,8 @@ import discord
 import pycord.multicog as pycog
 from discord.ext import commands
 
-from utils import Bot, CustomLogger, ContainerPaginator
+from extensions.automation.repository import Join2CreateRepository
+from utils import Bot, ContainerPaginator, CustomLogger
 
 
 class Mute(discord.ui.Button):
@@ -81,6 +82,7 @@ class InVoiceModeration(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.join2create_repo = Join2CreateRepository(self.client.db.session_maker)
         # {
         #   channel_id: user
         # }
@@ -116,7 +118,7 @@ class InVoiceModeration(commands.Cog):
         if isinstance(ctx.channel, discord.VoiceChannel):
             try:
                 user_claim = self.claimed[ctx.channel_id]
-                join2create = await self.client.db.get_join2create(ctx.channel)
+                join2create = await self.join2create_repo.get(ctx.channel)
                 is_channel_owner = False
                 if join2create is not None:
                     is_channel_owner = join2create.owner_id == ctx.user.id

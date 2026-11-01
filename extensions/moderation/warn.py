@@ -1,10 +1,10 @@
-import typing as t
 from datetime import datetime
+import typing as t
 
 import discord
-import pycord.multicog as pycog
 from discord.ext import commands
 from discord.utils import format_dt
+import pycord.multicog as pycog
 
 from extensions.internal.error_handler import error_embed
 from utils import (
@@ -18,11 +18,14 @@ from utils import (
     is_team,
 )
 
+from .repository import InfractionsRepository
+
 
 class Warn(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
 
     @pycog.subcommand("mod")
     @commands.slash_command(name="warn", description="Warns a given member")
@@ -61,7 +64,7 @@ class Warn(commands.Cog):
         if view.value is None or not view.value:
             return
         else:
-            case_id = await self.client.db.create_infraction(
+            case_id = await self.infractions_repo.create_infraction(
                 user=member, infraction=InfractionsEnum.Warn, reason=reason, guild=ctx.guild
             )
             em.set_footer(text=f"Case ID: {case_id}")

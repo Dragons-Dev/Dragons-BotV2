@@ -2,7 +2,9 @@ import discord
 from discord import SlashCommandGroup
 from discord.ext import commands
 
-from utils import Bot, CustomLogger, CommandDisabledError, is_team
+from utils import Bot, CommandDisabledError, CustomLogger, is_team
+
+from .repository import EnabledCommandsRepository
 
 
 def strip_emoji(command_name: str) -> str:
@@ -13,6 +15,7 @@ def strip_emoji(command_name: str) -> str:
 
 async def autocomplete_commands(ctx: discord.AutocompleteContext) -> list[str]:
     bot: Bot = ctx.bot
+    enabled_commands_repo = EnabledCommandsRepository(bot.db.session_maker)
     guild = ctx.interaction.guild
     if guild is None:
         return ["You can't disable commands in DMs."]  # Should not happen due to context restriction
@@ -27,7 +30,7 @@ async def autocomplete_commands(ctx: discord.AutocompleteContext) -> list[str]:
     emojified_commands = []
     try:
         for cmd in filtered if len(filtered) > 0 else all_commands:
-            if await bot.db.is_command_enabled(guild=guild, command_name=cmd):
+            if await enabled_commands_repo.is_command_enabled(guild=guild, command_name=cmd):
                 emojified_commands.append(f"🟢 {cmd}")
             else:
                 emojified_commands.append(f"🔴 {cmd}")
@@ -41,12 +44,13 @@ class EnabledCommands(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
+        self.enabled_commands_repo = EnabledCommandsRepository(self.client.db.session_maker)
         self.client.add_check(self.command_enabled_check)
 
     async def command_enabled_check(self, ctx: discord.ApplicationContext) -> bool:
         if not ctx.guild:
             return True
-        cmd_enabled = await self.client.db.is_command_enabled(ctx.guild, ctx.command.qualified_name)
+        cmd_enabled = await self.enabled_commands_repo.is_command_enabled(ctx.guild, ctx.command.qualified_name)
         if not cmd_enabled:
             raise CommandDisabledError(f"The command `/{ctx.command.qualified_name}` is disabled in this guild.")
         return True
@@ -66,7 +70,7 @@ class EnabledCommands(commands.Cog):
     )
     async def toggle_command(self, ctx: discord.ApplicationContext, cmd):
         command = strip_emoji(cmd)
-        new_state = await self.client.db.toggle_command(ctx.guild, command)
+        new_state = await self.enabled_commands_repo.toggle_command(ctx.guild, command)
         await ctx.respond(
             f"Command `{'🟢' if new_state else '🔴'} {command}` has been {'enabled' if new_state else 'disabled'}",
             ephemeral=True,
