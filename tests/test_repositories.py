@@ -12,12 +12,10 @@ from config import SERVER_TZ
 from extensions.administration.models import BotStatus
 from extensions.administration.repository import BotStatusRepository
 from extensions.automation.repository import Join2CreateRepository
-from extensions.fun.models import ConfirmationDB, Events
 from extensions.fun.repository import EventRepository
 from extensions.internal.repository import EnabledCommandsRepository
 from extensions.moderation.models import Infractions
 from extensions.moderation.repository import InfractionsRepository, ModmailRepository
-from extensions.stats.models import UserStats
 from extensions.stats.repository import UserStatsRepository
 from utils.enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from utils.orm_database import Base, ORMDataBase, SettingsRepository
@@ -43,9 +41,7 @@ def mock_entity(entity_id: int) -> SimpleNamespace:
 class TestRepositories(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        self.session_maker: async_sessionmaker[AsyncSession] = async_sessionmaker(
-            self.engine, expire_on_commit=False
-        )
+        self.session_maker: async_sessionmaker[AsyncSession] = async_sessionmaker(self.engine, expire_on_commit=False)
         # Ensure all models are discovered and tables created
         ORMDataBase._discover_models(SimpleNamespace(logger=None))  # type: ignore[arg-type]
         async with self.engine.begin() as conn:
@@ -105,9 +101,7 @@ class TestRepositories(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await status_repo.get_bot_status(None))
 
         # Create first status
-        await status_repo.create_bot_status(
-            discord.ActivityType.watching, discord.Status.online, "Dragons Server"
-        )
+        await status_repo.create_bot_status(discord.ActivityType.watching, discord.Status.online, "Dragons Server")
         status_single = await status_repo.get_bot_status(None)
         self.assertIsInstance(status_single, BotStatus)
         self.assertEqual(status_single.activity_name, "Dragons Server")
@@ -141,9 +135,7 @@ class TestRepositories(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(edited_2.activity_name, "Maintenance")
 
         # Create second status -> get_bot_status(None) returns sequence
-        await status_repo.create_bot_status(
-            discord.ActivityType.listening, discord.Status.idle, "Music"
-        )
+        await status_repo.create_bot_status(discord.ActivityType.listening, discord.Status.idle, "Music")
         all_statuses = await status_repo.get_bot_status(None)
         self.assertIsInstance(all_statuses, list)
         self.assertEqual(len(all_statuses), 2)
@@ -316,7 +308,9 @@ class TestRepositories(unittest.IsolatedAsyncioTestCase):
 
         await user_stats_repo.delete_user_stats(user, StatTypeEnum.MessagesSent, guild)  # type: ignore[arg-type]
         self.assertEqual(await user_stats_repo.get_user_stat_total(user, StatTypeEnum.MessagesSent, guild), 0)  # type: ignore[arg-type]
-        self.assertEqual(len(await user_stats_repo.get_user_stat_days(user, StatTypeEnum.MessagesSent, guild, days_back=5)), 0)  # type: ignore[arg-type]
+        self.assertEqual(
+            len(await user_stats_repo.get_user_stat_days(user, StatTypeEnum.MessagesSent, guild, days_back=5)), 0
+        )  # type: ignore[arg-type]
 
     async def test_event_repository(self):
         event_repo = EventRepository(self.session_maker)
@@ -354,9 +348,7 @@ class TestRepositories(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertTrue(
-            await event_repo.update_confirmation(
-                event_id=event_id, guest=guest_2.id, confirmation=False, reminders=[0]
-            )
+            await event_repo.update_confirmation(event_id=event_id, guest=guest_2.id, confirmation=False, reminders=[0])
         )
         # Updating non-existent confirmation returns False
         self.assertFalse(

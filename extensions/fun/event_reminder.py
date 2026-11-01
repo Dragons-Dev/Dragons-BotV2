@@ -171,7 +171,9 @@ class InviteRequestView(discord.ui.View):
                 value=f"📅 **You were invited to {event_obj.name}!** \n on {event_obj.time.date().strftime('%d.%m.%y')} at 🕒{event_obj.time.time().strftime('%H:%M')}.",
             )
             em.set_footer(text="Please confirm your participation 👇.")
-            await self.requester.send(embed=em, view=ParticipationView(self.client, self.event, event_repo=self.event_repo))
+            await self.requester.send(
+                embed=em, view=ParticipationView(self.client, self.event, event_repo=self.event_repo)
+            )
             await interaction.response.send_message("✅ Invitation was send.")
 
         else:
@@ -249,7 +251,9 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                     value=f"📅 **You were invited to {event_obj.name}!** \n on {event_obj.time.date().strftime('%d.%m.%y')} at 🕒{event_obj.time.time().strftime('%H:%M')}.",
                 )
                 em.set_footer(text="Please confirm your participation 👇.")
-                await interaction.user.send(embed=em, view=ParticipationView(self.client, event_obj, event_repo=self.event_repo))
+                await interaction.user.send(
+                    embed=em, view=ParticipationView(self.client, event_obj, event_repo=self.event_repo)
+                )
                 await interaction.respond(
                     f"{interaction.user} was invited to the event.",
                     ephemeral=True,
@@ -266,7 +270,8 @@ class EventRequestInviteModal(discord.ui.DesignerModal):
                 )
                 em.set_footer(text="Please accept or deny 👇.")
                 await host.send(
-                    embed=em, view=InviteRequestView(self.client, event_id, interaction.user, event_repo=self.event_repo)
+                    embed=em,
+                    view=InviteRequestView(self.client, event_id, interaction.user, event_repo=self.event_repo),
                 )
                 await interaction.respond(
                     f"{host} was asked if you can attend.",
@@ -599,7 +604,9 @@ class EventEditModal(discord.ui.DesignerModal):
                         value=f"📅 **The date of Event {updated_event.name}!** \n changed to {updated_event.time.replace(tzinfo=SERVER_TZ).date().strftime('%d.%m.%y')} at 🕒{updated_event.time.replace(tzinfo=SERVER_TZ).time().strftime('%H:%M')}.",
                     )
                     em.set_footer(text="Please confirm your participation again 👇.")
-                    await user_obj.send(embed=em, view=ParticipationView(self.client, self.event, event_repo=self.event_repo))
+                    await user_obj.send(
+                        embed=em, view=ParticipationView(self.client, self.event, event_repo=self.event_repo)
+                    )
                 except discord.Forbidden:
                     pass
 
@@ -684,7 +691,9 @@ class EventReminder(commands.Cog):
     @pycog.subcommand("event")
     @commands.slash_command(name="create", description="Create an event")
     async def create(self, ctx: discord.ApplicationContext):
-        modal = EventCreateModal(ctx.guild, self.client, ctx.author, event_repo=self.event_repo, title="Create an Event")
+        modal = EventCreateModal(
+            ctx.guild, self.client, ctx.author, event_repo=self.event_repo, title="Create an Event"
+        )
         await ctx.response.send_modal(modal)
 
     @commands.Cog.listener("on_start_done")
@@ -714,7 +723,9 @@ class EventReminder(commands.Cog):
         if filtered_events == []:
             await ctx.respond("Sry there are no future events", ephemeral=True, delete_after=5)
             return
-        modal = EventInviteModal(ctx, self.client, filtered_events, event_repo=self.event_repo, title="Invite user to an event")
+        modal = EventInviteModal(
+            ctx, self.client, filtered_events, event_repo=self.event_repo, title="Invite user to an event"
+        )
         await ctx.response.send_modal(modal)
 
     @pycog.subcommand("event")
@@ -765,7 +776,11 @@ class EventReminder(commands.Cog):
             )
             return
         modal = EventEditModal(
-            client=self.client, ctx=ctx, event=selected_event, event_repo=self.event_repo, title=f"Edit {selected_event.name}"
+            client=self.client,
+            ctx=ctx,
+            event=selected_event,
+            event_repo=self.event_repo,
+            title=f"Edit {selected_event.name}",
         )
         await ctx.interaction.response.send_modal(modal)
 
@@ -792,7 +807,11 @@ class EventReminder(commands.Cog):
             )
             return
         modal = EventDeleteModal(
-            client=self.client, ctx=ctx, event=selected_event, event_repo=self.event_repo, title=f"Delete {selected_event.name}"
+            client=self.client,
+            ctx=ctx,
+            event=selected_event,
+            event_repo=self.event_repo,
+            title=f"Delete {selected_event.name}",
         )
         await ctx.interaction.response.send_modal(modal)
 

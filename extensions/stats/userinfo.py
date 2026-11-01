@@ -125,7 +125,9 @@ class UserInfo(commands.Cog):
             if infractions:
                 container.add_section(
                     discord.ui.TextDisplay(content="See all infractions for this user"),
-                    accessory=InfractionButton(client=self.client, target=target, infractions_repo=self.infractions_repo),
+                    accessory=InfractionButton(
+                        client=self.client, target=target, infractions_repo=self.infractions_repo
+                    ),
                 )
         container.add_text(
             f"User: {member.mention}\n"

@@ -42,7 +42,9 @@ class EndModmailView(discord.ui.View):
 
 class GuildSelectDropdown(discord.ui.Select):
     # select to show mutual guilds of the bot and the author
-    def __init__(self, client_: Bot, author: discord.User, anonymous: bool, modmail_repo: ModmailRepository | None = None):
+    def __init__(
+        self, client_: Bot, author: discord.User, anonymous: bool, modmail_repo: ModmailRepository | None = None
+    ):
         self.client = client_
         self.modmail_repo = modmail_repo or ModmailRepository(client_.db.session_maker)
         self.author = author
@@ -78,7 +80,9 @@ class GuildSelectDropdown(discord.ui.Select):
 
 class GuildSelectView(discord.ui.View):
     # View class to display the advanced Select `GuildSelectDropdown`
-    def __init__(self, client: Bot, author: discord.User, anonymous: bool, modmail_repo: ModmailRepository | None = None):
+    def __init__(
+        self, client: Bot, author: discord.User, anonymous: bool, modmail_repo: ModmailRepository | None = None
+    ):
         super().__init__(timeout=30, disable_on_timeout=True)
         self.add_item(GuildSelectDropdown(client, author, anonymous, modmail_repo))
 

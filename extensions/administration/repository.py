@@ -17,9 +17,7 @@ class BotStatusRepository(BaseRepository):
         self, activity_type: discord.ActivityType, status: discord.Status, activity_name: str
     ) -> None:
         async with self.session() as session:
-            session.add(
-                BotStatus(activity_type=int(activity_type), status=str(status), activity_name=activity_name)
-            )
+            session.add(BotStatus(activity_type=int(activity_type), status=str(status), activity_name=activity_name))
 
     async def edit_bot_status(
         self,

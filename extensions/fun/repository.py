@@ -196,9 +196,7 @@ class EventRepository(BaseRepository):
             session.add(Events(id=str(event_id), host=int(host), name=str(name), time=time, mode=mode))
             await session.flush()
             for invite in invites:
-                session.add(
-                    ConfirmationDB(event_id=event_id, user_id=invite.id, confirmation=None, reminders="0")
-                )
+                session.add(ConfirmationDB(event_id=event_id, user_id=invite.id, confirmation=None, reminders="0"))
         self._log_info(f"Event created {event_id}")
         return event_id
 
