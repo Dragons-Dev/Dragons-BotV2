@@ -23,7 +23,7 @@ bot = Bot(
     intents=discord.Intents.all(),
     activity=discord.CustomActivity(name="Booting...", state="Booting..."),
     status=discord.Status.dnd,
-    version=VersionInfo(2, 2, 0, ""),
+    version=VersionInfo(3, 0, 1, ""),
 )
 
 
