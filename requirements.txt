@@ -1,5 +1,5 @@
 aiocache~=0.12.3
-aiohttp~=3.14.3
+aiohttp~=3.14.5
 aiosqlite==0.22.1
 beautifulsoup4~=4.13.5
 better-ipc~=2.0.3
