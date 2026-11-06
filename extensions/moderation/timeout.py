@@ -1,21 +1,35 @@
 # type: ignore
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import discord
 from discord.ext import commands
-from discord.utils import format_dt, get_or_fetch
 import pycord.multicog as pycog
 
-from utils import Bot, ButtonInfo, CustomLogger, InfractionsEnum, SettingsEnum, is_team
+from utils import Bot, CustomLogger, InfractionsEnum, is_team
 
-from .repository import InfractionsRepository
+
+_DURATION_PARSERS = {
+    "s": lambda v: timedelta(seconds=v),
+    "m": lambda v: timedelta(minutes=v),
+    "h": lambda v: timedelta(hours=v),
+    "d": lambda v: timedelta(days=v),
+    "w": lambda v: timedelta(days=27, hours=23, minutes=59) if v == 4 else timedelta(weeks=v),
+}
+
+
+def _parse_duration(length: str, logger: CustomLogger) -> timedelta:
+    if length and length[:-1].isdigit():
+        parser = _DURATION_PARSERS.get(length[-1])
+        if parser is not None:
+            return parser(int(length[:-1]))
+    logger.critical(f"Invalid duration provided: {length}")
+    return timedelta(seconds=1)
 
 
 class Timeout(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
 
     @pycog.subcommand("mod")
     @commands.slash_command(name="timeout", description="Timeouts a given member for a given time")
@@ -26,7 +40,7 @@ class Timeout(commands.Cog):
         self,
         ctx: discord.ApplicationContext,
         member: discord.Member,
-        length: discord.Option(  # type: ignore
+        length: discord.Option(
             name="timeout_time",
             description="For how long the timeout will be",
             input_type=str,
@@ -56,58 +70,18 @@ class Timeout(commands.Cog):
                 "I can't timeout that member since his top role is higher or even to mine", ephemeral=True
             )
         try:
-            if length[-1] == "s":
-                length = int(length[:-1])
-                until = timedelta(seconds=length)
-            elif length[-1] == "m":
-                length = int(length[:-1])
-                until = timedelta(minutes=length)
-            elif length[-1] == "h":
-                length = int(length[:-1])
-                until = timedelta(hours=length)
-            elif length[-1] == "d":
-                length = int(length[:-1])
-                until = timedelta(days=length)
-            elif length[-1] == "w":
-                length = int(length[:-1])
-                until = timedelta(weeks=length)
-                if length == 4:
-                    until = timedelta(days=27, hours=23, minutes=59)
-            else:
-                until = timedelta(seconds=1)
-                self.logger.critical(f"Invalid duration provided: {length}")
-            await member.timeout_for(duration=until, reason=reason)
-            case = await self.infractions_repo.create_infraction(
-                user=member, infraction=InfractionsEnum.Timeout, reason=reason, guild=ctx.guild
+            until = _parse_duration(length, self.logger)
+            self.client.dispatch(
+                "moderation_action",
+                InfractionsEnum.Timeout,
+                member,
+                ctx.guild,
+                reason,
+                ctx.author,
+                ctx=ctx,
+                duration=until,
             )
-            em = discord.Embed(title="Timeout successful", color=discord.Color.brand_green())
-            em.add_field(name="User", value=member.mention, inline=False)
-            em.add_field(name="Moderator", value=ctx.author.mention, inline=False)
-            em.add_field(name="Until", value=format_dt((datetime.now() + until), "R"), inline=False)
-            em.add_field(name="Reason", value=reason, inline=False)
-            em.add_field(name="Date", value=format_dt(datetime.now(), "F"), inline=False)
-            em.set_footer(text=f"Case ID: {case}")
-            await ctx.response.send_message(
-                embed=em,
-                view=ButtonInfo("A copy of this was sent to the timeouted member and the log channel!"),
-                ephemeral=True,
-            )
-            member_em = em.copy()
-            member_em.title = "Timeout"
-            member_em.colour = discord.Color.yellow()
-            try:
-                await member.send(
-                    embed=member_em,
-                    view=ButtonInfo("A copy of this was sent to the log channel and was stored in the database!"),
-                )
-            except discord.HTTPException or discord.Forbidden:
-                pass
-            setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
-            if setting:
-                log_channel: discord.TextChannel = await get_or_fetch(ctx.guild, "channel", setting.value, default=None)
-                if log_channel:
-                    await log_channel.send(embed=member_em)
-        except discord.Forbidden or discord.HTTPException as e:
+        except (discord.Forbidden, discord.HTTPException) as e:
             raise e
 
 
