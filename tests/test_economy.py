@@ -337,7 +337,7 @@ class TestEconomyCogVoiceTime(unittest.IsolatedAsyncioTestCase):
         # 1. Join voice
         before = MagicMock(channel=None, self_deaf=False, deaf=False)
         after = MagicMock(channel=channel, self_deaf=False, deaf=False)
-        with patch("time.time", return_value=1000.0):
+        with patch("time.monotonic", return_value=1000.0):
             await self.cog.on_voice_state_update(member, before, after)
             self.assertIn((100, 1), self.cog._voice_cache)
             self.assertEqual(self.cog._voice_cache[(100, 1)], 1000.0)
@@ -345,7 +345,7 @@ class TestEconomyCogVoiceTime(unittest.IsolatedAsyncioTestCase):
         # 2. Leave voice after 1 hour (3600 seconds)
         before_leave = MagicMock(channel=channel, self_deaf=False, deaf=False)
         after_leave = MagicMock(channel=None, self_deaf=False, deaf=False)
-        with patch("time.time", return_value=4600.0):
+        with patch("time.monotonic", return_value=4600.0):
             await self.cog.on_voice_state_update(member, before_leave, after_leave)
             self.assertNotIn((100, 1), self.cog._voice_cache)
             self.mock_repo.add_balance.assert_called_once_with(1, 100, 5)
@@ -361,7 +361,7 @@ class TestEconomyCogVoiceTime(unittest.IsolatedAsyncioTestCase):
         # Deafen after 2 hours (7200 seconds)
         before = MagicMock(channel=channel, self_deaf=False, deaf=False)
         after = MagicMock(channel=channel, self_deaf=True, deaf=False)
-        with patch("time.time", return_value=8200.0):
+        with patch("time.monotonic", return_value=8200.0):
             await self.cog.on_voice_state_update(member, before, after)
             self.assertNotIn((100, 1), self.cog._voice_cache)
             self.mock_repo.add_balance.assert_called_once_with(1, 100, 10)
@@ -370,7 +370,7 @@ class TestEconomyCogVoiceTime(unittest.IsolatedAsyncioTestCase):
         self.mock_repo.add_balance.reset_mock()
         before_und = MagicMock(channel=channel, self_deaf=True, deaf=False)
         after_und = MagicMock(channel=channel, self_deaf=False, deaf=False)
-        with patch("time.time", return_value=9000.0):
+        with patch("time.monotonic", return_value=9000.0):
             await self.cog.on_voice_state_update(member, before_und, after_und)
             self.assertIn((100, 1), self.cog._voice_cache)
             self.assertEqual(self.cog._voice_cache[(100, 1)], 9000.0)
@@ -385,7 +385,7 @@ class TestEconomyCogVoiceTime(unittest.IsolatedAsyncioTestCase):
         before = MagicMock(channel=channel1, self_deaf=False, deaf=False)
         after = MagicMock(channel=channel2, self_deaf=False, deaf=False)
 
-        with patch("time.time", return_value=2000.0):
+        with patch("time.monotonic", return_value=2000.0):
             await self.cog.on_voice_state_update(member, before, after)
             self.mock_repo.add_balance.assert_not_called()
             self.assertEqual(self.cog._voice_cache[(100, 1)], 1000.0)
@@ -401,10 +401,27 @@ class TestEconomyCogVoiceTime(unittest.IsolatedAsyncioTestCase):
         before = MagicMock(channel=normal_channel, self_deaf=False, deaf=False)
         after = MagicMock(channel=afk_channel, self_deaf=False, deaf=False)
 
-        with patch("time.time", return_value=4600.0):
+        with patch("time.monotonic", return_value=4600.0):
             await self.cog.on_voice_state_update(member, before, after)
             self.assertNotIn((100, 1), self.cog._voice_cache)
             self.mock_repo.add_balance.assert_called_once_with(1, 100, 5)
+
+    async def test_on_voice_state_update_leaves_cache_on_add_balance_failure(self):
+        guild = MagicMock(id=100, afk_channel=None)
+        channel = MagicMock(id=10, guild=guild)
+        member = MagicMock(bot=False, id=1, guild=guild)
+
+        self.cog._voice_cache[(100, 1)] = 1000.0
+        self.mock_repo.add_balance = AsyncMock(side_effect=RuntimeError("Database failure"))
+
+        before_leave = MagicMock(channel=channel, self_deaf=False, deaf=False)
+        after_leave = MagicMock(channel=None, self_deaf=False, deaf=False)
+        with patch("time.monotonic", return_value=4600.0):
+            with self.assertRaises(RuntimeError):
+                await self.cog.on_voice_state_update(member, before_leave, after_leave)
+
+        self.assertIn((100, 1), self.cog._voice_cache)
+        self.assertEqual(self.cog._voice_cache[(100, 1)], 1000.0)
 
 
 class TestEconomyCogSlashCommands(unittest.IsolatedAsyncioTestCase):
