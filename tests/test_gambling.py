@@ -188,6 +188,19 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         # Cannot resolve again
         self.assertIsNone(await self.repo.resolve_bet_pool(pool.id, 10, "A"))
 
+    async def test_resolve_bet_pool_integer_division_precision(self):
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", "Option A", "Option B")
+        # Test large numbers with integer floor division: (wager.amount * total_pool) // winning_side_total
+        await self.economy_repo.set_balance(1, 10, 10_000_000_000)
+        await self.economy_repo.set_balance(2, 10, 20_000_000_000)
+
+        await self.repo.place_wager(pool.id, 1, 10, "A", 10_000_000_000)
+        await self.repo.place_wager(pool.id, 2, 10, "B", 20_000_000_000)
+
+        payouts = await self.repo.resolve_bet_pool(pool.id, 10, "A")
+        self.assertEqual(payouts, {1: 30_000_000_000})
+        self.assertEqual(await self.economy_repo.get_balance(1, 10), 30_000_000_000)
+
     async def test_resolve_bet_pool_zero_winners_refunds(self):
         pool = await self.repo.create_bet_pool(10, 100, "Bet", "Option A", "Option B")
         # User 1 bets 100 on A
@@ -424,6 +437,27 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
         ctx.response.send_message.assert_called_once()
         self.assertIn("cannot be empty", ctx.response.send_message.call_args[0][0])
 
+    async def test_bet_create_title_too_long(self):
+        ctx = self._make_ctx()
+        await self.cog.bet_create(ctx, title="A" * 201, option_a="Yes", option_b="No")
+        ctx.response.send_message.assert_called_once()
+        self.assertIn("cannot exceed 200 characters", ctx.response.send_message.call_args[0][0])
+        self.assertTrue(ctx.response.send_message.call_args[1].get("ephemeral"))
+
+    async def test_bet_create_option_a_too_long(self):
+        ctx = self._make_ctx()
+        await self.cog.bet_create(ctx, title="Valid Title", option_a="A" * 101, option_b="No")
+        ctx.response.send_message.assert_called_once()
+        self.assertIn("cannot exceed 100 characters", ctx.response.send_message.call_args[0][0])
+        self.assertTrue(ctx.response.send_message.call_args[1].get("ephemeral"))
+
+    async def test_bet_create_option_b_too_long(self):
+        ctx = self._make_ctx()
+        await self.cog.bet_create(ctx, title="Valid Title", option_a="Yes", option_b="B" * 101)
+        ctx.response.send_message.assert_called_once()
+        self.assertIn("cannot exceed 100 characters", ctx.response.send_message.call_args[0][0])
+        self.assertTrue(ctx.response.send_message.call_args[1].get("ephemeral"))
+
     async def test_bet_create_success(self):
         ctx = self._make_ctx(user_id=100, guild_id=10)
         created_pool = BetPool(
@@ -526,6 +560,28 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
         embed = ctx.response.send_message.call_args[1]["embed"]
         self.assertEqual(embed.title, "Active Prediction Bet Pools")
         self.assertEqual(len(embed.fields), 1)
+
+    async def test_bet_list_truncates_at_10_pools(self):
+        ctx = self._make_ctx()
+        pools = [
+            BetPool(
+                id=i,
+                guild_id=10,
+                creator_id=100,
+                title=f"Match {i}",
+                option_a=f"A{i}",
+                option_b=f"B{i}",
+                is_open=True,
+            )
+            for i in range(1, 13)
+        ]
+        self.mock_gambling_repo.get_open_bet_pools = AsyncMock(return_value=pools)
+        self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[])
+
+        await self.cog.bet_list(ctx)
+        embed = ctx.response.send_message.call_args[1]["embed"]
+        self.assertEqual(len(embed.fields), 10)
+        self.assertIn("Showing 10 of 12", embed.footer.text)
 
     async def test_bet_resolve_unauthorized_user(self):
         ctx = self._make_ctx(user_id=999, is_admin=False, roles=[])

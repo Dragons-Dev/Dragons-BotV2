@@ -8,7 +8,7 @@ from pycord import multicog as pycog
 from utils import Bot, CustomLogger
 from utils.enums import SettingsEnum
 
-from .models import BetPool, format_scales
+from .models import BetPool, format_scales, get_guild_id
 from .repository import EconomyRepository, GamblingRepository
 
 __all__ = ["Gambling", "setup"]
@@ -43,9 +43,10 @@ class Gambling(commands.Cog):
         if amount <= 0:
             await ctx.response.send_message("The bet amount must be greater than 0.", ephemeral=True)
             return False
-        success = await self.economy_repo.remove_balance(ctx.author.id, ctx.guild.id, amount)
+        guild_id = get_guild_id(ctx)
+        success = await self.economy_repo.remove_balance(ctx.author.id, guild_id, amount)
         if not success:
-            bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)
+            bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             await ctx.response.send_message(
                 f"You do not have enough Dragon Scales. Current balance: {format_scales(bal, ctx.guild)}.",
                 ephemeral=True,
@@ -66,12 +67,13 @@ class Gambling(commands.Cog):
         if not await self._deduct_or_notify(ctx, amount):
             return
 
+        guild_id = get_guild_id(ctx)
         flip = random.choice(["heads", "tails"])
         won = choice.lower() == flip
         if won:
             payout = amount * 2
-            await self.economy_repo.add_balance(ctx.author.id, ctx.guild.id, payout)
-            new_bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)
+            await self.economy_repo.add_balance(ctx.author.id, guild_id, payout)
+            new_bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             embed = discord.Embed(
                 title="🪙 Coinflip — Winner!",
                 description=(
@@ -82,7 +84,7 @@ class Gambling(commands.Cog):
                 color=discord.Color.green(),
             )
         else:
-            new_bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)
+            new_bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             embed = discord.Embed(
                 title="🪙 Coinflip — Lost",
                 description=(
@@ -111,12 +113,13 @@ class Gambling(commands.Cog):
         if not await self._deduct_or_notify(ctx, amount):
             return
 
+        guild_id = get_guild_id(ctx)
         roll = random.randint(1, 6)
         won = guess == roll
         if won:
             payout = amount * 6
-            await self.economy_repo.add_balance(ctx.author.id, ctx.guild.id, payout)
-            new_bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)
+            await self.economy_repo.add_balance(ctx.author.id, guild_id, payout)
+            new_bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             embed = discord.Embed(
                 title="🎲 Dice Roll — Winner!",
                 description=(
@@ -127,7 +130,7 @@ class Gambling(commands.Cog):
                 color=discord.Color.green(),
             )
         else:
-            new_bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)
+            new_bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             embed = discord.Embed(
                 title="🎲 Dice Roll — Lost",
                 description=(
@@ -150,14 +153,15 @@ class Gambling(commands.Cog):
         if not await self._deduct_or_notify(ctx, amount):
             return
 
+        guild_id = get_guild_id(ctx)
         symbols = random.choices(SLOT_SYMBOLS, k=3)
         multiplier = _calculate_slot_multiplier(symbols)
         slot_display = f"[ {' | '.join(symbols)} ]"
 
         if multiplier > 0:
             payout = amount * multiplier
-            await self.economy_repo.add_balance(ctx.author.id, ctx.guild.id, payout)
-            new_bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)
+            await self.economy_repo.add_balance(ctx.author.id, guild_id, payout)
+            new_bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             embed = discord.Embed(
                 title="🎰 Slots — Winner!",
                 description=(
@@ -169,7 +173,7 @@ class Gambling(commands.Cog):
                 color=discord.Color.green(),
             )
         else:
-            new_bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)
+            new_bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             embed = discord.Embed(
                 title="🎰 Slots — Lost",
                 description=(
@@ -201,7 +205,16 @@ class Gambling(commands.Cog):
             await ctx.response.send_message("Title and options cannot be empty.", ephemeral=True)
             return
 
-        pool = await self.gambling_repo.create_bet_pool(ctx.guild.id, ctx.author.id, clean_title, clean_a, clean_b)
+        if len(clean_title) > 200:
+            await ctx.response.send_message("Bet title cannot exceed 200 characters.", ephemeral=True)
+            return
+
+        if len(clean_a) > 100 or len(clean_b) > 100:
+            await ctx.response.send_message("Bet options cannot exceed 100 characters each.", ephemeral=True)
+            return
+
+        guild_id = get_guild_id(ctx)
+        pool = await self.gambling_repo.create_bet_pool(guild_id, ctx.author.id, clean_title, clean_a, clean_b)
         embed = discord.Embed(
             title=f"🎲 Bet Pool #{pool.id}: {pool.title}",
             color=discord.Color.gold(),
@@ -219,7 +232,8 @@ class Gambling(commands.Cog):
         choice: str,
         amount: int,
     ) -> None:
-        wagers = await self.gambling_repo.get_pool_wagers(bet_id, ctx.guild.id)
+        guild_id = get_guild_id(ctx)
+        wagers = await self.gambling_repo.get_pool_wagers(bet_id, guild_id)
         user_wagers = [w for w in wagers if w.user_id == ctx.author.id]
         if any(w.choice != choice for w in user_wagers):
             await ctx.response.send_message(
@@ -228,7 +242,7 @@ class Gambling(commands.Cog):
             )
             return
 
-        bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)
+        bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
         if bal < amount:
             await ctx.response.send_message(
                 f"You do not have enough Dragon Scales. Current balance: {format_scales(bal, ctx.guild)}.",
@@ -258,7 +272,8 @@ class Gambling(commands.Cog):
             await ctx.response.send_message("The wager amount must be greater than 0.", ephemeral=True)
             return
 
-        pool = await self.gambling_repo.get_bet_pool(bet_id, ctx.guild.id)
+        guild_id = get_guild_id(ctx)
+        pool = await self.gambling_repo.get_bet_pool(bet_id, guild_id)
         if pool is None:
             await ctx.response.send_message(f"Bet pool #{bet_id} does not exist.", ephemeral=True)
             return
@@ -266,7 +281,7 @@ class Gambling(commands.Cog):
             await ctx.response.send_message(f"Bet pool #{bet_id} is already closed.", ephemeral=True)
             return
 
-        success = await self.gambling_repo.place_wager(bet_id, ctx.author.id, ctx.guild.id, normalized_choice, amount)
+        success = await self.gambling_repo.place_wager(bet_id, ctx.author.id, guild_id, normalized_choice, amount)
         if not success:
             await self._handle_bet_place_failure(ctx, bet_id, normalized_choice, amount)
             return
@@ -285,7 +300,8 @@ class Gambling(commands.Cog):
     @pycog.subcommand("gamble")
     @commands.slash_command(name="bet_list", description="List all open prediction bet pools.")
     async def bet_list(self, ctx: discord.ApplicationContext) -> None:
-        pools = await self.gambling_repo.get_open_bet_pools(ctx.guild.id)
+        guild_id = get_guild_id(ctx)
+        pools = await self.gambling_repo.get_open_bet_pools(guild_id)
         if not pools:
             await ctx.response.send_message("There are currently no open bet pools in this server.")
             return
@@ -294,8 +310,8 @@ class Gambling(commands.Cog):
             title="Active Prediction Bet Pools",
             color=discord.Color.gold(),
         )
-        for pool in pools:
-            wagers = await self.gambling_repo.get_pool_wagers(pool.id, ctx.guild.id)
+        for pool in pools[:10]:
+            wagers = await self.gambling_repo.get_pool_wagers(pool.id, guild_id)
             total_a = sum(w.amount for w in wagers if w.choice == "A")
             total_b = sum(w.amount for w in wagers if w.choice == "B")
             embed.add_field(
@@ -307,6 +323,8 @@ class Gambling(commands.Cog):
                 ),
                 inline=False,
             )
+        if len(pools) > 10:
+            embed.set_footer(text=f"Showing 10 of {len(pools)} open bet pools.")
         await ctx.response.send_message(embed=embed)
 
     async def _is_authorized_resolver(self, ctx: discord.ApplicationContext, creator_id: int) -> bool:
@@ -327,7 +345,8 @@ class Gambling(commands.Cog):
         return False
 
     async def _handle_bet_cancel(self, ctx: discord.ApplicationContext, pool: BetPool) -> None:
-        success = await self.gambling_repo.cancel_bet_pool(pool.id, ctx.guild.id)
+        guild_id = get_guild_id(ctx)
+        success = await self.gambling_repo.cancel_bet_pool(pool.id, guild_id)
         if not success:
             await ctx.response.send_message(f"Bet pool #{pool.id} could not be cancelled.", ephemeral=True)
             return
@@ -340,7 +359,8 @@ class Gambling(commands.Cog):
         await ctx.response.send_message(embed=embed)
 
     async def _handle_bet_outcome(self, ctx: discord.ApplicationContext, pool: BetPool, winning_choice: str) -> None:
-        payouts = await self.gambling_repo.resolve_bet_pool(pool.id, ctx.guild.id, winning_choice)
+        guild_id = get_guild_id(ctx)
+        payouts = await self.gambling_repo.resolve_bet_pool(pool.id, guild_id, winning_choice)
         if payouts is None:
             await ctx.response.send_message(f"Bet pool #{pool.id} could not be resolved.", ephemeral=True)
             return
@@ -382,7 +402,8 @@ class Gambling(commands.Cog):
         bet_id: int,
         outcome: Literal["A", "B", "cancel"],
     ) -> None:
-        pool = await self.gambling_repo.get_bet_pool(bet_id, ctx.guild.id)
+        guild_id = get_guild_id(ctx)
+        pool = await self.gambling_repo.get_bet_pool(bet_id, guild_id)
         if pool is None:
             await ctx.response.send_message(f"Bet pool #{bet_id} does not exist.", ephemeral=True)
             return

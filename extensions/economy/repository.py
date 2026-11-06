@@ -239,7 +239,7 @@ class GamblingRepository(BaseRepository):
         """Distribute proportional payouts to winning wagers."""
         payouts: dict[int, int] = {}
         for wager in winning_wagers:
-            payout = int(wager.amount * total_pool / winning_side_total)
+            payout = (wager.amount * total_pool) // winning_side_total
             if payout > 0:
                 await self._credit_wallet(session, wager.user_id, guild_id, payout)
                 payouts[wager.user_id] = payouts.get(wager.user_id, 0) + payout

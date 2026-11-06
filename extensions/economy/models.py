@@ -4,7 +4,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from utils.orm_database.models import Base
 
-__all__ = ["BetPool", "BetWager", "EconomyWallet", "format_scales"]
+__all__ = ["BetPool", "BetWager", "EconomyWallet", "format_scales", "get_guild_id"]
+
+
+def get_guild_id(ctx: discord.ApplicationContext) -> int:
+    guild = ctx.guild
+    if guild is None:
+        return 0
+    return guild.id
 
 
 def format_scales(amount: int, guild: discord.Guild | None = None) -> str:
