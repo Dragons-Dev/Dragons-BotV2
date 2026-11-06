@@ -3,11 +3,12 @@ import unittest
 
 import discord
 
-from extensions.automation.join2create import (
+from extensions.automation.join2create import (  # type: ignore[attr-defined]
     BanRole,
     BanUser,
     Join2Create,
     build_join2create_overwrites,
+    create_overwrite_from_select,
     reset_permission,
     transfer_ownership,
 )
@@ -115,7 +116,7 @@ class TestJoin2Create(unittest.IsolatedAsyncioTestCase):
 
     async def test_build_overwrites_without_team_role_setting(self):
         self.bot.db.get_setting = AsyncMock(return_value=None)
-        derived_overwrites = {}
+        derived_overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite] = {}
 
         overwrites = await build_join2create_overwrites(
             derived_overwrites=derived_overwrites,
@@ -134,8 +135,9 @@ class TestJoin2Create(unittest.IsolatedAsyncioTestCase):
         self.guild.get_role.return_value = None
         self.guild.get_or_fetch = AsyncMock(return_value=None)
 
+        empty_derived_overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite] = {}
         overwrites = await build_join2create_overwrites(
-            derived_overwrites={},
+            derived_overwrites=empty_derived_overwrites,
             guild=self.guild,
             owner=self.owner,
             bot=self.bot,
@@ -260,6 +262,122 @@ class TestJoin2Create(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(reset_ow)
             self.assertTrue(reset_ow.speak)
             self.assertIsNone(reset_ow.move_members)
+
+    async def test_transfer_ownership_permission_grant_failure_aborts(self):
+        interaction = MagicMock(spec=discord.Interaction)
+        interaction.client = self.bot
+        interaction.user = self.regular_user
+        interaction.respond = AsyncMock()
+
+        channel = MagicMock(spec=discord.VoiceChannel)
+        channel.guild = self.guild
+        channel.members = [self.regular_user]
+        channel.overwrites = {}
+        channel.set_permissions = AsyncMock(side_effect=discord.Forbidden(MagicMock(status=403), "Missing Permissions"))
+
+        temp_voice = Join2CreateModel(channel=channel.id, owner_id=self.owner.id, derived_channel=100)
+
+        with patch("extensions.automation.join2create.Join2CreateRepository") as mock_repo_class:
+            mock_repo = MagicMock()
+            mock_repo.update = AsyncMock()
+            mock_repo_class.return_value = mock_repo
+
+            await transfer_ownership(interaction, channel, temp_voice)
+
+            # DB must NOT be updated when permission grant fails
+            mock_repo.update.assert_not_called()
+            interaction.respond.assert_awaited_once_with(
+                "Failed to update channel permissions. Ownership was not transferred.", ephemeral=True
+            )
+
+    async def test_transfer_ownership_previous_owner_not_in_guild(self):
+        interaction = MagicMock(spec=discord.Interaction)
+        interaction.client = self.bot
+        interaction.user = self.regular_user
+        interaction.respond = AsyncMock()
+        interaction.message = MagicMock()
+        interaction.message.edit = AsyncMock()
+
+        channel = MagicMock(spec=discord.VoiceChannel)
+        channel.guild = self.guild
+        channel.members = [self.regular_user]
+        channel.overwrites = {}
+        channel.set_permissions = AsyncMock()
+
+        # Old owner is not found in cache and fetch fails
+        self.guild.get_member.side_effect = lambda uid: self.regular_user if uid == self.regular_user.id else None
+        self.guild.fetch_member = AsyncMock(side_effect=discord.NotFound(MagicMock(status=404), "User not found"))
+
+        temp_voice = Join2CreateModel(channel=channel.id, owner_id=self.owner.id, derived_channel=100)
+
+        with patch("extensions.automation.join2create.Join2CreateRepository") as mock_repo_class:
+            mock_repo = MagicMock()
+            mock_repo.update = AsyncMock()
+            mock_repo_class.return_value = mock_repo
+
+            await transfer_ownership(interaction, channel, temp_voice)
+
+            mock_repo.update.assert_awaited_once_with(channel, self.regular_user)
+            # Only 1 set_permissions call because previous owner could not be resolved to a Member
+            self.assertEqual(channel.set_permissions.call_count, 1)
+            first_call = channel.set_permissions.call_args_list[0]
+            self.assertEqual(first_call[0][0], self.regular_user)
+
+    async def test_unban_role_preserves_team_role_overwrite(self):
+        channel = MagicMock(spec=discord.VoiceChannel)
+        channel.guild = self.guild
+        channel.overwrites = {self.team_role: discord.PermissionOverwrite(move_members=False)}
+
+        team_setting = Settings(guild=self.guild.id, setting=SettingsEnum.TeamRole, value=self.team_role.id)
+        self.bot.db.get_setting = AsyncMock(return_value=team_setting)
+
+        with patch("extensions.automation.join2create.Join2CreateRepository") as mock_repo_class:
+            mock_repo = MagicMock()
+            mock_repo.get = AsyncMock(return_value=None)
+            mock_repo_class.return_value = mock_repo
+
+            res = await create_overwrite_from_select(
+                channel=channel,
+                overwrite_items=[self.team_role],
+                banning=False,
+                bot=self.bot,
+            )
+
+            # Team role must NOT be popped; it must be preserved with J2C permissions
+            self.assertIn(self.team_role, res)
+            self.assertTrue(res[self.team_role].view_channel)
+            self.assertTrue(res[self.team_role].connect)
+            self.assertTrue(res[self.team_role].move_members)
+
+    async def test_unban_role_preserves_team_role_overwrite_with_derived_permissions(self):
+        channel = MagicMock(spec=discord.VoiceChannel)
+        channel.guild = self.guild
+        channel.overwrites = {}
+
+        derived_channel = MagicMock(spec=discord.VoiceChannel)
+        derived_channel.overwrites = {self.team_role: discord.PermissionOverwrite(send_messages=True)}
+        self.bot.get_or_fetch = AsyncMock(return_value=derived_channel)
+
+        team_setting = Settings(guild=self.guild.id, setting=SettingsEnum.TeamRole, value=self.team_role.id)
+        self.bot.db.get_setting = AsyncMock(return_value=team_setting)
+
+        current_j2c = Join2CreateModel(channel=channel.id, owner_id=self.owner.id, derived_channel=100)
+
+        with patch("extensions.automation.join2create.Join2CreateRepository") as mock_repo_class:
+            mock_repo = MagicMock()
+            mock_repo.get = AsyncMock(return_value=current_j2c)
+            mock_repo_class.return_value = mock_repo
+
+            res = await create_overwrite_from_select(
+                channel=channel,
+                overwrite_items=[self.team_role],
+                banning=False,
+                bot=self.bot,
+            )
+
+            self.assertIn(self.team_role, res)
+            self.assertTrue(res[self.team_role].send_messages)
+            self.assertTrue(res[self.team_role].move_members)
 
     async def test_ban_role_filters_team_role(self):
         modal = BanRole()
