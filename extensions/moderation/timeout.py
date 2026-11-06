@@ -69,20 +69,17 @@ class Timeout(commands.Cog):
             return await ctx.response.send_message(
                 "I can't timeout that member since his top role is higher or even to mine", ephemeral=True
             )
-        try:
-            until = _parse_duration(length, self.logger)
-            self.client.dispatch(
-                "moderation_action",
-                InfractionsEnum.Timeout,
-                member,
-                ctx.guild,
-                reason,
-                ctx.author,
-                ctx=ctx,
-                duration=until,
-            )
-        except (discord.Forbidden, discord.HTTPException) as e:
-            raise e
+        until = _parse_duration(length, self.logger)
+        self.client.dispatch(
+            "moderation_action",
+            InfractionsEnum.Timeout,
+            member,
+            ctx.guild,
+            reason,
+            ctx.author,
+            ctx=ctx,
+            duration=until,
+        )
 
 
 def setup(client):

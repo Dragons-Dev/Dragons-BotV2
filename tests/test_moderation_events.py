@@ -144,6 +144,93 @@ class TestModerationEvents(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(mod_embed)
         self.assertEqual(mod_embed.title, "Ban successful")
         self.assertEqual(mod_embed.color, discord.Color.brand_green())
+        mod_view = mod_call_kwargs.get("view")
+        self.assertIsNotNone(mod_view)
+        # Verify past-tense mapping: "banned" instead of "baned"
+        self.assertIn("banned", mod_view.children[0].label)
+
+    async def test_on_moderation_action_order_dm_before_ban_and_kick(self):
+        call_order = []
+
+        async def mock_send(*args, **kwargs):
+            call_order.append("send")
+
+        async def mock_ban(*args, **kwargs):
+            call_order.append("ban")
+
+        async def mock_kick(*args, **kwargs):
+            call_order.append("kick")
+
+        self.member.send.side_effect = mock_send
+        self.guild.ban.side_effect = mock_ban
+        self.member.kick.side_effect = mock_kick
+
+        # Verify Ban order: DM must happen BEFORE guild.ban
+        call_order.clear()
+        await self.cog.on_moderation_action(
+            InfractionsEnum.Ban,
+            self.member,
+            self.guild,
+            "Ban order check",
+            self.moderator,
+        )
+        self.assertEqual(call_order, ["send", "ban"])
+
+        # Verify Kick order: DM must happen BEFORE member.kick
+        call_order.clear()
+        await self.cog.on_moderation_action(
+            InfractionsEnum.Kick,
+            self.member,
+            self.guild,
+            "Kick order check",
+            self.moderator,
+        )
+        self.assertEqual(call_order, ["send", "kick"])
+
+    async def test_on_moderation_action_discord_action_forbidden_handled(self):
+        self.guild.ban.side_effect = discord.Forbidden(MagicMock(), "Missing Permissions")
+        ctx = create_mock_context(self.guild, self.moderator)
+        ctx.response.is_done.return_value = True
+
+        result = await self.cog.on_moderation_action(
+            InfractionsEnum.Ban,
+            self.member,
+            self.guild,
+            "Ban permission failure",
+            self.moderator,
+            ctx=ctx,
+        )
+        self.assertIsNone(result)
+        # ModLogChannel should NOT be sent when discord action fails
+        self.log_channel.send.assert_not_called()
+        # Moderator receives error feedback
+        ctx.followup.send.assert_awaited_once()
+        err_embed = ctx.followup.send.call_args.kwargs.get("embed")
+        self.assertIsNotNone(err_embed)
+        self.assertEqual(err_embed.title, "Failed to ban user")
+        self.assertEqual(err_embed.color, discord.Color.brand_red())
+
+    async def test_on_moderation_action_timeout_forbidden_handled(self):
+        self.member.timeout_for.side_effect = discord.Forbidden(MagicMock(), "Missing Permissions")
+        ctx = create_mock_context(self.guild, self.moderator)
+        ctx.response.is_done.return_value = False
+
+        result = await self.cog.on_moderation_action(
+            InfractionsEnum.Timeout,
+            self.member,
+            self.guild,
+            "Timeout permission failure",
+            self.moderator,
+            duration=timedelta(minutes=5),
+            ctx=ctx,
+        )
+        self.assertIsNone(result)
+        self.log_channel.send.assert_not_called()
+        ctx.response.send_message.assert_awaited_once()
+        err_embed = ctx.response.send_message.call_args.kwargs.get("embed")
+        self.assertIsNotNone(err_embed)
+        self.assertEqual(err_embed.title, "Failed to timeout user")
+        self.assertEqual(err_embed.color, discord.Color.brand_red())
 
     async def test_on_moderation_action_kick_with_channel_sequence(self):
         setting_mock = MagicMock()

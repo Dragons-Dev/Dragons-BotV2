@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+import typing as t
 
 import discord
 from discord.ext import commands
@@ -14,6 +15,13 @@ from utils import (
 )
 
 from .repository import InfractionsRepository
+
+PAST_TENSE_ACTIONS = {
+    InfractionsEnum.Ban: "banned",
+    InfractionsEnum.Kick: "kicked",
+    InfractionsEnum.Timeout: "timeouted",
+    InfractionsEnum.Warn: "warned",
+}
 
 
 class ModerationEvents(commands.Cog):
@@ -34,19 +42,27 @@ class ModerationEvents(commands.Cog):
         guild: discord.Guild,
         reason: str,
         **kwargs,
-    ) -> None:
-        if action == InfractionsEnum.Ban:
-            await guild.ban(member, reason=reason)
-        elif action == InfractionsEnum.Kick:
-            if hasattr(member, "kick"):
-                await member.kick(reason=reason)
-            elif hasattr(guild, "kick"):
-                await guild.kick(member, reason=reason)
-        elif action == InfractionsEnum.Timeout:
-            duration: timedelta = kwargs["duration"]
-            await member.timeout_for(duration=duration, reason=reason)
-        elif action == InfractionsEnum.Warn:
-            pass
+    ) -> bool:
+        try:
+            if action == InfractionsEnum.Ban:
+                await guild.ban(member, reason=reason)
+            elif action == InfractionsEnum.Kick:
+                if hasattr(member, "kick"):
+                    await member.kick(reason=reason)
+                elif hasattr(guild, "kick"):
+                    await guild.kick(member, reason=reason)
+            elif action == InfractionsEnum.Timeout:
+                duration: timedelta = kwargs["duration"]
+                await member.timeout_for(duration=duration, reason=reason)
+            elif action == InfractionsEnum.Warn:
+                pass
+            return True
+        except (discord.Forbidden, discord.HTTPException) as e:
+            self.logger.error(
+                f"Failed to execute {action.value} on {member} in guild {guild.id}: {e}",
+                exc_info=e,
+            )
+            return False
 
     def _build_moderation_embed(
         self,
@@ -118,6 +134,29 @@ class ModerationEvents(commands.Cog):
         if log_channel:
             await log_channel.send(embed=embed)
 
+    async def _send_ctx_response(
+        self,
+        ctx: discord.ApplicationContext,
+        embed: discord.Embed,
+        view: discord.ui.View | None = None,
+        ephemeral: bool = True,
+    ) -> None:
+        is_done = False
+        if hasattr(ctx, "response"):
+            is_done_attr = getattr(ctx.response, "is_done", False)
+            is_done = is_done_attr() if callable(is_done_attr) else bool(is_done_attr)
+
+        send_kwargs: dict[str, t.Any] = {"embed": embed, "ephemeral": ephemeral}
+        if view is not None:
+            send_kwargs["view"] = view
+
+        if is_done and hasattr(ctx, "followup"):
+            await ctx.followup.send(**send_kwargs)
+        elif hasattr(ctx, "response") and hasattr(ctx.response, "send_message"):
+            await ctx.response.send_message(**send_kwargs)
+        elif hasattr(ctx, "send"):
+            await ctx.send(**send_kwargs)
+
     async def _send_moderator_feedback(
         self,
         ctx: discord.ApplicationContext,
@@ -141,25 +180,14 @@ class ModerationEvents(commands.Cog):
         mod_embed.add_field(name="Date", value=format_dt(datetime.now(), "F"), inline=False)
         mod_embed.set_footer(text=f"Case ID: {case_id}")
 
-        target_name = "timeouted" if action == InfractionsEnum.Timeout else f"{action.value.lower()}ed"
+        target_name = PAST_TENSE_ACTIONS.get(action, f"{action.value.lower()}ed")
         view = ButtonInfo(
             kwargs.get(
                 "mod_info_text",
                 f"A copy of this was sent to the {target_name} member and the log channel!",
             )
         )
-
-        is_done = False
-        if hasattr(ctx, "response"):
-            is_done_attr = getattr(ctx.response, "is_done", False)
-            is_done = is_done_attr() if callable(is_done_attr) else bool(is_done_attr)
-
-        if is_done and hasattr(ctx, "followup"):
-            await ctx.followup.send(embed=mod_embed, view=view, ephemeral=True)
-        elif hasattr(ctx, "response") and hasattr(ctx.response, "send_message"):
-            await ctx.response.send_message(embed=mod_embed, view=view, ephemeral=True)
-        elif hasattr(ctx, "send"):
-            await ctx.send(embed=mod_embed, view=view, ephemeral=True)
+        await self._send_ctx_response(ctx, embed=mod_embed, view=view, ephemeral=True)
 
     @commands.Cog.listener("on_moderation_action")
     async def on_moderation_action(
@@ -177,19 +205,29 @@ class ModerationEvents(commands.Cog):
             except ValueError:
                 action = InfractionsEnum[action]
 
-        # 1. Execute Discord Moderation Action
-        await self._execute_discord_action(action, member, guild, reason, **kwargs)
-
-        # 2. Create Database Infraction
+        # 1. Create Database Infraction to obtain case_id
         case_id = await self.infractions_repo.create_infraction(
             user=member, infraction=action, reason=reason, guild=guild
         )
 
-        # 3. Build Standardized Embeds
+        # 2. Build Standardized Embeds
         embed = self._build_moderation_embed(action, member, moderator, reason, case_id, **kwargs)
 
-        # 4. DM the Disciplined User
+        # 3. DM the Disciplined User while still in guild
         await self._send_dm(member, embed, **kwargs)
+
+        # 4. Execute Discord Moderation Action
+        success = await self._execute_discord_action(action, member, guild, reason, **kwargs)
+        if not success:
+            ctx = kwargs.get("ctx")
+            if ctx is not None:
+                err_embed = discord.Embed(
+                    title=f"Failed to {action.value.lower()} user",
+                    description=f"An error occurred while attempting to {action.value.lower()} {member.mention}.",
+                    color=discord.Color.brand_red(),
+                )
+                await self._send_ctx_response(ctx, embed=err_embed, ephemeral=True)
+            return None
 
         # 5. Send to ModLogChannel
         await self._send_mod_log(guild, embed)
