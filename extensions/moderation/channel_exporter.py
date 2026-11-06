@@ -27,13 +27,20 @@ class DatabaseAttachmentHandler(chat_exporter.AttachmentHandler):
         cached_attachments: Sequence[CachedAttachment] | dict[int, CachedAttachment],
     ) -> None:
         if isinstance(cached_attachments, dict):
+            attachments_list = list(cached_attachments.values())
             self.cached_by_id: dict[int, CachedAttachment] = cached_attachments
-            self.cached_by_name: dict[str, CachedAttachment] = {
-                att.filename: att for att in cached_attachments.values()
-            }
         else:
+            attachments_list = list(cached_attachments)
             self.cached_by_id = {att.attachment_id: att for att in cached_attachments}
-            self.cached_by_name = {att.filename: att for att in cached_attachments}
+
+        filename_counts: dict[str, int] = {}
+        filename_map: dict[str, CachedAttachment] = {}
+        for att in attachments_list:
+            filename_counts[att.filename] = filename_counts.get(att.filename, 0) + 1
+            filename_map[att.filename] = att
+        self.cached_by_name: dict[str, CachedAttachment] = {
+            name: att for name, att in filename_map.items() if filename_counts[name] == 1
+        }
 
     async def process_asset(self, attachment: discord.Attachment) -> discord.Attachment:
         cached = self.cached_by_id.get(attachment.id) or self.cached_by_name.get(attachment.filename)
@@ -76,7 +83,7 @@ async def export_and_archive_channel(
         attachment_handler=handler,
     )
 
-    if not transcript_html:
+    if not transcript_html or transcript_html.lstrip().startswith("Whoops! Something went wrong"):
         return None, None
 
     channel_name = getattr(channel, "name", f"channel-{channel.id}")
@@ -180,8 +187,13 @@ class ChannelExporter(commands.Cog):
 
     @pycog.subcommand("mod")
     @is_team()
+    @discord.guild_only()
     @commands.slash_command(name="export", description="Exports a channel to a single html file to archive it.")
     async def export(self, ctx: discord.ApplicationContext) -> None:
+        if ctx.guild is None:
+            await ctx.respond("This command can only be used in a server.", ephemeral=True)
+            return
+
         await ctx.response.defer(ephemeral=True, invisible=False)
         transcript_html, _ = await self.export_and_archive_channel(
             channel=ctx.channel,

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, LargeBinary, String
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from utils.orm_database.models import Base
@@ -63,7 +63,7 @@ class ArchivedTranscript(Base):
     channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     channel_name: Mapped[str] = mapped_column(String, nullable=False)
     exported_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    html_content: Mapped[str] = mapped_column(String, nullable=False)
+    html_content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
     def __repr__(self) -> str:
