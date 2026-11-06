@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from utils.orm_database.repository import BaseRepository
@@ -71,16 +71,18 @@ class EconomyRepository(BaseRepository):
             return False
 
         async with self.session() as session:
-            stmt = select(EconomyWallet).where(
-                EconomyWallet.user_id == user_id,
-                EconomyWallet.guild_id == guild_id,
+            stmt = (
+                update(EconomyWallet)
+                .where(
+                    EconomyWallet.user_id == user_id,
+                    EconomyWallet.guild_id == guild_id,
+                    EconomyWallet.balance >= amount,
+                )
+                .values(balance=EconomyWallet.balance - amount)
             )
-            wallet = (await session.execute(stmt)).scalar_one_or_none()
-            if wallet is None or wallet.balance < amount:
-                return False
-
-            wallet.balance -= amount
-            return True
+            result = await session.execute(stmt)
+            rowcount = getattr(result, "rowcount", 0)
+            return bool(rowcount and rowcount > 0)
 
     async def set_balance(self, user_id: int, guild_id: int, amount: int) -> int:
         """
