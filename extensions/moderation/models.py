@@ -26,13 +26,17 @@ class Infractions(Base):
 
 class Modmail(Base):
     __tablename__ = "modmail"
-    user_id: Mapped[int] = mapped_column(BigInteger)
-    guild_id: Mapped[int] = mapped_column(BigInteger)
     uuid: Mapped[str] = mapped_column(String, primary_key=True)
-    anon: Mapped[bool] = mapped_column(Boolean)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    thread_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, default=None)
+    anon: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    def __repr__(self):
-        return f"<Modmail(user_id={self.user_id}, guild_id={self.guild_id}, uuid={self.uuid}, anon={self.anon})>"
+    def __repr__(self) -> str:
+        return (
+            f"<Modmail(uuid={self.uuid!r}, user_id={self.user_id}, "
+            f"guild_id={self.guild_id}, thread_id={self.thread_id}, anon={self.anon})>"
+        )
 
 
 class CachedAttachment(Base):
