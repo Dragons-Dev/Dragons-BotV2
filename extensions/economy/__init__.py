@@ -1,4 +1,13 @@
-from .models import EconomyWallet, format_scales
-from .repository import EconomyRepository
+from .gambling import Gambling
+from .models import BetPool, BetWager, EconomyWallet, format_scales
+from .repository import EconomyRepository, GamblingRepository
 
-__all__ = ["EconomyWallet", "EconomyRepository", "format_scales"]
+__all__ = [
+    "BetPool",
+    "BetWager",
+    "EconomyRepository",
+    "EconomyWallet",
+    "Gambling",
+    "GamblingRepository",
+    "format_scales",
+]
