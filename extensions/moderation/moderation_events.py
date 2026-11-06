@@ -14,7 +14,10 @@ from utils import (
     SettingsEnum,
 )
 
+from .modmail import ModerationQuickTicketView
 from .repository import InfractionsRepository
+
+__all__ = ["ModerationEvents", "ModerationQuickTicketView", "PAST_TENSE_ACTIONS"]
 
 PAST_TENSE_ACTIONS = {
     InfractionsEnum.Ban: "banned",
@@ -34,6 +37,15 @@ class ModerationEvents(commands.Cog):
             self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
         else:
             self.infractions_repo = None  # type: ignore[assignment]
+
+    @commands.Cog.listener("on_ready")
+    async def on_ready(self):
+        self.client.add_view(
+            ModerationQuickTicketView(
+                bot=self.client,
+                infractions_repo=self.infractions_repo,
+            )
+        )
 
     async def _execute_discord_action(
         self,
@@ -103,7 +115,11 @@ class ModerationEvents(commands.Cog):
             "dm_info_text",
             "A copy of this was sent to the log channel and was stored in the database!",
         )
-        view = ButtonInfo(dm_info_text)
+        view = ModerationQuickTicketView(
+            info_text=dm_info_text,
+            bot=self.client,
+            infractions_repo=self.infractions_repo,
+        )
         extra_embeds = kwargs.get("extra_embeds")
         try:
             if extra_embeds:
