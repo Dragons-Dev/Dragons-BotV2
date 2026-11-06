@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from extensions.moderation.bad_urls import SafebrowsingCog
 from extensions.moderation.ban import Ban
 from extensions.moderation.kick import Kick
+from extensions.moderation.models import Infractions
 from extensions.moderation.moderation_events import ModerationEvents
 from extensions.moderation.repository import InfractionsRepository
-from extensions.moderation.timeout import Timeout, _parse_duration
+from extensions.moderation.timeout import Timeout, _parse_duration  # type: ignore[attr-defined]
 from extensions.moderation.warn import Warn
 from utils import InfractionsEnum, ModerationEnum
 from utils.orm_database import Base, ORMDataBase
@@ -119,6 +120,7 @@ class TestModerationEvents(unittest.IsolatedAsyncioTestCase):
         # 2. DB infraction created
         db_record = await self.infractions_repo.get_infraction(case_id=case_id, user=None)
         self.assertIsNotNone(db_record)
+        assert isinstance(db_record, Infractions)
         self.assertEqual(db_record.user_id, self.member.id)
         self.assertEqual(db_record.infraction, "Ban")
         self.assertEqual(db_record.reason, "Violating rules")
@@ -187,6 +189,22 @@ class TestModerationEvents(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(call_order, ["send", "kick"])
 
+        # Verify Timeout order: member.timeout_for must happen BEFORE DM
+        async def mock_timeout(*args, **kwargs):
+            call_order.append("timeout")
+
+        self.member.timeout_for.side_effect = mock_timeout
+        call_order.clear()
+        await self.cog.on_moderation_action(
+            InfractionsEnum.Timeout,
+            self.member,
+            self.guild,
+            "Timeout order check",
+            self.moderator,
+            duration=timedelta(minutes=5),
+        )
+        self.assertEqual(call_order, ["timeout", "send"])
+
     async def test_on_moderation_action_discord_action_forbidden_handled(self):
         self.guild.ban.side_effect = discord.Forbidden(MagicMock(), "Missing Permissions")
         ctx = create_mock_context(self.guild, self.moderator)
@@ -226,11 +244,33 @@ class TestModerationEvents(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNone(result)
         self.log_channel.send.assert_not_called()
+        self.member.send.assert_not_called()
         ctx.response.send_message.assert_awaited_once()
         err_embed = ctx.response.send_message.call_args.kwargs.get("embed")
         self.assertIsNotNone(err_embed)
         self.assertEqual(err_embed.title, "Failed to timeout user")
         self.assertEqual(err_embed.color, discord.Color.brand_red())
+
+    async def test_on_moderation_action_mod_log_failure_does_not_abort_feedback(self):
+        setting_mock = MagicMock()
+        setting_mock.value = 55555
+        self.mock_client.db.get_setting.return_value = setting_mock
+        self.guild.get_or_fetch.return_value = self.log_channel
+        self.log_channel.send.side_effect = discord.Forbidden(MagicMock(), "Missing Permissions")
+
+        ctx = create_mock_context(self.guild, self.moderator)
+        ctx.response.is_done.return_value = True
+
+        case_id = await self.cog.on_moderation_action(
+            InfractionsEnum.Ban,
+            self.member,
+            self.guild,
+            "Log error check",
+            self.moderator,
+            ctx=ctx,
+        )
+        self.assertIsInstance(case_id, int)
+        ctx.followup.send.assert_awaited_once()
 
     async def test_on_moderation_action_kick_with_channel_sequence(self):
         setting_mock = MagicMock()
@@ -295,6 +335,7 @@ class TestModerationEvents(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(case_id, int)
         # Check DB recorded reason
         db_record = await self.infractions_repo.get_infraction(case_id=case_id, user=None)
+        assert isinstance(db_record, Infractions)
         self.assertEqual(db_record.reason, "Bad URL sent")
 
         # Check DM with extra_embeds and custom title/reason
