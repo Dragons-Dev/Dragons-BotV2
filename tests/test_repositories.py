@@ -448,6 +448,7 @@ class TestRepositories(unittest.IsolatedAsyncioTestCase):
         # Get transcript by id
         transcript = await repo.get_transcript(archive_id)
         self.assertIsNotNone(transcript)
+        assert transcript is not None
         self.assertEqual(transcript.channel_name, "modmail-user")
         self.assertEqual(transcript.exported_by, 9001)
         self.assertEqual(transcript.html_content, "<html><body>Transcript 1</body></html>")

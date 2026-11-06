@@ -97,6 +97,7 @@ class TestChannelExporterRepository(unittest.IsolatedAsyncioTestCase):
         # Retrieve by id
         transcript = await self.repo.get_transcript(archive_id)
         self.assertIsNotNone(transcript)
+        assert transcript is not None
         self.assertEqual(transcript.channel_name, "modmail-user")
         self.assertEqual(transcript.exported_by, 900)
         self.assertEqual(transcript.html_content, "<html>Transcript</html>")
@@ -176,6 +177,27 @@ class TestDatabaseAttachmentHandler(unittest.IsolatedAsyncioTestCase):
         expected_data_uri = f"data:image/png;base64,{self.b64_expected}"
         self.assertEqual(result.url, expected_data_uri)
         self.assertEqual(result.proxy_url, expected_data_uri)
+
+    async def test_process_asset_ambiguous_filename_not_used(self):
+        item2 = CachedAttachment(
+            id=2,
+            channel_id=100,
+            message_id=201,
+            attachment_id=3002,
+            filename="photo.png",
+            content_type="image/png",
+            data=b"other_bytes",
+        )
+        handler = DatabaseAttachmentHandler([self.cached_item, item2])
+
+        mock_attachment = MagicMock(spec=discord.Attachment)
+        mock_attachment.id = 9999
+        mock_attachment.filename = "photo.png"
+        mock_attachment.url = "https://cdn.discordapp.com/old_url.png"
+        mock_attachment.proxy_url = "https://media.discordapp.net/old_proxy.png"
+
+        result = await handler.process_asset(mock_attachment)
+        self.assertEqual(result.url, "https://cdn.discordapp.com/old_url.png")
 
     async def test_process_asset_not_found(self):
         handler = DatabaseAttachmentHandler([self.cached_item])
@@ -424,6 +446,37 @@ class TestExportAndArchiveFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(archive_id)
         self.repo.save_transcript.assert_not_called()
         self.repo.delete_channel_attachments.assert_not_called()
+
+    @patch("chat_exporter.export", new_callable=AsyncMock)
+    async def test_export_and_archive_channel_whoops_error(self, mock_export):
+        mock_export.return_value = "Whoops! Something went wrong while exporting."
+        self.repo.get_channel_attachments.return_value = []
+
+        channel = MagicMock(spec=discord.TextChannel)
+        channel.id = 701
+        guild = MagicMock(spec=discord.Guild)
+        guild.id = 501
+
+        html, archive_id = await export_and_archive_channel(
+            bot=self.bot,
+            channel=channel,
+            guild=guild,
+            exported_by_id=12345,
+            exporter_repo=self.repo,
+        )
+
+        self.assertIsNone(html)
+        self.assertIsNone(archive_id)
+        self.repo.save_transcript.assert_not_called()
+        self.repo.delete_channel_attachments.assert_not_called()
+
+    async def test_slash_command_export_dm_guard(self):
+        ctx = MagicMock(spec=discord.ApplicationContext)
+        ctx.guild = None
+        ctx.respond = AsyncMock()
+
+        await self.cog.export.callback(self.cog, ctx)
+        ctx.respond.assert_awaited_once_with("This command can only be used in a server.", ephemeral=True)
 
     @patch("extensions.moderation.channel_exporter.export_and_archive_channel", new_callable=AsyncMock)
     async def test_slash_command_export_success(self, mock_export_helper):
