@@ -8,6 +8,7 @@ disable_error_code = ["no-redef"]
 implicit_optional = true
 warn_unreachable = true
 allow_redefinition = true
+follow_imports = "silent"
 
 [tool.ruff]
 extend-exclude = [".github", "data", "logs"]
@@ -15,3 +16,6 @@ fix = true
 line-length = 120
 output-format = "grouped"
 target-version = "py313"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
