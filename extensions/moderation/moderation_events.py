@@ -148,7 +148,13 @@ class ModerationEvents(commands.Cog):
             log_channel = guild.get_channel(channel_id)
 
         if log_channel:
-            await log_channel.send(embed=embed)
+            try:
+                await log_channel.send(embed=embed)
+            except (discord.Forbidden, discord.HTTPException) as e:
+                self.logger.warning(
+                    f"Failed to send mod log to channel {channel_id} in guild {guild.id}: {e}",
+                    exc_info=e,
+                )
 
     async def _send_ctx_response(
         self,
@@ -208,7 +214,7 @@ class ModerationEvents(commands.Cog):
     @commands.Cog.listener("on_moderation_action")
     async def on_moderation_action(
         self,
-        action: InfractionsEnum,
+        action: InfractionsEnum | str,
         member: discord.Member | discord.User,
         guild: discord.Guild,
         reason: str,
@@ -219,7 +225,7 @@ class ModerationEvents(commands.Cog):
             try:
                 action = InfractionsEnum(action.capitalize())
             except ValueError:
-                action = InfractionsEnum[action]
+                action = InfractionsEnum(action)
 
         # 1. Create Database Infraction to obtain case_id
         case_id = await self.infractions_repo.create_infraction(
@@ -229,8 +235,9 @@ class ModerationEvents(commands.Cog):
         # 2. Build Standardized Embeds
         embed = self._build_moderation_embed(action, member, moderator, reason, case_id, **kwargs)
 
-        # 3. DM the Disciplined User while still in guild
-        await self._send_dm(member, embed, **kwargs)
+        # 3. DM the Disciplined User before removal (Ban/Kick) while still in guild
+        if action in (InfractionsEnum.Ban, InfractionsEnum.Kick):
+            await self._send_dm(member, embed, **kwargs)
 
         # 4. Execute Discord Moderation Action
         success = await self._execute_discord_action(action, member, guild, reason, **kwargs)
@@ -244,6 +251,10 @@ class ModerationEvents(commands.Cog):
                 )
                 await self._send_ctx_response(ctx, embed=err_embed, ephemeral=True)
             return None
+
+        # DM disciplined user after successful action for non-removal actions (Timeout/Warn)
+        if action not in (InfractionsEnum.Ban, InfractionsEnum.Kick):
+            await self._send_dm(member, embed, **kwargs)
 
         # 5. Send to ModLogChannel
         await self._send_mod_log(guild, embed)

@@ -59,11 +59,13 @@ class TestModmailRepositoryCRUD(unittest.IsolatedAsyncioTestCase):
         # Query by user
         by_user = await self.repo.get_modmail(user=user)  # type: ignore[arg-type]
         self.assertIsNotNone(by_user)
+        assert by_user is not None
         self.assertEqual(by_user.uuid, uuid_str)
 
         # Query by uuid
         by_uuid = await self.repo.get_modmail(uuid=uuid_str)
         self.assertIsNotNone(by_uuid)
+        assert by_uuid is not None
         self.assertEqual(by_uuid.user_id, 101)
 
         # Query by thread_id before setting
@@ -75,6 +77,7 @@ class TestModmailRepositoryCRUD(unittest.IsolatedAsyncioTestCase):
         # Query by thread_id after setting
         by_thread = await self.repo.get_modmail(thread_id=5555)
         self.assertIsNotNone(by_thread)
+        assert by_thread is not None
         self.assertEqual(by_thread.uuid, uuid_str)
         self.assertEqual(by_thread.thread_id, 5555)
 
@@ -716,3 +719,81 @@ class TestCloseAndArchiveModmail(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(args[1], ctx.guild)
         self.assertTrue(args[3])  # anonymous
         ctx.response.send_message.assert_awaited_once()
+
+    async def test_close_modmail_thread_view_button_unauthorized(self):
+        view = CloseModmailThreadView(self.bot, self.repo)
+        interaction = MagicMock(spec=discord.Interaction)
+        interaction.channel_id = 77777
+        user = MagicMock(spec=discord.Member, id=9999, name="RandomUser")
+        user.guild_permissions = MagicMock()
+        user.guild_permissions.administrator = False
+        user.roles = []
+        interaction.user = user
+        interaction.guild = MagicMock(spec=discord.Guild, id=2001)
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        self.bot.db = AsyncMock()
+        self.bot.db.get_setting.return_value = None
+
+        mail = Modmail(uuid="btn-uuid", user_id=1001, guild_id=2001, anon=False, thread_id=77777)
+        self.repo.get_modmail.return_value = mail
+
+        with patch("extensions.moderation.modmail.close_and_archive_modmail", new_callable=AsyncMock) as mock_close:
+            await view.close_thread_button.callback(interaction)
+
+        interaction.response.send_message.assert_awaited_once()
+        self.assertIn("permission", interaction.response.send_message.call_args.args[0])
+        mock_close.assert_not_called()
+
+    async def test_slash_command_close_in_thread_unauthorized(self):
+        cog = ModMail(self.bot, modmail_repo=self.repo)
+        ctx = MagicMock(spec=discord.ApplicationContext)
+        ctx.guild = MagicMock(spec=discord.Guild, id=2001)
+        ctx.channel = MagicMock(spec=discord.Thread, id=77777)
+        user = MagicMock(spec=discord.Member, id=9999)
+        user.guild_permissions = MagicMock()
+        user.guild_permissions.administrator = False
+        user.roles = []
+        ctx.author = user
+        ctx.response = MagicMock()
+        ctx.response.send_message = AsyncMock()
+
+        self.bot.db = AsyncMock()
+        self.bot.db.get_setting.return_value = None
+
+        mail = Modmail(uuid="close-uuid", user_id=1001, guild_id=2001, anon=True, thread_id=77777)
+        self.repo.get_modmail.return_value = mail
+
+        with patch("extensions.moderation.modmail.close_and_archive_modmail", new_callable=AsyncMock) as mock_close:
+            await cog.close_modmail.callback(cog, ctx)
+
+        interaction_call = ctx.response.send_message.call_args
+        self.assertIn("permission", interaction_call.args[0])
+        mock_close.assert_not_called()
+
+    async def test_slash_command_close_in_guild_non_thread_does_not_fall_back_to_user_dm(self):
+        cog = ModMail(self.bot, modmail_repo=self.repo)
+        ctx = MagicMock(spec=discord.ApplicationContext)
+        ctx.guild = MagicMock(spec=discord.Guild, id=2001)
+        ctx.channel = MagicMock(spec=discord.TextChannel, id=88888)  # Not a thread
+        ctx.author = MagicMock(spec=discord.Member, id=1001)
+        ctx.response = MagicMock()
+        ctx.response.send_message = AsyncMock()
+
+        # Thread query returns None; user query returns active ticket
+        async def fake_get_modmail(*args, **kwargs):
+            if kwargs.get("thread_id") == 88888:
+                return None
+            if kwargs.get("user") == ctx.author:
+                return Modmail(uuid="user-dm-mail", user_id=1001, guild_id=2001, anon=False)
+            return None
+
+        self.repo.get_modmail.side_effect = fake_get_modmail
+
+        with patch("extensions.moderation.modmail.close_and_archive_modmail", new_callable=AsyncMock) as mock_close:
+            await cog.close_modmail.callback(cog, ctx)
+
+        interaction_call = ctx.response.send_message.call_args
+        self.assertIn("No active modmail session or thread found", interaction_call.args[0])
+        mock_close.assert_not_called()

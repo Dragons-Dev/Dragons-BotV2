@@ -167,6 +167,51 @@ async def _notify_user_closure(bot: Bot, guild_name: str, user_id: int) -> None:
         pass
 
 
+async def _has_team_role(bot: Bot, guild: discord.Guild, member: discord.Member) -> bool:
+    if not hasattr(bot, "db") or not hasattr(bot.db, "get_setting"):
+        return False
+    try:
+        setting = await bot.db.get_setting(SettingsEnum.TeamRole, guild)
+        if setting is None:
+            return False
+        team_role_id = setting[0].value if isinstance(setting, (tuple, list, Sequence)) else setting.value
+        return any(getattr(r, "id", None) == team_role_id for r in getattr(member, "roles", []))
+    except Exception:
+        return False
+
+
+async def _can_close_modmail(
+    bot: Bot,
+    mail: Modmail,
+    user: discord.User | discord.Member,
+    guild: discord.Guild | None,
+) -> bool:
+    """Checks whether the user has permission to close the modmail session."""
+    if user.id == mail.user_id:
+        return True
+
+    if guild is None:
+        return False
+
+    member: discord.Member | None = user if isinstance(user, discord.Member) else None
+    if member is None and hasattr(guild, "get_member"):
+        member = guild.get_member(user.id)
+    if member is None and hasattr(guild, "get_or_fetch"):
+        try:
+            member = await get_or_fetch(guild, "member", user.id, default=None)
+        except Exception:
+            pass
+
+    if member is None:
+        return False
+
+    perms = getattr(member, "guild_permissions", None)
+    if getattr(perms, "administrator", False):
+        return True
+
+    return await _has_team_role(bot, guild, member)
+
+
 async def close_and_archive_modmail(
     bot: Bot,
     mail: Modmail,
@@ -175,15 +220,14 @@ async def close_and_archive_modmail(
     closed_by_staff: bool = False,
 ) -> None:
     """
-    Deletes the Modmail DB record, notifies thread, archives and exports HTML transcript,
-    sends transcript file to modmail_channel, and locks & archives thread.
+    Notifies thread, archives and exports HTML transcript, sends transcript file
+    to modmail_channel, locks & archives thread, and deletes the Modmail DB record.
     """
-    await modmail_repo.delete_modmail(uuid=mail.uuid)
-
     guild = bot.get_guild(mail.guild_id)
     if guild is None:
         guild = await get_or_fetch(bot, "guild", mail.guild_id, default=None)
     if guild is None:
+        await modmail_repo.delete_modmail(uuid=mail.uuid)
         return
 
     modmail_channel = None
@@ -214,6 +258,8 @@ async def close_and_archive_modmail(
         except Exception:
             pass
 
+    await modmail_repo.delete_modmail(uuid=mail.uuid)
+
     if closed_by_staff:
         await _notify_user_closure(bot, guild.name, mail.user_id)
 
@@ -239,6 +285,12 @@ class CloseModmailThreadView(discord.ui.View):
         if mail is None:
             return await interaction.response.send_message(
                 "This modmail is already closed or could not be found.", ephemeral=True
+            )
+
+        guild = interaction.guild or bot.get_guild(mail.guild_id)
+        if not await _can_close_modmail(bot, mail, interaction.user, guild):
+            return await interaction.response.send_message(
+                "You do not have permission to close this Modmail ticket.", ephemeral=True
             )
 
         await interaction.response.send_message("Closing and archiving modmail thread...", ephemeral=True)
@@ -586,7 +638,7 @@ class ModMail(commands.Cog):
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
         self.modmail_repo = modmail_repo or ModmailRepository(self.client.db.session_maker)
 
-    @commands.Cog.listener("on_ready")
+    @commands.Cog.listener("on_ready", once=True)
     async def on_ready(self):
         self.client.add_view(CloseModmailThreadView(self.client, self.modmail_repo))
         self.client.add_view(ModerationQuickTicketView(bot=self.client, modmail_repo=self.modmail_repo))
@@ -665,14 +717,17 @@ class ModMail(commands.Cog):
             mail = await self.modmail_repo.get_modmail(thread_id=ctx.channel.id)
             if mail is not None:
                 closed_by_staff = ctx.author.id != mail.user_id
-            else:
-                mail = await self.modmail_repo.get_modmail(user=ctx.author)
         else:
             mail = await self.modmail_repo.get_modmail(user=ctx.author)
 
         if mail is None:
             return await ctx.response.send_message(
                 "No active modmail session or thread found to close!", ephemeral=True
+            )
+
+        if not await _can_close_modmail(self.client, mail, ctx.author, ctx.guild):
+            return await ctx.response.send_message(
+                "You do not have permission to close this Modmail ticket.", ephemeral=True
             )
 
         await ctx.response.send_message("Closing and archiving modmail...", ephemeral=True)
