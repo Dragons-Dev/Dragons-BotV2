@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 from datetime import datetime
+import inspect
 import io
+from typing import Any
 import uuid as _uuid
 
 import discord
@@ -386,6 +388,67 @@ class GuildSelectView(discord.ui.View):
         self.add_item(GuildSelectDropdown(client, author, anonymous, modmail_repo))
 
 
+def _is_interaction_done(interaction: discord.Interaction) -> bool:
+    resp = getattr(interaction, "response", None)
+    if resp is None:
+        return False
+    try:
+        is_done = getattr(resp, "is_done", None)
+        if callable(is_done):
+            res = is_done()
+            if isinstance(res, bool):
+                return res
+        defer = getattr(resp, "defer", None)
+        return bool(getattr(defer, "called", False))
+    except Exception:
+        return False
+
+
+def _resolve_info_text(custom_text: str | None, base_text: str, message: discord.Message | None) -> str:
+    default_text = "A copy of this was sent to the log channel and was stored in the database!"
+    text = custom_text or base_text
+    if text != default_text and text:
+        return text
+    embeds = getattr(message, "embeds", None) or []
+    if any(getattr(embed, "title", None) == "Message context" for embed in embeds):
+        return "You were warned due to the message above."
+    return text
+
+
+async def _create_ticket_thread(modmail_channel: discord.TextChannel, name: str) -> discord.Thread | None:
+    target_name = f"Thread for {escape_markdown(name)}"
+    create_fn = getattr(modmail_channel, "create_thread", None)
+    if callable(create_fn):
+        try:
+            return await create_fn(name=target_name, auto_archive_duration=4320)
+        except TypeError:
+            return await create_fn(name=target_name)
+        except Exception:
+            return None
+
+    send_fn = getattr(modmail_channel, "send", None)
+    if callable(send_fn):
+        try:
+            msg = await send_fn(f"Creating {target_name}")
+            if hasattr(msg, "create_thread"):
+                return await msg.create_thread(name=target_name, auto_archive_duration=4320)
+        except Exception:
+            return None
+    return None
+
+
+async def _defer_interaction(interaction: discord.Interaction) -> None:
+    resp = getattr(interaction, "response", None)
+    defer_fn = getattr(resp, "defer", None)
+    if callable(defer_fn):
+        try:
+            res = defer_fn(ephemeral=True)
+            if inspect.isawaitable(res):
+                await res
+        except Exception:
+            pass
+
+
 class ModerationQuickTicketView(discord.ui.View):
     """Persistent view attached to moderation DMs allowing quick ticket creation."""
 
@@ -398,6 +461,11 @@ class ModerationQuickTicketView(discord.ui.View):
     ):
         super().__init__(timeout=None)
         self.info_text = info_text
+        self._custom_info_text = (
+            info_text
+            if info_text != "A copy of this was sent to the log channel and was stored in the database!"
+            else None
+        )
         self.bot = bot
         self.infractions_repo = infractions_repo
         self.modmail_repo = modmail_repo
@@ -434,9 +502,9 @@ class ModerationQuickTicketView(discord.ui.View):
         if infractions_repo is None:
             return None
         infraction = await infractions_repo.get_infraction(case_id=case_id, user=None)
-        if isinstance(infraction, (list, tuple)):
-            return infraction[0] if infraction else None
-        return infraction
+        if isinstance(infraction, (list, tuple, Sequence)):
+            infraction = infraction[0] if infraction else None
+        return infraction if isinstance(infraction, Infractions) else None
 
     @staticmethod
     async def _resolve_guild(client: Bot, guild_id: int) -> discord.Guild | None:
@@ -449,6 +517,25 @@ class ModerationQuickTicketView(discord.ui.View):
         if guild is None and hasattr(client, "get_guild"):
             guild = client.get_guild(guild_id)
         return guild
+
+    @staticmethod
+    async def _send_ephemeral(
+        interaction: discord.Interaction,
+        content: str,
+        *,
+        view: discord.ui.View | None = None,
+        embed: discord.Embed | None = None,
+    ) -> None:
+        kwargs: dict[str, Any] = {"ephemeral": True}
+        if view is not None:
+            kwargs["view"] = view
+        if embed is not None:
+            kwargs["embed"] = embed
+
+        sender = interaction.followup.send if _is_interaction_done(interaction) else interaction.response.send_message
+        res = sender(content, **kwargs)
+        if inspect.isawaitable(res):
+            await res
 
     async def _check_existing_mail(
         self,
@@ -465,10 +552,10 @@ class ModerationQuickTicketView(discord.ui.View):
         target_guild = await self._resolve_guild(client, existing_mail.guild_id)
         guild_name = target_guild.name if target_guild else str(existing_mail.guild_id)
         view = EndModmailView(interaction.user, client, modmail_repo)
-        await interaction.response.send_message(
+        await self._send_ephemeral(
+            interaction,
             f"You already have an open modmail session with **{escape_markdown(guild_name)}**!",
             view=view,
-            ephemeral=True,
         )
         return True
 
@@ -506,32 +593,19 @@ class ModerationQuickTicketView(discord.ui.View):
         infraction: Infractions,
         button: discord.ui.Button,
     ) -> None:
+        thread = await _create_ticket_thread(modmail_channel, interaction.user.name)
+        if thread is None:
+            await self._send_ephemeral(interaction, "Failed to create a ticket thread. Please try again later.")
+            return
+
         ticket_uuid = str(_uuid.uuid4())
         await modmail_repo.create_modmail(
             user=interaction.user,
             guild=guild,
             uuid=ticket_uuid,
             anonymous=False,
+            thread_id=thread.id,
         )
-
-        target_name = f"Thread for {escape_markdown(interaction.user.name)}"
-        thread = None
-        if hasattr(modmail_channel, "create_thread"):
-            try:
-                thread = await modmail_channel.create_thread(name=target_name, auto_archive_duration=4320)
-            except TypeError:
-                thread = await modmail_channel.create_thread(name=target_name)
-        if thread is None and hasattr(modmail_channel, "send"):
-            start_msg = await modmail_channel.send(f"Creating {target_name}")
-            if hasattr(start_msg, "create_thread"):
-                thread = await start_msg.create_thread(name=target_name, auto_archive_duration=4320)
-
-        if thread is None:
-            return await interaction.response.send_message(
-                "Failed to create a ticket thread. Please try again later.", ephemeral=True
-            )
-
-        await modmail_repo.update_thread_id(ticket_uuid, thread.id)
 
         context_embed = discord.Embed(
             title=f"Moderation Ticket — Case #{case_id} ({infraction.infraction})",
@@ -551,23 +625,24 @@ class ModerationQuickTicketView(discord.ui.View):
         context_embed.set_footer(text=f"Member ID: {interaction.user.id}")
 
         embeds = [context_embed]
-        if interaction.message and interaction.message.embeds and len(interaction.message.embeds) > 1:
-            embeds.extend(interaction.message.embeds[1:])
+        msg_embeds = getattr(getattr(interaction, "message", None), "embeds", None)
+        if msg_embeds and len(msg_embeds) > 1:
+            embeds.extend(msg_embeds[1:])
 
         await thread.send(embeds=embeds, view=CloseModmailThreadView(client, modmail_repo))
 
         button.label = "Ticket Opened"
         button.disabled = True
-        if interaction.message and hasattr(interaction.message, "edit"):
-            try:
+        try:
+            if interaction.message:
                 await interaction.message.edit(view=self)
-            except Exception:
-                pass
+        except Exception:
+            pass
 
-        await interaction.response.send_message(
+        await self._send_ephemeral(
+            interaction,
             f"Your modmail ticket with **{escape_markdown(guild.name)}** has been opened! "
             "You can now type messages directly in this DM to communicate with staff.",
-            ephemeral=True,
         )
 
     @discord.ui.button(
@@ -577,7 +652,8 @@ class ModerationQuickTicketView(discord.ui.View):
         custom_id="mod_quick_ticket__info_button",
     )
     async def info_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await interaction.response.send_message(self.info_text, ephemeral=True)
+        text = _resolve_info_text(self._custom_info_text, self.info_text, interaction.message)
+        await self._send_ephemeral(interaction, text)
 
     @discord.ui.button(
         label="Open Modmail Ticket",
@@ -586,24 +662,21 @@ class ModerationQuickTicketView(discord.ui.View):
         custom_id="mod_quick_ticket__open_button",
     )
     async def open_ticket_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await _defer_interaction(interaction)
         client, infractions_repo, modmail_repo = self._get_client_and_repos(interaction)
 
         case_id = self._extract_case_id(interaction)
         if case_id is None:
-            return await interaction.response.send_message(
-                "Could not find the moderation case in the database.", ephemeral=True
-            )
+            return await self._send_ephemeral(interaction, "Could not find the moderation case in the database.")
 
         infraction = await self._fetch_infraction(infractions_repo, case_id)
         if infraction is None:
-            return await interaction.response.send_message(
-                "Could not find the moderation case in the database.", ephemeral=True
-            )
+            return await self._send_ephemeral(interaction, "Could not find the moderation case in the database.")
 
         guild = await self._resolve_guild(client, infraction.guild)
         if guild is None:
-            return await interaction.response.send_message(
-                "Could not find the server associated with this moderation case.", ephemeral=True
+            return await self._send_ephemeral(
+                interaction, "Could not find the server associated with this moderation case."
             )
 
         if await self._check_existing_mail(interaction, client, modmail_repo):
@@ -611,14 +684,12 @@ class ModerationQuickTicketView(discord.ui.View):
 
         modmail_channel = await self._resolve_modmail_channel(client, guild)
         if modmail_channel is None:
-            return await interaction.response.send_message(
-                f"Modmail is not configured on **{escape_markdown(guild.name)}**.", ephemeral=True
+            return await self._send_ephemeral(
+                interaction, f"Modmail is not configured on **{escape_markdown(guild.name)}**."
             )
 
         if modmail_repo is None:
-            return await interaction.response.send_message(
-                "Database error: modmail repository is unavailable.", ephemeral=True
-            )
+            return await self._send_ephemeral(interaction, "Database error: modmail repository is unavailable.")
 
         await self._create_quick_ticket(
             interaction=interaction,
