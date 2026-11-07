@@ -1,14 +1,29 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import discord
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from extensions.economy.gambling import Gambling, _calculate_slot_multiplier
-from extensions.economy.models import BetPool, BetWager
+from extensions.economy.gambling import (
+    AddCustomOptionModal,
+    BetCreateModal,
+    BetPoolView,
+    BetSetupView,
+    CancelButton,
+    CustomOutcomeModal,
+    Gambling,
+    LockButton,
+    PlaceWagerModal,
+    ResolveBetView,
+    ResolveButton,
+    _calculate_slot_multiplier,
+    _parse_bet_duration,
+    _parse_bet_options,
+)
+from extensions.economy.models import MAX_BET_OPTIONS, BetOption, BetPool, BetWager
 from extensions.economy.repository import EconomyRepository, GamblingRepository
-from utils.enums import SettingsEnum
 from utils.orm_database import Base, ORMDataBase
 
 
@@ -29,6 +44,52 @@ class TestSlotMultiplier(unittest.TestCase):
         self.assertEqual(_calculate_slot_multiplier(["🍒", "🍋", "💎"]), 0)
 
 
+class TestBetParsers(unittest.TestCase):
+    def test_parse_bet_duration_valid(self):
+        self.assertEqual(_parse_bet_duration("30s"), timedelta(seconds=30))
+        self.assertEqual(_parse_bet_duration("15m"), timedelta(minutes=15))
+        self.assertEqual(_parse_bet_duration("2h"), timedelta(hours=2))
+        self.assertEqual(_parse_bet_duration("1d"), timedelta(days=1))
+        self.assertEqual(_parse_bet_duration("2w"), timedelta(weeks=2))
+        self.assertEqual(_parse_bet_duration("1h 30m"), timedelta(hours=1, minutes=30))
+
+    def test_parse_bet_duration_invalid(self):
+        self.assertIsNone(_parse_bet_duration(""))
+        self.assertIsNone(_parse_bet_duration("   "))
+        self.assertIsNone(_parse_bet_duration("invalid"))
+        self.assertIsNone(_parse_bet_duration("30x"))
+        self.assertIsNone(_parse_bet_duration("-5m"))
+        self.assertIsNone(_parse_bet_duration("0m"))
+
+    def test_parse_bet_options_normal(self):
+        text = "Option A\nOption B\nOption C"
+        opts = _parse_bet_options(text)
+        self.assertEqual(opts, ["Option A", "Option B", "Option C"])
+
+    def test_parse_bet_options_stripping_and_empty_lines(self):
+        text = "   Red Dragon   \n\n\n   Blue Dragon  \n"
+        opts = _parse_bet_options(text)
+        self.assertEqual(opts, ["Red Dragon", "Blue Dragon"])
+
+    def test_parse_bet_options_deduplication(self):
+        text = "Yes\nNo\nyes\nNO\nMaybe"
+        opts = _parse_bet_options(text)
+        self.assertEqual(opts, ["Yes", "No", "Maybe"])
+
+    def test_parse_bet_options_max_25(self):
+        text = "\n".join(f"Opt {i}" for i in range(30))
+        opts = _parse_bet_options(text)
+        self.assertEqual(len(opts), MAX_BET_OPTIONS)
+        self.assertEqual(opts[0], "Opt 0")
+        self.assertEqual(opts[-1], "Opt 24")
+
+    def test_parse_bet_options_exceeds_100_chars_raises(self):
+        long_line = "A" * 101
+        with self.assertRaises(ValueError) as ctx:
+            _parse_bet_options(long_line)
+        self.assertIn("exceeds maximum length of 100", str(ctx.exception))
+
+
 class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.engine = create_async_engine("sqlite+aiosqlite:///:memory:")
@@ -42,22 +103,26 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.engine.dispose()
 
-    async def test_create_and_get_bet_pool(self):
+    async def test_create_and_get_bet_pool_with_options(self):
         pool = await self.repo.create_bet_pool(
             guild_id=10,
             creator_id=100,
             title="Will it rain tomorrow?",
-            option_a="Yes",
-            option_b="No",
+            options=["Yes", "No"],
+            allow_custom_options=True,
         )
         self.assertIsNotNone(pool.id)
         self.assertEqual(pool.guild_id, 10)
         self.assertEqual(pool.creator_id, 100)
         self.assertEqual(pool.title, "Will it rain tomorrow?")
-        self.assertEqual(pool.option_a, "Yes")
-        self.assertEqual(pool.option_b, "No")
+        self.assertTrue(pool.allow_custom_options)
         self.assertTrue(pool.is_open)
+        self.assertFalse(pool.is_locked)
         self.assertIsNone(pool.winning_option)
+
+        options = await self.repo.get_pool_options(pool.id)
+        self.assertEqual(len(options), 2)
+        self.assertEqual([o.label for o in options], ["Yes", "No"])
 
         fetched = await self.repo.get_bet_pool(pool.id, guild_id=10)
         self.assertIsNotNone(fetched)
@@ -67,10 +132,35 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         wrong_guild = await self.repo.get_bet_pool(pool.id, guild_id=999)
         self.assertIsNone(wrong_guild)
 
+    async def test_create_bet_pool_zero_options_forces_custom_options(self):
+        pool = await self.repo.create_bet_pool(
+            guild_id=10,
+            creator_id=100,
+            title="Open ended question",
+            options=[],
+            allow_custom_options=False,
+        )
+        self.assertTrue(pool.allow_custom_options)
+        options = await self.repo.get_pool_options(pool.id)
+        self.assertEqual(len(options), 0)
+
+    async def test_set_pool_message(self):
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A"])
+        success = await self.repo.set_pool_message(pool.id, 10, channel_id=222, message_id=333)
+        self.assertTrue(success)
+
+        fetched = await self.repo.get_bet_pool(pool.id, 10)
+        self.assertIsNotNone(fetched)
+        self.assertEqual(fetched.channel_id, 222)  # type: ignore[union-attr]
+        self.assertEqual(fetched.message_id, 333)  # type: ignore[union-attr]
+
+        # Non-existent pool returns False
+        self.assertFalse(await self.repo.set_pool_message(999, 10, 222, 333))
+
     async def test_get_open_bet_pools(self):
-        p1 = await self.repo.create_bet_pool(10, 100, "Bet 1", "A", "B")
-        p2 = await self.repo.create_bet_pool(10, 100, "Bet 2", "A", "B")
-        await self.repo.create_bet_pool(20, 100, "Bet Other Guild", "A", "B")
+        p1 = await self.repo.create_bet_pool(10, 100, "Bet 1", options=["A", "B"])
+        p2 = await self.repo.create_bet_pool(10, 100, "Bet 2", options=["A", "B"])
+        await self.repo.create_bet_pool(20, 100, "Bet Other Guild", options=["A", "B"])
 
         open_pools = await self.repo.get_open_bet_pools(10)
         self.assertEqual(len(open_pools), 2)
@@ -84,22 +174,66 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(open_after), 1)
         self.assertEqual(open_after[0].id, p2.id)
 
+    async def test_add_bet_option_success_and_duplicate(self):
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["Option 1"])
+        success, opt, msg = await self.repo.add_bet_option(pool.id, 10, 100, "Option 2")
+        self.assertTrue(success)
+        self.assertIsNotNone(opt)
+        self.assertEqual(opt.label, "Option 2")  # type: ignore[union-attr]
+
+        # Case-insensitive duplicate returns existing option
+        success2, opt2, msg2 = await self.repo.add_bet_option(pool.id, 10, 101, "option 2")
+        self.assertTrue(success2)
+        self.assertIsNotNone(opt2)
+        self.assertEqual(opt2.id, opt.id)  # type: ignore[union-attr]
+        self.assertEqual(msg2, "Option already exists.")
+
+    async def test_add_bet_option_disallowed_when_custom_false(self):
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"], allow_custom_options=False)
+        success, opt, msg = await self.repo.add_bet_option(pool.id, 10, 100, "Option C")
+        self.assertFalse(success)
+        self.assertIsNone(opt)
+        self.assertIn("not allowed", msg)
+
+    async def test_add_bet_option_max_25_options(self):
+        initial = [f"Opt {i}" for i in range(MAX_BET_OPTIONS)]
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=initial, allow_custom_options=True)
+        success, opt, msg = await self.repo.add_bet_option(pool.id, 10, 100, "Overflow Opt")
+        self.assertFalse(success)
+        self.assertIsNone(opt)
+        self.assertIn("Maximum of 25 options reached", msg)
+
+    async def test_add_bet_option_locked_or_expired(self):
+        # Locked pool
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A"])
+        await self.repo.lock_bet_pool(pool.id, 10)
+        success, _, msg = await self.repo.add_bet_option(pool.id, 10, 100, "B")
+        self.assertFalse(success)
+        self.assertIn("locked", msg)
+
+        # Expired pool
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+        pool_exp = await self.repo.create_bet_pool(10, 100, "Bet Exp", options=["A"], locks_at=past_time)
+        success_exp, _, msg_exp = await self.repo.add_bet_option(pool_exp.id, 10, 100, "B")
+        self.assertFalse(success_exp)
+        self.assertIn("locked", msg_exp)
+
     async def test_place_wager_validation(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "A", "B")
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"])
         await self.economy_repo.set_balance(user_id=1, guild_id=10, amount=500)
 
         # Invalid amount
         self.assertFalse(await self.repo.place_wager(pool.id, 1, 10, "A", 0))
         self.assertFalse(await self.repo.place_wager(pool.id, 1, 10, "A", -50))
 
-        # Invalid choice
-        self.assertFalse(await self.repo.place_wager(pool.id, 1, 10, "C", 50))
+        # Invalid option (not in pool)
+        self.assertFalse(await self.repo.place_wager(pool.id, 1, 10, "NonExistent", 50))
 
         # Non-existent pool
         self.assertFalse(await self.repo.place_wager(9999, 1, 10, "A", 50))
 
     async def test_place_wager_insufficient_balance(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "A", "B")
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"])
         await self.economy_repo.set_balance(user_id=1, guild_id=10, amount=50)
 
         # Try to wager more than balance
@@ -110,7 +244,7 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(wagers), 0)
 
     async def test_place_wager_success_and_increment(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "A", "B")
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"])
         await self.economy_repo.set_balance(user_id=1, guild_id=10, amount=500)
 
         # First wager of 100 on A
@@ -124,7 +258,7 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(wagers[0].choice, "A")
 
         # Second wager of 50 on same choice A increments wager
-        success2 = await self.repo.place_wager(pool.id, 1, 10, "A", 50)
+        success2 = await self.repo.place_wager(pool.id, 1, 10, "a", 50)
         self.assertTrue(success2)
         self.assertEqual(await self.economy_repo.get_balance(1, 10), 350)
 
@@ -133,7 +267,7 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(wagers_after[0].amount, 150)
 
     async def test_place_wager_opposite_side_rejection(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "A", "B")
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"])
         await self.economy_repo.set_balance(user_id=1, guild_id=10, amount=500)
 
         # First wager on A
@@ -144,36 +278,73 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         # Balance should still be 400
         self.assertEqual(await self.economy_repo.get_balance(1, 10), 400)
 
-    async def test_place_wager_closed_pool_rejection(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "A", "B")
+    async def test_place_wager_closed_or_locked_or_expired_rejection(self):
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"])
         await self.economy_repo.set_balance(user_id=1, guild_id=10, amount=500)
-        await self.repo.cancel_bet_pool(pool.id, 10)
 
+        # Cancel pool
+        await self.repo.cancel_bet_pool(pool.id, 10)
         self.assertFalse(await self.repo.place_wager(pool.id, 1, 10, "A", 100))
-        self.assertEqual(await self.economy_repo.get_balance(1, 10), 500)
+
+        # Locked pool
+        pool2 = await self.repo.create_bet_pool(10, 100, "Bet 2", options=["A", "B"])
+        await self.repo.lock_bet_pool(pool2.id, 10)
+        self.assertFalse(await self.repo.place_wager(pool2.id, 1, 10, "A", 100))
+
+        # Expired pool
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=10)
+        pool3 = await self.repo.create_bet_pool(10, 100, "Bet 3", options=["A", "B"], locks_at=past_time)
+        self.assertFalse(await self.repo.place_wager(pool3.id, 1, 10, "A", 100))
+        updated_pool3 = await self.repo.get_bet_pool(pool3.id, 10)
+        self.assertTrue(updated_pool3.is_locked)  # type: ignore[union-attr]
+
+    async def test_lock_bet_pool(self):
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"])
+        self.assertFalse(pool.is_locked)
+
+        success = await self.repo.lock_bet_pool(pool.id, 10)
+        self.assertTrue(success)
+
+        updated = await self.repo.get_bet_pool(pool.id, 10)
+        self.assertTrue(updated.is_locked)  # type: ignore[union-attr]
+
+        # Cannot lock already locked pool
+        self.assertFalse(await self.repo.lock_bet_pool(pool.id, 10))
+
+    async def test_auto_lock_expired_pools(self):
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=10)
+        future_time = datetime.now(timezone.utc) + timedelta(minutes=30)
+
+        p1 = await self.repo.create_bet_pool(10, 100, "P1", options=["A"], locks_at=past_time)
+        p2 = await self.repo.create_bet_pool(10, 100, "P2", options=["A"], locks_at=future_time)
+        p3 = await self.repo.create_bet_pool(10, 100, "P3", options=["A"], locks_at=None)
+
+        expired = await self.repo.auto_lock_expired_pools()
+        self.assertEqual(len(expired), 1)
+        self.assertEqual(expired[0].id, p1.id)
+
+        p1_after = await self.repo.get_bet_pool(p1.id, 10)
+        p2_after = await self.repo.get_bet_pool(p2.id, 10)
+        p3_after = await self.repo.get_bet_pool(p3.id, 10)
+        self.assertTrue(p1_after.is_locked)  # type: ignore[union-attr]
+        self.assertFalse(p2_after.is_locked)  # type: ignore[union-attr]
+        self.assertFalse(p3_after.is_locked)  # type: ignore[union-attr]
 
     async def test_resolve_bet_pool_proportional_payout(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "Option A", "Option B")
-        # User 1 bets 100 on A
-        # User 2 bets 100 on A
-        # User 3 bets 200 on B
-        # Total pool = 400, Winning side (A) = 200
-        # User 1 payout = 100 * 400 / 200 = 200
-        # User 2 payout = 100 * 400 / 200 = 200
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["Option A", "Option B"])
         await self.economy_repo.set_balance(1, 10, 100)
         await self.economy_repo.set_balance(2, 10, 100)
         await self.economy_repo.set_balance(3, 10, 200)
 
-        await self.repo.place_wager(pool.id, 1, 10, "A", 100)
-        await self.repo.place_wager(pool.id, 2, 10, "A", 100)
-        await self.repo.place_wager(pool.id, 3, 10, "B", 200)
+        await self.repo.place_wager(pool.id, 1, 10, "Option A", 100)
+        await self.repo.place_wager(pool.id, 2, 10, "Option A", 100)
+        await self.repo.place_wager(pool.id, 3, 10, "Option B", 200)
 
-        # Before resolution, all balances are 0
         self.assertEqual(await self.economy_repo.get_balance(1, 10), 0)
         self.assertEqual(await self.economy_repo.get_balance(2, 10), 0)
         self.assertEqual(await self.economy_repo.get_balance(3, 10), 0)
 
-        payouts = await self.repo.resolve_bet_pool(pool.id, 10, "A")
+        payouts = await self.repo.resolve_bet_pool(pool.id, 10, "option a")
         self.assertIsNotNone(payouts)
         self.assertEqual(payouts, {1: 200, 2: 200})
 
@@ -183,14 +354,14 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
 
         updated_pool = await self.repo.get_bet_pool(pool.id, 10)
         self.assertFalse(updated_pool.is_open)  # type: ignore[union-attr]
-        self.assertEqual(updated_pool.winning_option, "A")  # type: ignore[union-attr]
+        self.assertTrue(updated_pool.is_locked)  # type: ignore[union-attr]
+        self.assertEqual(updated_pool.winning_option, "option a")  # type: ignore[union-attr]
 
         # Cannot resolve again
-        self.assertIsNone(await self.repo.resolve_bet_pool(pool.id, 10, "A"))
+        self.assertIsNone(await self.repo.resolve_bet_pool(pool.id, 10, "Option A"))
 
     async def test_resolve_bet_pool_integer_division_precision(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "Option A", "Option B")
-        # Test large numbers with integer floor division: (wager.amount * total_pool) // winning_side_total
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"])
         await self.economy_repo.set_balance(1, 10, 10_000_000_000)
         await self.economy_repo.set_balance(2, 10, 20_000_000_000)
 
@@ -202,28 +373,21 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.economy_repo.get_balance(1, 10), 30_000_000_000)
 
     async def test_resolve_bet_pool_zero_winners_refunds(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "Option A", "Option B")
-        # User 1 bets 100 on A
-        # Nobody bets on B
-        # B is chosen as winner -> zero winners, should refund User 1
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["Option A", "Option B"])
         await self.economy_repo.set_balance(1, 10, 100)
-        await self.repo.place_wager(pool.id, 1, 10, "A", 100)
+        await self.repo.place_wager(pool.id, 1, 10, "Option A", 100)
 
-        payouts = await self.repo.resolve_bet_pool(pool.id, 10, "B")
+        # Resolving with Option B when nobody bet on Option B -> full refund
+        payouts = await self.repo.resolve_bet_pool(pool.id, 10, "Option B")
         self.assertEqual(payouts, {})
-        # User 1 should have their 100 scales refunded
         self.assertEqual(await self.economy_repo.get_balance(1, 10), 100)
 
         updated_pool = await self.repo.get_bet_pool(pool.id, 10)
         self.assertFalse(updated_pool.is_open)  # type: ignore[union-attr]
-        self.assertEqual(updated_pool.winning_option, "B")  # type: ignore[union-attr]
-
-    async def test_resolve_bet_pool_invalid_choice(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "A", "B")
-        self.assertIsNone(await self.repo.resolve_bet_pool(pool.id, 10, "X"))
+        self.assertEqual(updated_pool.winning_option, "Option B")  # type: ignore[union-attr]
 
     async def test_cancel_bet_pool_refunds_all(self):
-        pool = await self.repo.create_bet_pool(10, 100, "Bet", "Option A", "Option B")
+        pool = await self.repo.create_bet_pool(10, 100, "Bet", options=["A", "B"])
         await self.economy_repo.set_balance(1, 10, 100)
         await self.economy_repo.set_balance(2, 10, 200)
 
@@ -241,8 +405,17 @@ class TestGamblingRepository(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(updated_pool.is_open)  # type: ignore[union-attr]
         self.assertEqual(updated_pool.winning_option, "CANCELLED")  # type: ignore[union-attr]
 
-        # Cancel already closed pool returns False
-        self.assertFalse(await self.repo.cancel_bet_pool(pool.id, 10))
+    async def test_get_all_open_bet_pools(self):
+        p1 = await self.repo.create_bet_pool(10, 100, "Bet G1", options=["A"])
+        p2 = await self.repo.create_bet_pool(20, 100, "Bet G2", options=["A"])
+        p3 = await self.repo.create_bet_pool(30, 100, "Bet G3 Closed", options=["A"])
+        await self.repo.cancel_bet_pool(p3.id, 30)
+
+        all_open = await self.repo.get_all_open_bet_pools()
+        all_ids = [p.id for p in all_open]
+        self.assertIn(p1.id, all_ids)
+        self.assertIn(p2.id, all_ids)
+        self.assertNotIn(p3.id, all_ids)
 
 
 class TestGamblingCogMiniGames(unittest.IsolatedAsyncioTestCase):
@@ -404,6 +577,7 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
         self.logger_patcher.start()
         self.mock_client = MagicMock()
         self.mock_client.boot_time = datetime.now()
+        self.mock_client.wait_until_ready = AsyncMock()
         self.mock_client.db = MagicMock()
         self.mock_economy_repo = MagicMock(spec=EconomyRepository)
         self.mock_gambling_repo = MagicMock(spec=GamblingRepository)
@@ -412,15 +586,12 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
             gambling_repo=self.mock_gambling_repo,
             economy_repo=self.mock_economy_repo,
         )
-        for cmd in [
-            self.cog.bet_create,
-            self.cog.bet_place,
-            self.cog.bet_list,
-            self.cog.bet_resolve,
-        ]:
+        for cmd in [self.cog.bet, self.cog.bet_list]:
             cmd.cog = self.cog
 
     def tearDown(self):
+        if self.cog.auto_lock_task.is_running():
+            self.cog.auto_lock_task.cancel()
         self.logger_patcher.stop()
 
     def _make_ctx(self, user_id: int = 1, guild_id: int = 10, is_admin: bool = False, roles=None):
@@ -429,110 +600,276 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
         ctx.author.guild_permissions = MagicMock(administrator=is_admin)
         ctx.guild = MagicMock(id=guild_id, emojis=[])
         ctx.response.send_message = AsyncMock()
+        ctx.response.send_modal = AsyncMock()
         return ctx
 
-    async def test_bet_create_empty_title_or_options(self):
-        ctx = self._make_ctx()
-        await self.cog.bet_create(ctx, title="   ", option_a="Yes", option_b="No")
-        ctx.response.send_message.assert_called_once()
-        self.assertIn("cannot be empty", ctx.response.send_message.call_args[0][0])
+    def _make_interaction(self, user_id: int = 1, guild_id: int = 10, is_admin: bool = False, roles=None):
+        inter = MagicMock(spec=discord.Interaction)
+        inter.user = MagicMock(id=user_id, mention=f"<@{user_id}>", roles=roles or [])
+        inter.user.guild_permissions = MagicMock(administrator=is_admin)
+        inter.guild = MagicMock(id=guild_id, emojis=[])
+        inter.channel = MagicMock()
+        inter.channel.id = 555
+        inter.channel.send = AsyncMock()
+        inter.response.send_message = AsyncMock()
+        inter.response.send_modal = AsyncMock()
+        inter.response.edit_message = AsyncMock()
+        return inter
 
-    async def test_bet_create_title_too_long(self):
+    async def test_bet_command_sends_modal(self):
         ctx = self._make_ctx()
-        await self.cog.bet_create(ctx, title="A" * 201, option_a="Yes", option_b="No")
-        ctx.response.send_message.assert_called_once()
-        self.assertIn("cannot exceed 200 characters", ctx.response.send_message.call_args[0][0])
-        self.assertTrue(ctx.response.send_message.call_args[1].get("ephemeral"))
+        await self.cog.bet(ctx)
+        ctx.response.send_modal.assert_called_once()
+        modal = ctx.response.send_modal.call_args[0][0]
+        self.assertIsInstance(modal, BetCreateModal)
 
-    async def test_bet_create_option_a_too_long(self):
-        ctx = self._make_ctx()
-        await self.cog.bet_create(ctx, title="Valid Title", option_a="A" * 101, option_b="No")
-        ctx.response.send_message.assert_called_once()
-        self.assertIn("cannot exceed 100 characters", ctx.response.send_message.call_args[0][0])
-        self.assertTrue(ctx.response.send_message.call_args[1].get("ephemeral"))
+    async def test_bet_create_modal_empty_title(self):
+        modal = BetCreateModal(self.cog)
+        modal.title_input = MagicMock(value="   ")
+        modal.options_input = MagicMock(value="A\nB")
+        modal.duration_input = MagicMock(value="30m")
 
-    async def test_bet_create_option_b_too_long(self):
-        ctx = self._make_ctx()
-        await self.cog.bet_create(ctx, title="Valid Title", option_a="Yes", option_b="B" * 101)
-        ctx.response.send_message.assert_called_once()
-        self.assertIn("cannot exceed 100 characters", ctx.response.send_message.call_args[0][0])
-        self.assertTrue(ctx.response.send_message.call_args[1].get("ephemeral"))
+        inter = self._make_interaction()
+        await modal.callback(inter)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("cannot be empty", inter.response.send_message.call_args[0][0])
 
-    async def test_bet_create_success(self):
-        ctx = self._make_ctx(user_id=100, guild_id=10)
+    async def test_bet_create_modal_invalid_duration(self):
+        modal = BetCreateModal(self.cog)
+        modal.title_input = MagicMock(value="Valid Title")
+        modal.options_input = MagicMock(value="A\nB")
+        modal.duration_input = MagicMock(value="invalid_duration")
+
+        inter = self._make_interaction()
+        await modal.callback(inter)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("Invalid duration", inter.response.send_message.call_args[0][0])
+
+    async def test_bet_create_modal_option_too_long(self):
+        modal = BetCreateModal(self.cog)
+        modal.title_input = MagicMock(value="Valid Title")
+        modal.options_input = MagicMock(value="A" * 105)
+        modal.duration_input = MagicMock(value="")
+
+        inter = self._make_interaction()
+        await modal.callback(inter)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("exceeds maximum length of 100", inter.response.send_message.call_args[0][0])
+
+    async def test_bet_create_modal_success_shows_setup_view(self):
+        modal = BetCreateModal(self.cog)
+        modal.title_input = MagicMock(value="Race winner")
+        modal.options_input = MagicMock(value="Dragon 1\nDragon 2")
+        modal.duration_input = MagicMock(value="1h")
+
+        inter = self._make_interaction()
+        await modal.callback(inter)
+        inter.response.send_message.assert_called_once()
+        embed = inter.response.send_message.call_args[1]["embed"]
+        view = inter.response.send_message.call_args[1]["view"]
+        self.assertIn("Race winner", embed.title)
+        self.assertIsInstance(view, BetSetupView)
+
+    async def test_bet_setup_view_toggle_custom_options(self):
+        view = BetSetupView(self.cog, "Title", ["A", "B"], timedelta(hours=1))
+        self.assertTrue(view.allow_custom)
+
+        inter = self._make_interaction()
+        await view._on_toggle_custom(inter)
+        self.assertFalse(view.allow_custom)
+        inter.response.edit_message.assert_called_once()
+
+    async def test_bet_setup_view_toggle_custom_options_locked_for_zero_options(self):
+        view = BetSetupView(self.cog, "Title", [], None)
+        self.assertTrue(view.allow_custom)
+
+        inter = self._make_interaction()
+        await view._on_toggle_custom(inter)
+        # Should stay True and notify user
+        self.assertTrue(view.allow_custom)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("must be allowed", inter.response.send_message.call_args[0][0])
+
+    async def test_bet_setup_view_publish_success(self):
+        view = BetSetupView(self.cog, "Grand Tournament", ["Knight A", "Knight B"], timedelta(hours=2))
+        inter = self._make_interaction(user_id=100, guild_id=10)
+
         created_pool = BetPool(
-            id=1,
+            id=42,
             guild_id=10,
+            channel_id=None,
+            message_id=None,
             creator_id=100,
-            title="Rain prediction",
-            option_a="Yes",
-            option_b="No",
+            title="Grand Tournament",
+            allow_custom_options=True,
             is_open=True,
-            winning_option=None,
+            is_locked=False,
+            locks_at=datetime.now(timezone.utc) + timedelta(hours=2),
         )
         self.mock_gambling_repo.create_bet_pool = AsyncMock(return_value=created_pool)
+        self.mock_gambling_repo.get_pool_options = AsyncMock(
+            return_value=[
+                BetOption(id=1, pool_id=42, label="Knight A", creator_id=100),
+                BetOption(id=2, pool_id=42, label="Knight B", creator_id=100),
+            ]
+        )
+        self.mock_gambling_repo.set_pool_message = AsyncMock(return_value=True)
 
-        await self.cog.bet_create(ctx, title="Rain prediction", option_a="Yes", option_b="No")
-        self.mock_gambling_repo.create_bet_pool.assert_called_once_with(10, 100, "Rain prediction", "Yes", "No")
-        ctx.response.send_message.assert_called_once()
-        embed = ctx.response.send_message.call_args[1]["embed"]
-        self.assertIn("Bet Pool #1", embed.title)
+        sent_msg = MagicMock()
+        sent_msg.id = 999
+        sent_msg.jump_url = "https://discord.com/channels/10/555/999"
+        inter.channel.send = AsyncMock(return_value=sent_msg)
 
-    async def test_bet_place_pool_not_found(self):
-        ctx = self._make_ctx()
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=None)
+        await view._on_publish(inter)
+        self.mock_gambling_repo.create_bet_pool.assert_called_once()
+        inter.channel.send.assert_called_once()
+        self.mock_gambling_repo.set_pool_message.assert_called_once_with(42, 10, 555, 999)
+        inter.response.edit_message.assert_called_once()
+        self.assertIn("published successfully", inter.response.edit_message.call_args[1]["content"])
 
-        await self.cog.bet_place(ctx, bet_id=999, choice="A", amount=50)
-        self.assertIn("does not exist", ctx.response.send_message.call_args[0][0])
-
-    async def test_bet_place_pool_closed(self):
-        ctx = self._make_ctx()
-        closed_pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=False)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=closed_pool)
-
-        await self.cog.bet_place(ctx, bet_id=1, choice="A", amount=50)
-        self.assertIn("already closed", ctx.response.send_message.call_args[0][0])
-
-    async def test_bet_place_insufficient_balance(self):
-        ctx = self._make_ctx()
-        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=True)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_gambling_repo.place_wager = AsyncMock(return_value=False)
-        self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[])
-        self.mock_economy_repo.get_balance = AsyncMock(return_value=10)
-
-        await self.cog.bet_place(ctx, bet_id=1, choice="A", amount=50)
-        self.assertIn("do not have enough", ctx.response.send_message.call_args[0][0])
-
-    async def test_bet_place_opposite_choice_conflict(self):
-        ctx = self._make_ctx(user_id=1)
-        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=True)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_gambling_repo.place_wager = AsyncMock(return_value=False)
-        existing_wager = BetWager(id=1, pool_id=1, user_id=1, guild_id=10, choice="A", amount=50)
-        self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[existing_wager])
-
-        await self.cog.bet_place(ctx, bet_id=1, choice="B", amount=50)
-        self.assertIn("already wagered on the other option", ctx.response.send_message.call_args[0][0])
-
-    async def test_bet_place_success(self):
-        ctx = self._make_ctx()
-        pool = BetPool(
+    async def test_bet_pool_view_components(self):
+        pool_open = BetPool(
             id=1,
             guild_id=10,
             creator_id=100,
             title="T",
-            option_a="Red",
-            option_b="Blue",
+            allow_custom_options=True,
             is_open=True,
+            is_locked=False,
         )
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_gambling_repo.place_wager = AsyncMock(return_value=True)
+        options = [BetOption(id=1, pool_id=1, label="A", creator_id=100)]
+        view_open = BetPoolView(self.cog, pool_open, options)
+        # Should have Select, Add Option button, Lock button, Resolve button, Cancel button
+        self.assertEqual(len(view_open.children), 5)
 
-        await self.cog.bet_place(ctx, bet_id=1, choice="A", amount=50)
-        self.mock_gambling_repo.place_wager.assert_called_once_with(1, ctx.author.id, 10, "A", 50)
-        embed = ctx.response.send_message.call_args[1]["embed"]
-        self.assertIn("Wager Placed!", embed.title)
+        pool_locked = BetPool(
+            id=1,
+            guild_id=10,
+            creator_id=100,
+            title="T",
+            allow_custom_options=True,
+            is_open=True,
+            is_locked=True,
+        )
+        view_locked = BetPoolView(self.cog, pool_locked, options)
+        # Should only have Resolve button and Cancel button
+        self.assertEqual(len(view_locked.children), 2)
+
+    async def test_lock_button_unauthorized(self):
+        btn = LockButton(self.cog, pool_id=1, creator_id=100)
+        inter = self._make_interaction(user_id=999, is_admin=False)
+        self.mock_client.db.get_setting = AsyncMock(return_value=None)
+
+        await btn.callback(inter)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("Only the creator or a team member", inter.response.send_message.call_args[0][0])
+        self.mock_gambling_repo.lock_bet_pool.assert_not_called()
+
+    async def test_lock_button_authorized(self):
+        btn = LockButton(self.cog, pool_id=1, creator_id=100)
+        inter = self._make_interaction(user_id=100, guild_id=10)
+        self.mock_gambling_repo.lock_bet_pool = AsyncMock(return_value=True)
+        mock_update = AsyncMock()
+        setattr(self.cog, "_update_bet_message", mock_update)
+
+        await btn.callback(inter)
+        self.mock_gambling_repo.lock_bet_pool.assert_called_once_with(1, 10)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("now locked", inter.response.send_message.call_args[0][0])
+        mock_update.assert_called_once_with(1, 10)
+
+    async def test_cancel_button_authorized(self):
+        btn = CancelButton(self.cog, pool_id=1, creator_id=100)
+        inter = self._make_interaction(user_id=100, guild_id=10)
+        self.mock_gambling_repo.cancel_bet_pool = AsyncMock(return_value=True)
+        mock_update = AsyncMock()
+        setattr(self.cog, "_update_bet_message", mock_update)
+
+        await btn.callback(inter)
+        self.mock_gambling_repo.cancel_bet_pool.assert_called_once_with(1, 10)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("cancelled and all wagers refunded", inter.response.send_message.call_args[0][0])
+        mock_update.assert_called_once_with(1, 10)
+
+    async def test_resolve_button_opens_view(self):
+        btn = ResolveButton(self.cog, pool_id=1, creator_id=100, options=[])
+        inter = self._make_interaction(user_id=100)
+        self.mock_gambling_repo.get_pool_options = AsyncMock(return_value=[])
+
+        await btn.callback(inter)
+        inter.response.send_message.assert_called_once()
+        view = inter.response.send_message.call_args[1]["view"]
+        self.assertIsInstance(view, ResolveBetView)
+
+    async def test_place_wager_modal_success(self):
+        modal = PlaceWagerModal(self.cog, pool_id=1, option_label="Option A")
+        modal.amount_input = MagicMock(value="150")
+
+        inter = self._make_interaction(user_id=5, guild_id=10)
+        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", is_open=True, is_locked=False)
+        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
+        self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[])
+        self.mock_economy_repo.get_balance = AsyncMock(return_value=500)
+        self.mock_gambling_repo.place_wager = AsyncMock(return_value=True)
+        mock_update = AsyncMock()
+        setattr(self.cog, "_update_bet_message", mock_update)
+
+        await modal.callback(inter)
+        self.mock_gambling_repo.place_wager.assert_called_once_with(1, 5, 10, "Option A", 150)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("Successfully wagered", inter.response.send_message.call_args[0][0])
+        mock_update.assert_called_once_with(1, 10)
+
+    async def test_place_wager_modal_conflicting_option(self):
+        modal = PlaceWagerModal(self.cog, pool_id=1, option_label="Option B")
+        modal.amount_input = MagicMock(value="150")
+
+        inter = self._make_interaction(user_id=5, guild_id=10)
+        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", is_open=True, is_locked=False)
+        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
+        existing_wager = BetWager(id=1, pool_id=1, user_id=5, guild_id=10, choice="Option A", amount=100)
+        self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[existing_wager])
+
+        await modal.callback(inter)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("already wagered on 'Option A'", inter.response.send_message.call_args[0][0])
+        self.mock_gambling_repo.place_wager.assert_not_called()
+
+    async def test_add_custom_option_modal_success(self):
+        modal = AddCustomOptionModal(self.cog, pool_id=1)
+        modal.label_input = MagicMock(value="Dark Horse")
+        modal.amount_input = MagicMock(value="200")
+
+        inter = self._make_interaction(user_id=5, guild_id=10)
+        created_opt = BetOption(id=10, pool_id=1, label="Dark Horse", creator_id=5)
+        self.mock_gambling_repo.add_bet_option = AsyncMock(return_value=(True, created_opt, "Option added."))
+        self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[])
+        self.mock_economy_repo.get_balance = AsyncMock(return_value=500)
+        self.mock_gambling_repo.place_wager = AsyncMock(return_value=True)
+        mock_update = AsyncMock()
+        setattr(self.cog, "_update_bet_message", mock_update)
+
+        await modal.callback(inter)
+        self.mock_gambling_repo.add_bet_option.assert_called_once_with(1, 10, 5, "Dark Horse")
+        self.mock_gambling_repo.place_wager.assert_called_once_with(1, 5, 10, "Dark Horse", 200)
+        inter.response.send_message.assert_called_once()
+        self.assertIn("Successfully added option", inter.response.send_message.call_args[0][0])
+        mock_update.assert_called_once_with(1, 10)
+
+    async def test_custom_outcome_modal_resolves_pool(self):
+        modal = CustomOutcomeModal(self.cog, pool_id=1)
+        modal.outcome_input = MagicMock(value="Tie / Draw")
+
+        inter = self._make_interaction(user_id=100, guild_id=10)
+        self.mock_gambling_repo.resolve_bet_pool = AsyncMock(return_value={5: 600})
+        mock_update = AsyncMock()
+        setattr(self.cog, "_update_bet_message", mock_update)
+
+        await modal.callback(inter)
+        self.mock_gambling_repo.resolve_bet_pool.assert_called_once_with(1, 10, "Tie / Draw")
+        inter.response.send_message.assert_called_once()
+        self.assertIn("Distributed", inter.response.send_message.call_args[0][0])
+        mock_update.assert_called_once_with(1, 10)
 
     async def test_bet_list_empty(self):
         ctx = self._make_ctx()
@@ -541,25 +878,27 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
         await self.cog.bet_list(ctx)
         self.assertIn("no open bet pools", ctx.response.send_message.call_args[0][0])
 
-    async def test_bet_list_with_pools(self):
+    async def test_bet_list_with_pools_and_jump_links(self):
         ctx = self._make_ctx()
         pool = BetPool(
             id=1,
             guild_id=10,
+            channel_id=555,
+            message_id=999,
             creator_id=100,
             title="Match 1",
-            option_a="Team A",
-            option_b="Team B",
             is_open=True,
+            is_locked=False,
         )
         self.mock_gambling_repo.get_open_bet_pools = AsyncMock(return_value=[pool])
-        wager = BetWager(id=1, pool_id=1, user_id=2, guild_id=10, choice="A", amount=150)
+        wager = BetWager(id=1, pool_id=1, user_id=2, guild_id=10, choice="Option A", amount=150)
         self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[wager])
 
         await self.cog.bet_list(ctx)
         embed = ctx.response.send_message.call_args[1]["embed"]
         self.assertEqual(embed.title, "Active Prediction Bet Pools")
         self.assertEqual(len(embed.fields), 1)
+        self.assertIn("Jump to Bet", embed.fields[0].value)
 
     async def test_bet_list_truncates_at_10_pools(self):
         ctx = self._make_ctx()
@@ -569,9 +908,8 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
                 guild_id=10,
                 creator_id=100,
                 title=f"Match {i}",
-                option_a=f"A{i}",
-                option_b=f"B{i}",
                 is_open=True,
+                is_locked=False,
             )
             for i in range(1, 13)
         ]
@@ -583,74 +921,44 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(embed.fields), 10)
         self.assertIn("Showing 10 of 12", embed.footer.text)
 
-    async def test_bet_resolve_unauthorized_user(self):
-        ctx = self._make_ctx(user_id=999, is_admin=False, roles=[])
-        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=True)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_client.db.get_setting = AsyncMock(return_value=None)
+    async def test_auto_lock_task(self):
+        expired_pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", is_open=True, is_locked=True)
+        self.mock_gambling_repo.auto_lock_expired_pools = AsyncMock(return_value=[expired_pool])
+        mock_update = AsyncMock()
+        setattr(self.cog, "_update_bet_message", mock_update)
 
-        await self.cog.bet_resolve(ctx, bet_id=1, outcome="A")
-        self.assertIn("Only the bet creator or a team member", ctx.response.send_message.call_args[0][0])
-        self.assertTrue(ctx.response.send_message.call_args[1].get("ephemeral"))
-        self.mock_gambling_repo.resolve_bet_pool.assert_not_called()
+        # Execute one iteration of the task directly
+        await self.cog.auto_lock_task()
+        self.mock_gambling_repo.auto_lock_expired_pools.assert_called_once()
+        mock_update.assert_called_once_with(1, 10)
 
-    async def test_bet_resolve_authorized_by_creator(self):
-        # User is the creator
-        ctx = self._make_ctx(user_id=100, is_admin=False)
-        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=True)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_gambling_repo.resolve_bet_pool = AsyncMock(return_value={2: 400})
-
-        await self.cog.bet_resolve(ctx, bet_id=1, outcome="A")
-        self.mock_gambling_repo.resolve_bet_pool.assert_called_once_with(1, 10, "A")
-        embed = ctx.response.send_message.call_args[1]["embed"]
-        self.assertIn("Resolved", embed.title)
-
-    async def test_bet_resolve_authorized_by_admin(self):
-        # User is not creator, but is admin
-        ctx = self._make_ctx(user_id=200, is_admin=True)
-        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=True)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_gambling_repo.resolve_bet_pool = AsyncMock(return_value={2: 400})
-
-        await self.cog.bet_resolve(ctx, bet_id=1, outcome="A")
-        self.mock_gambling_repo.resolve_bet_pool.assert_called_once_with(1, 10, "A")
-        embed = ctx.response.send_message.call_args[1]["embed"]
-        self.assertIn("Resolved", embed.title)
-
-    async def test_bet_resolve_authorized_by_team_role(self):
-        # User is not creator, not admin, but has TeamRole
-        role = SimpleNamespace(id=555)
-        ctx = self._make_ctx(user_id=300, is_admin=False, roles=[role])
-        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=True)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_client.db.get_setting = AsyncMock(
-            return_value=SimpleNamespace(setting=SettingsEnum.TeamRole.value, value=555)
+    async def test_on_start_done_registers_views(self):
+        pool_with_msg = BetPool(
+            id=1,
+            guild_id=10,
+            channel_id=555,
+            message_id=999,
+            creator_id=100,
+            title="Pool With Message",
+            is_open=True,
+            is_locked=False,
         )
-        self.mock_gambling_repo.resolve_bet_pool = AsyncMock(return_value={2: 400})
+        pool_no_msg = BetPool(
+            id=2,
+            guild_id=10,
+            channel_id=None,
+            message_id=None,
+            creator_id=100,
+            title="Pool Without Message",
+            is_open=True,
+            is_locked=False,
+        )
+        self.mock_gambling_repo.get_all_open_bet_pools = AsyncMock(return_value=[pool_with_msg, pool_no_msg])
+        self.mock_gambling_repo.get_pool_options = AsyncMock(return_value=[])
 
-        await self.cog.bet_resolve(ctx, bet_id=1, outcome="B")
-        self.mock_gambling_repo.resolve_bet_pool.assert_called_once_with(1, 10, "B")
-        embed = ctx.response.send_message.call_args[1]["embed"]
-        self.assertIn("Resolved", embed.title)
+        await self.cog.on_start_done()
 
-    async def test_bet_resolve_cancel(self):
-        ctx = self._make_ctx(user_id=100)
-        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=True)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_gambling_repo.cancel_bet_pool = AsyncMock(return_value=True)
-
-        await self.cog.bet_resolve(ctx, bet_id=1, outcome="cancel")
-        self.mock_gambling_repo.cancel_bet_pool.assert_called_once_with(1, 10)
-        embed = ctx.response.send_message.call_args[1]["embed"]
-        self.assertIn("Cancelled", embed.title)
-
-    async def test_bet_resolve_zero_winners_announcement(self):
-        ctx = self._make_ctx(user_id=100)
-        pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", option_a="A", option_b="B", is_open=True)
-        self.mock_gambling_repo.get_bet_pool = AsyncMock(return_value=pool)
-        self.mock_gambling_repo.resolve_bet_pool = AsyncMock(return_value={})
-
-        await self.cog.bet_resolve(ctx, bet_id=1, outcome="A")
-        embed = ctx.response.send_message.call_args[1]["embed"]
-        self.assertIn("refunded", embed.description.lower())
+        self.mock_client.add_view.assert_called_once()
+        call_kwargs = self.mock_client.add_view.call_args[1]
+        self.assertEqual(call_kwargs.get("message_id"), 999)
+        self.assertIsInstance(self.mock_client.add_view.call_args[0][0], BetPoolView)

@@ -24,6 +24,7 @@ EXPECTED_TABLES = {
     "Confirmation",
     "Events",
     "botstatus",
+    "economy_bet_options",
     "economy_bet_pools",
     "economy_bet_wagers",
     "economy_wallets",

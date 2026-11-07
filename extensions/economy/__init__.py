@@ -1,8 +1,10 @@
 from .gambling import Gambling
-from .models import BetPool, BetWager, EconomyWallet, format_scales, get_guild_id
+from .models import MAX_BET_OPTIONS, BetOption, BetPool, BetWager, EconomyWallet, format_scales, get_guild_id
 from .repository import EconomyRepository, GamblingRepository
 
 __all__ = [
+    "MAX_BET_OPTIONS",
+    "BetOption",
     "BetPool",
     "BetWager",
     "EconomyRepository",
