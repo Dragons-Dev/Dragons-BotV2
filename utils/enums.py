@@ -28,6 +28,9 @@ class InfractionsEnum(Enum):
     Warn = "Warn"
 
 
+ModerationEnum = InfractionsEnum
+
+
 class StatTypeEnum(Enum):
     MessagesSent = "MessagesSent"
     CommandsUsed = "CommandsUsed"
