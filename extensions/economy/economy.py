@@ -7,7 +7,7 @@ from pycord import multicog as pycog
 
 from utils import Bot, CustomLogger, is_team
 
-from .models import format_scales
+from .models import format_scales, get_guild_id
 from .repository import EconomyRepository
 
 __all__ = ["Economy", "setup"]
@@ -144,7 +144,8 @@ class Economy(commands.Cog):
     )
     async def balance(self, ctx: discord.ApplicationContext, member: discord.Member | None = None) -> None:
         target = member or ctx.author
-        bal = await self.economy_repo.get_balance(target.id, ctx.guild.id)  # type: ignore[union-attr]
+        guild_id = get_guild_id(ctx)
+        bal = await self.economy_repo.get_balance(target.id, guild_id)
         embed = discord.Embed(
             title="Dragon Scales Balance",
             description=f"{target.mention} has **{format_scales(bal, ctx.guild)}**.",
@@ -178,14 +179,10 @@ class Economy(commands.Cog):
             await ctx.response.send_message("The transfer amount must be greater than 0.", ephemeral=True)
             return
 
-        success = await self.economy_repo.transfer_balance(
-            ctx.author.id,
-            member.id,
-            ctx.guild.id,
-            amount,  # type: ignore[union-attr]
-        )
+        guild_id = get_guild_id(ctx)
+        success = await self.economy_repo.transfer_balance(ctx.author.id, member.id, guild_id, amount)
         if not success:
-            bal = await self.economy_repo.get_balance(ctx.author.id, ctx.guild.id)  # type: ignore[union-attr]
+            bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             await ctx.response.send_message(
                 f"You do not have enough Dragon Scales. Your current balance is {format_scales(bal, ctx.guild)}.",
                 ephemeral=True,
@@ -199,7 +196,8 @@ class Economy(commands.Cog):
     @pycog.subcommand("economy")
     @commands.slash_command(name="leaderboard", description="View the top 10 richest members in the guild.")
     async def leaderboard(self, ctx: discord.ApplicationContext) -> None:
-        leaders = await self.economy_repo.get_leaderboard(ctx.guild.id, limit=10)  # type: ignore[union-attr]
+        guild_id = get_guild_id(ctx)
+        leaders = await self.economy_repo.get_leaderboard(guild_id, limit=10)
         if not leaders:
             await ctx.response.send_message("No members have any Dragon Scales yet.")
             return
@@ -236,7 +234,8 @@ class Economy(commands.Cog):
             await ctx.response.send_message("The amount must be greater than 0.", ephemeral=True)
             return
 
-        new_bal = await self.economy_repo.add_balance(member.id, ctx.guild.id, amount)  # type: ignore[union-attr]
+        guild_id = get_guild_id(ctx)
+        new_bal = await self.economy_repo.add_balance(member.id, guild_id, amount)
         await ctx.response.send_message(
             f"Added {format_scales(amount, ctx.guild)} to {member.mention}. "
             f"New balance: {format_scales(new_bal, ctx.guild)}."
@@ -263,9 +262,10 @@ class Economy(commands.Cog):
             await ctx.response.send_message("The amount must be greater than 0.", ephemeral=True)
             return
 
-        success = await self.economy_repo.remove_balance(member.id, ctx.guild.id, amount)  # type: ignore[union-attr]
+        guild_id = get_guild_id(ctx)
+        success = await self.economy_repo.remove_balance(member.id, guild_id, amount)
         if not success:
-            bal = await self.economy_repo.get_balance(member.id, ctx.guild.id)  # type: ignore[union-attr]
+            bal = await self.economy_repo.get_balance(member.id, guild_id)
             await ctx.response.send_message(
                 f"Cannot take {format_scales(amount, ctx.guild)} from {member.mention}. "
                 f"Current balance: {format_scales(bal, ctx.guild)}.",
@@ -273,7 +273,7 @@ class Economy(commands.Cog):
             )
             return
 
-        new_bal = await self.economy_repo.get_balance(member.id, ctx.guild.id)  # type: ignore[union-attr]
+        new_bal = await self.economy_repo.get_balance(member.id, guild_id)
         await ctx.response.send_message(
             f"Took {format_scales(amount, ctx.guild)} from {member.mention}. "
             f"New balance: {format_scales(new_bal, ctx.guild)}."
@@ -300,7 +300,8 @@ class Economy(commands.Cog):
             await ctx.response.send_message("The amount cannot be negative.", ephemeral=True)
             return
 
-        new_bal = await self.economy_repo.set_balance(member.id, ctx.guild.id, amount)  # type: ignore[union-attr]
+        guild_id = get_guild_id(ctx)
+        new_bal = await self.economy_repo.set_balance(member.id, guild_id, amount)
         await ctx.response.send_message(f"Set balance of {member.mention} to {format_scales(new_bal, ctx.guild)}.")
 
 
