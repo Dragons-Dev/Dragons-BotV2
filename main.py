@@ -30,6 +30,7 @@ bot = Bot(
 @bot.listen("on_ready", once=True)
 async def on_boot():
     await bot.setup_databases()
+    await bot.ensure_application_emoji("dragon_scale", "assets/dragon_scale.png")
     bot.api = aiohttp.ClientSession(
         "https://discord.com",
         headers={"Authorization": "Bot " + DISCORD_API_KEY, "User-Agent": f"Dragons BotV{bot.version}"},

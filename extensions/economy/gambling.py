@@ -12,7 +12,15 @@ from pycord import multicog as pycog
 from utils import Bot, CustomLogger
 from utils.enums import SettingsEnum
 
-from .models import MAX_BET_OPTIONS, BetOption, BetPool, BetWager, format_scales, get_guild_id
+from .models import (
+    MAX_BET_OPTIONS,
+    BetOption,
+    BetPool,
+    BetWager,
+    format_scales,
+    get_dragon_scale_emoji,
+    get_guild_id,
+)
 from .repository import EconomyRepository, GamblingRepository
 
 __all__ = ["Gambling", "setup"]
@@ -20,10 +28,10 @@ __all__ = ["Gambling", "setup"]
 SLOT_SYMBOLS = ["🍒", "🍋", "🔔", "💎", "🐉"]
 
 
-def _calculate_slot_multiplier(symbols: list[str]) -> int:
+def _calculate_slot_multiplier(symbols: list[str], dragon_symbol: str = "🐉") -> int:
     s1, s2, s3 = symbols
     if s1 == s2 == s3:
-        return 10 if s1 == "🐉" else 5
+        return 10 if s1 in ("🐉", dragon_symbol) else 5
     if s1 == s2 or s2 == s3 or s1 == s3:
         return 2
     return 0
@@ -60,13 +68,16 @@ def _parse_bet_options(text: str) -> list[str]:
     return result
 
 
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _is_expired(locks_at: datetime | None) -> bool:
     if locks_at is None:
         return False
-    now = datetime.now(timezone.utc)
-    if locks_at.tzinfo is None:
-        locks_at = locks_at.replace(tzinfo=timezone.utc)
-    return now >= locks_at
+    return datetime.now(timezone.utc) >= _ensure_utc(locks_at)
 
 
 def _get_embed_status_and_color(pool: BetPool) -> tuple[str, discord.Color]:
@@ -83,6 +94,7 @@ def _format_pool_options_text(
     options: Sequence[BetOption],
     wagers: Sequence[BetWager],
     guild: discord.Guild | None,
+    bot: Bot | None = None,
 ) -> str:
     if not options:
         return "*No options yet. Use '➕ Add Option & Bet' below to add the first option!*"
@@ -92,7 +104,7 @@ def _format_pool_options_text(
         opt_total = sum(w.amount for w in opt_wagers)
         bettor_count = len(opt_wagers)
         suffix = "bettors" if bettor_count != 1 else "bettor"
-        opt_lines.append(f"• **{opt.label}**: {format_scales(opt_total, guild)} ({bettor_count} {suffix})")
+        opt_lines.append(f"• **{opt.label}**: {format_scales(opt_total, guild, bot)} ({bettor_count} {suffix})")
     return "\n".join(opt_lines)
 
 
@@ -102,6 +114,7 @@ def _add_resolution_field_if_closed(
     wagers: Sequence[BetWager],
     total_pool: int,
     guild: discord.Guild | None,
+    bot: Bot | None = None,
 ) -> None:
     if pool.is_open or pool.winning_option == "CANCELLED":
         return
@@ -115,7 +128,7 @@ def _add_resolution_field_if_closed(
     else:
         embed.add_field(
             name="Resolution",
-            value=f"{len(win_wagers)} winner(s) split the pool of {format_scales(total_pool, guild)}!",
+            value=f"{len(win_wagers)} winner(s) split the pool of {format_scales(total_pool, guild, bot)}!",
             inline=False,
         )
 
@@ -125,6 +138,7 @@ def _build_bet_embed(
     options: Sequence[BetOption],
     wagers: Sequence[BetWager],
     guild: discord.Guild | None,
+    bot: Bot | None = None,
 ) -> discord.Embed:
     total_pool = sum(w.amount for w in wagers)
     status_text, color = _get_embed_status_and_color(pool)
@@ -139,14 +153,14 @@ def _build_bet_embed(
     embed.add_field(name="Custom Options", value=custom_text, inline=True)
 
     if pool.locks_at:
-        ts = int(pool.locks_at.timestamp())
+        ts = int(_ensure_utc(pool.locks_at).timestamp())
         embed.add_field(name="Locks At", value=f"<t:{ts}:R> (<t:{ts}:f>)", inline=False)
 
-    options_value = _format_pool_options_text(options, wagers, guild)
+    options_value = _format_pool_options_text(options, wagers, guild, bot)
     embed.add_field(name="Options", value=options_value, inline=False)
-    embed.add_field(name="Total Pool", value=format_scales(total_pool, guild), inline=False)
+    embed.add_field(name="Total Pool", value=format_scales(total_pool, guild, bot), inline=False)
 
-    _add_resolution_field_if_closed(embed, pool, wagers, total_pool, guild)
+    _add_resolution_field_if_closed(embed, pool, wagers, total_pool, guild, bot)
     return embed
 
 
@@ -405,7 +419,8 @@ class PlaceWagerModal(discord.ui.Modal):
         bal = await self.cog.economy_repo.get_balance(interaction.user.id, guild_id)
         if bal < amount:
             await interaction.response.send_message(
-                f"You do not have enough Dragon Scales. Current balance: {format_scales(bal, interaction.guild)}.",
+                f"You do not have enough Dragon Scales. "
+                f"Current balance: {format_scales(bal, interaction.guild, self.cog.client)}.",
                 ephemeral=True,
             )
             return
@@ -418,7 +433,8 @@ class PlaceWagerModal(discord.ui.Modal):
             return
 
         await interaction.response.send_message(
-            f"Successfully wagered **{format_scales(amount, interaction.guild)}** on **{self.option_label}**!",
+            f"Successfully wagered **{format_scales(amount, interaction.guild, self.cog.client)}** "
+            f"on **{self.option_label}**!",
             ephemeral=True,
         )
         await self.cog._update_bet_message(self.pool_id, guild_id)
@@ -482,7 +498,8 @@ class AddCustomOptionModal(discord.ui.Modal):
         bal = await self.cog.economy_repo.get_balance(interaction.user.id, guild_id)
         if bal < amount:
             await interaction.response.send_message(
-                f"You do not have enough Dragon Scales. Current balance: {format_scales(bal, interaction.guild)}.",
+                f"You do not have enough Dragon Scales. "
+                f"Current balance: {format_scales(bal, interaction.guild, self.cog.client)}.",
                 ephemeral=True,
             )
             return
@@ -495,7 +512,8 @@ class AddCustomOptionModal(discord.ui.Modal):
             return
 
         await interaction.response.send_message(
-            f"Successfully added option **{opt.label}** and wagered **{format_scales(amount, interaction.guild)}**!",
+            f"Successfully added option **{opt.label}** and wagered "
+            f"**{format_scales(amount, interaction.guild, self.cog.client)}**!",
             ephemeral=True,
         )
         await self.cog._update_bet_message(self.pool_id, guild_id)
@@ -637,7 +655,7 @@ class BetSetupView(discord.ui.View):
             locks_at=locks_at,
         )
         options = await self.cog.gambling_repo.get_pool_options(pool.id)
-        embed = _build_bet_embed(pool, options, [], interaction.guild)
+        embed = _build_bet_embed(pool, options, [], interaction.guild, self.cog.client)
         view = _build_bet_pool_view(self.cog, pool, options)
 
         channel = interaction.channel
@@ -725,7 +743,7 @@ class Gambling(commands.Cog):
         if not success:
             bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             await ctx.response.send_message(
-                f"You do not have enough Dragon Scales. Current balance: {format_scales(bal, ctx.guild)}.",
+                f"You do not have enough Dragon Scales. Current balance: {format_scales(bal, ctx.guild, self.client)}.",
                 ephemeral=True,
             )
             return False
@@ -782,7 +800,8 @@ class Gambling(commands.Cog):
             total_distributed = sum(payouts.values())
             await interaction.response.send_message(
                 f"Resolved Bet #{pool_id} with outcome **{winning_choice}**!\n"
-                f"Distributed **{format_scales(total_distributed, interaction.guild)}** to {len(payouts)} winner(s).",
+                f"Distributed **{format_scales(total_distributed, interaction.guild, self.client)}** "
+                f"to {len(payouts)} winner(s).",
                 ephemeral=True,
             )
         await self._update_bet_message(pool_id, guild_id)
@@ -800,7 +819,7 @@ class Gambling(commands.Cog):
                 channel = await self.client.fetch_channel(pool.channel_id)
             guild = getattr(channel, "guild", None)
             msg = await channel.fetch_message(pool.message_id)  # type: ignore[union-attr]
-            embed = _build_bet_embed(pool, options, wagers, guild)
+            embed = _build_bet_embed(pool, options, wagers, guild, self.client)
             view = _build_bet_pool_view(self, pool, options)
             await msg.edit(embed=embed, view=view)
         except Exception as e:
@@ -830,8 +849,8 @@ class Gambling(commands.Cog):
                 title="🪙 Coinflip — Winner!",
                 description=(
                     f"The coin landed on **{flip}**!\n"
-                    f"You won **{format_scales(payout, ctx.guild)}**!\n"
-                    f"New balance: {format_scales(new_bal, ctx.guild)}."
+                    f"You won **{format_scales(payout, ctx.guild, self.client)}**!\n"
+                    f"New balance: {format_scales(new_bal, ctx.guild, self.client)}."
                 ),
                 color=discord.Color.green(),
             )
@@ -841,8 +860,8 @@ class Gambling(commands.Cog):
                 title="🪙 Coinflip — Lost",
                 description=(
                     f"The coin landed on **{flip}**.\n"
-                    f"You lost **{format_scales(amount, ctx.guild)}**.\n"
-                    f"New balance: {format_scales(new_bal, ctx.guild)}."
+                    f"You lost **{format_scales(amount, ctx.guild, self.client)}**.\n"
+                    f"New balance: {format_scales(new_bal, ctx.guild, self.client)}."
                 ),
                 color=discord.Color.red(),
             )
@@ -876,8 +895,8 @@ class Gambling(commands.Cog):
                 title="🎲 Dice Roll — Winner!",
                 description=(
                     f"The die rolled a **{roll}**!\n"
-                    f"You won **{format_scales(payout, ctx.guild)}**!\n"
-                    f"New balance: {format_scales(new_bal, ctx.guild)}."
+                    f"You won **{format_scales(payout, ctx.guild, self.client)}**!\n"
+                    f"New balance: {format_scales(new_bal, ctx.guild, self.client)}."
                 ),
                 color=discord.Color.green(),
             )
@@ -887,8 +906,8 @@ class Gambling(commands.Cog):
                 title="🎲 Dice Roll — Lost",
                 description=(
                     f"The die rolled a **{roll}** (your guess: {guess}).\n"
-                    f"You lost **{format_scales(amount, ctx.guild)}**.\n"
-                    f"New balance: {format_scales(new_bal, ctx.guild)}."
+                    f"You lost **{format_scales(amount, ctx.guild, self.client)}**.\n"
+                    f"New balance: {format_scales(new_bal, ctx.guild, self.client)}."
                 ),
                 color=discord.Color.red(),
             )
@@ -906,8 +925,11 @@ class Gambling(commands.Cog):
             return
 
         guild_id = get_guild_id(ctx)
-        symbols = random.choices(SLOT_SYMBOLS, k=3)
-        multiplier = _calculate_slot_multiplier(symbols)
+        dragon_emoji = get_dragon_scale_emoji(ctx.guild, self.client)
+        slot_symbols = [dragon_emoji if s == "🐉" else s for s in SLOT_SYMBOLS]
+        raw_symbols = random.choices(slot_symbols, k=3)
+        symbols = [dragon_emoji if s == "🐉" else s for s in raw_symbols]
+        multiplier = _calculate_slot_multiplier(symbols, dragon_emoji)
         slot_display = f"[ {' | '.join(symbols)} ]"
 
         if multiplier > 0:
@@ -919,8 +941,8 @@ class Gambling(commands.Cog):
                 description=(
                     f"**{slot_display}**\n\n"
                     f"Multiplier: **{multiplier}x**!\n"
-                    f"You won **{format_scales(payout, ctx.guild)}**!\n"
-                    f"New balance: {format_scales(new_bal, ctx.guild)}."
+                    f"You won **{format_scales(payout, ctx.guild, self.client)}**!\n"
+                    f"New balance: {format_scales(new_bal, ctx.guild, self.client)}."
                 ),
                 color=discord.Color.green(),
             )
@@ -931,8 +953,8 @@ class Gambling(commands.Cog):
                 description=(
                     f"**{slot_display}**\n\n"
                     "No matching symbols.\n"
-                    f"You lost **{format_scales(amount, ctx.guild)}**.\n"
-                    f"New balance: {format_scales(new_bal, ctx.guild)}."
+                    f"You lost **{format_scales(amount, ctx.guild, self.client)}**.\n"
+                    f"New balance: {format_scales(new_bal, ctx.guild, self.client)}."
                 ),
                 color=discord.Color.red(),
             )
@@ -950,7 +972,7 @@ class Gambling(commands.Cog):
         guild_id = get_guild_id(ctx)
         pools = await self.gambling_repo.get_open_bet_pools(guild_id)
         if not pools:
-            await ctx.response.send_message("There are currently no open bet pools in this server.")
+            await ctx.response.send_message("There are currently no open bet pools in this server.", ephemeral=True)
             return
 
         embed = discord.Embed(
@@ -967,12 +989,15 @@ class Gambling(commands.Cog):
 
             embed.add_field(
                 name=f"#{pool.id}: {pool.title}",
-                value=f"Status: **{status_icon}** • Total Pool: **{format_scales(total_pool, ctx.guild)}**{jump}",
+                value=(
+                    f"Status: **{status_icon}** • Total Pool: **{format_scales(total_pool, ctx.guild, self.client)}**"
+                    f"{jump}"
+                ),
                 inline=False,
             )
         if len(pools) > 10:
             embed.set_footer(text=f"Showing 10 of {len(pools)} open bet pools.")
-        await ctx.response.send_message(embed=embed)
+        await ctx.response.send_message(embed=embed, ephemeral=True)
 
 
 def setup(client: Bot) -> None:
