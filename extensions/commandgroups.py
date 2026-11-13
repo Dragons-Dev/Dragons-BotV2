@@ -15,6 +15,7 @@ class CommandGroups(commands.Cog):
 
     user = discord.SlashCommandGroup("user", contexts={discord.InteractionContextType.guild})
     economy = discord.SlashCommandGroup("economy", contexts={discord.InteractionContextType.guild})
+    gamble = discord.SlashCommandGroup("gamble", contexts={discord.InteractionContextType.guild})
 
 
 def setup(client):
