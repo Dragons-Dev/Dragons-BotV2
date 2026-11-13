@@ -77,36 +77,69 @@ class ModmailRepository(BaseRepository):
     """Repository for modmail operations."""
 
     async def create_modmail(
-        self, user: discord.User | discord.Member, guild: discord.Guild, uuid: str, anonymous: bool
-    ) -> None:
+        self,
+        user: discord.User | discord.Member,
+        guild: discord.Guild,
+        uuid: str,
+        anonymous: bool,
+        thread_id: int | None = None,
+    ) -> Modmail:
         async with self.session() as session:
-            session.add(
-                Modmail(
-                    user_id=user.id,
-                    guild_id=guild.id,
-                    uuid=uuid,
-                    anon=anonymous,
-                )
+            record = Modmail(
+                user_id=user.id,
+                guild_id=guild.id,
+                uuid=uuid,
+                anon=anonymous,
+                thread_id=thread_id,
             )
+            session.add(record)
+            await session.flush()
+            return record
 
-    async def get_modmail(self, user: discord.User | discord.Member | None, uuid: str | None) -> None | Modmail:
+    async def get_modmail(
+        self,
+        user: discord.User | discord.Member | None = None,
+        uuid: str | None = None,
+        thread_id: int | None = None,
+    ) -> Modmail | None:
         async with self.session() as session:
-            if user:
-                query = select(Modmail).where(Modmail.user_id == user.id)
-            elif uuid:
-                query = select(Modmail).where(Modmail.uuid == uuid)
-            else:
-                raise LookupError("Both arguments are 'None'. At least one must have a value!")
+            conditions = []
+            if thread_id is not None:
+                conditions.append(Modmail.thread_id == thread_id)
+            if uuid is not None:
+                conditions.append(Modmail.uuid == uuid)
+            if user is not None:
+                conditions.append(Modmail.user_id == user.id)
+            if not conditions:
+                raise LookupError("All arguments are 'None'. At least one must have a value!")
+            query = select(Modmail).where(*conditions)
             modmail = (await session.execute(query)).scalar_one_or_none()
         return modmail
 
-    async def delete_modmail(self, user: discord.User | discord.Member) -> None:
+    async def update_thread_id(self, uuid: str, thread_id: int) -> None:
         async with self.session() as session:
-            query = select(Modmail).where(Modmail.user_id == user.id)
-            result = (await session.execute(query)).scalar()
-            if result is None:
-                return
-            await session.delete(result)
+            query = select(Modmail).where(Modmail.uuid == uuid)
+            record = (await session.execute(query)).scalar_one_or_none()
+            if record is not None:
+                record.thread_id = thread_id
+
+    async def delete_modmail(
+        self,
+        user: discord.User | discord.Member | None = None,
+        uuid: str | None = None,
+        thread_id: int | None = None,
+    ) -> None:
+        async with self.session() as session:
+            conditions = []
+            if thread_id is not None:
+                conditions.append(Modmail.thread_id == thread_id)
+            if uuid is not None:
+                conditions.append(Modmail.uuid == uuid)
+            if user is not None:
+                conditions.append(Modmail.user_id == user.id)
+            if not conditions:
+                raise LookupError("All arguments are 'None'. At least one must have a value!")
+            await session.execute(delete(Modmail).where(*conditions))
 
 
 class ChannelExporterRepository(BaseRepository):

@@ -250,28 +250,53 @@ class TestRepositories(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(LookupError):
             await modmail_repo.get_modmail(None, None)
 
+        with self.assertRaises(LookupError):
+            await modmail_repo.delete_modmail(None, None, None)
+
         # Not found returns None
         self.assertIsNone(await modmail_repo.get_modmail(user, None))  # type: ignore[arg-type]
         self.assertIsNone(await modmail_repo.get_modmail(None, uuid_str))
+        self.assertIsNone(await modmail_repo.get_modmail(thread_id=9001))
 
-        # Create modmail
-        await modmail_repo.create_modmail(user, guild, uuid_str, anonymous=True)  # type: ignore[arg-type]
+        # Create modmail without thread_id
+        created = await modmail_repo.create_modmail(user, guild, uuid_str, anonymous=True)  # type: ignore[arg-type]
+        self.assertIsNotNone(created)
+        self.assertEqual(created.uuid, uuid_str)
+        self.assertIsNone(created.thread_id)
 
         # Get by user and by uuid
         by_user = await modmail_repo.get_modmail(user, None)  # type: ignore[arg-type]
         self.assertIsNotNone(by_user)
+        assert by_user is not None
         self.assertEqual(by_user.uuid, uuid_str)
         self.assertEqual(by_user.guild_id, 8001)
         self.assertTrue(by_user.anon)
 
         by_uuid = await modmail_repo.get_modmail(None, uuid_str)
         self.assertIsNotNone(by_uuid)
+        assert by_uuid is not None
         self.assertEqual(by_uuid.user_id, 7001)
 
-        # Delete modmail (and safe delete when already absent)
-        await modmail_repo.delete_modmail(user)  # type: ignore[arg-type]
+        # Update thread_id and query by thread_id
+        await modmail_repo.update_thread_id(uuid_str, 9001)
+        by_thread = await modmail_repo.get_modmail(thread_id=9001)
+        self.assertIsNotNone(by_thread)
+        assert by_thread is not None
+        self.assertEqual(by_thread.uuid, uuid_str)
+
+        # Delete modmail by thread_id (and safe delete when already absent)
+        await modmail_repo.delete_modmail(thread_id=9001)
         self.assertIsNone(await modmail_repo.get_modmail(user, None))  # type: ignore[arg-type]
-        await modmail_repo.delete_modmail(user)  # type: ignore[arg-type]
+        await modmail_repo.delete_modmail(thread_id=9001)
+
+        # Create with thread_id initially and delete by uuid
+        await modmail_repo.create_modmail(user, guild, uuid_str, anonymous=False, thread_id=9002)  # type: ignore[arg-type]
+        by_thread2 = await modmail_repo.get_modmail(thread_id=9002)
+        self.assertIsNotNone(by_thread2)
+        assert by_thread2 is not None
+        self.assertFalse(by_thread2.anon)
+        await modmail_repo.delete_modmail(uuid=uuid_str)
+        self.assertIsNone(await modmail_repo.get_modmail(thread_id=9002))
 
     async def test_user_stats_repository_and_multi_day_handling(self):
         user_stats_repo = UserStatsRepository(self.session_maker)
