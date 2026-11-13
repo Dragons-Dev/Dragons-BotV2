@@ -15,7 +15,7 @@ from extensions.automation.repository import Join2CreateRepository
 from extensions.fun.repository import EventRepository
 from extensions.internal.repository import EnabledCommandsRepository
 from extensions.moderation.models import Infractions
-from extensions.moderation.repository import InfractionsRepository, ModmailRepository
+from extensions.moderation.repository import ChannelExporterRepository, InfractionsRepository, ModmailRepository
 from extensions.stats.repository import UserStatsRepository
 from utils.enums import InfractionsEnum, SettingsEnum, StatTypeEnum
 from utils.orm_database import Base, ORMDataBase, SettingsRepository
@@ -23,7 +23,13 @@ from utils.orm_database import Base, ORMDataBase, SettingsRepository
 EXPECTED_TABLES = {
     "Confirmation",
     "Events",
+    "archived_transcripts",
     "botstatus",
+    "cached_attachments",
+    "economy_bet_options",
+    "economy_bet_pools",
+    "economy_bet_wagers",
+    "economy_wallets",
     "enabledcommands",
     "infractions",
     "join2create",
@@ -248,28 +254,53 @@ class TestRepositories(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(LookupError):
             await modmail_repo.get_modmail(None, None)
 
+        with self.assertRaises(LookupError):
+            await modmail_repo.delete_modmail(None, None, None)
+
         # Not found returns None
         self.assertIsNone(await modmail_repo.get_modmail(user, None))  # type: ignore[arg-type]
         self.assertIsNone(await modmail_repo.get_modmail(None, uuid_str))
+        self.assertIsNone(await modmail_repo.get_modmail(thread_id=9001))
 
-        # Create modmail
-        await modmail_repo.create_modmail(user, guild, uuid_str, anonymous=True)  # type: ignore[arg-type]
+        # Create modmail without thread_id
+        created = await modmail_repo.create_modmail(user, guild, uuid_str, anonymous=True)  # type: ignore[arg-type]
+        self.assertIsNotNone(created)
+        self.assertEqual(created.uuid, uuid_str)
+        self.assertIsNone(created.thread_id)
 
         # Get by user and by uuid
         by_user = await modmail_repo.get_modmail(user, None)  # type: ignore[arg-type]
         self.assertIsNotNone(by_user)
+        assert by_user is not None
         self.assertEqual(by_user.uuid, uuid_str)
         self.assertEqual(by_user.guild_id, 8001)
         self.assertTrue(by_user.anon)
 
         by_uuid = await modmail_repo.get_modmail(None, uuid_str)
         self.assertIsNotNone(by_uuid)
+        assert by_uuid is not None
         self.assertEqual(by_uuid.user_id, 7001)
 
-        # Delete modmail (and safe delete when already absent)
-        await modmail_repo.delete_modmail(user)  # type: ignore[arg-type]
+        # Update thread_id and query by thread_id
+        await modmail_repo.update_thread_id(uuid_str, 9001)
+        by_thread = await modmail_repo.get_modmail(thread_id=9001)
+        self.assertIsNotNone(by_thread)
+        assert by_thread is not None
+        self.assertEqual(by_thread.uuid, uuid_str)
+
+        # Delete modmail by thread_id (and safe delete when already absent)
+        await modmail_repo.delete_modmail(thread_id=9001)
         self.assertIsNone(await modmail_repo.get_modmail(user, None))  # type: ignore[arg-type]
-        await modmail_repo.delete_modmail(user)  # type: ignore[arg-type]
+        await modmail_repo.delete_modmail(thread_id=9001)
+
+        # Create with thread_id initially and delete by uuid
+        await modmail_repo.create_modmail(user, guild, uuid_str, anonymous=False, thread_id=9002)  # type: ignore[arg-type]
+        by_thread2 = await modmail_repo.get_modmail(thread_id=9002)
+        self.assertIsNotNone(by_thread2)
+        assert by_thread2 is not None
+        self.assertFalse(by_thread2.anon)
+        await modmail_repo.delete_modmail(uuid=uuid_str)
+        self.assertIsNone(await modmail_repo.get_modmail(thread_id=9002))
 
     async def test_user_stats_repository_and_multi_day_handling(self):
         user_stats_repo = UserStatsRepository(self.session_maker)
@@ -393,6 +424,98 @@ class TestRepositories(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await event_repo.delete_event(event_id))
         self.assertIsNone(await event_repo.get_event_by_id(event_id))
         self.assertEqual(await event_repo.get_all_confirmations_for_event(event_id=event_id), [])
+
+    async def test_channel_exporter_repository(self):
+        repo = ChannelExporterRepository(self.session_maker)
+
+        # 1. Attachment operations
+        saved_att = await repo.save_attachment(
+            channel_id=1001,
+            message_id=2001,
+            attachment_id=3001,
+            filename="screenshot.png",
+            content_type="image/png",
+            data=b"\x89PNG\r\n\x1a\nfakecontent",
+        )
+        self.assertIsNotNone(saved_att.id)
+        self.assertEqual(saved_att.channel_id, 1001)
+        self.assertEqual(saved_att.filename, "screenshot.png")
+        self.assertEqual(saved_att.content_type, "image/png")
+        self.assertEqual(saved_att.data, b"\x89PNG\r\n\x1a\nfakecontent")
+
+        # Save second attachment for a different channel
+        await repo.save_attachment(
+            channel_id=1002,
+            message_id=2002,
+            attachment_id=3002,
+            filename="doc.pdf",
+            content_type="application/pdf",
+            data=b"%PDF-1.4fakecontent",
+        )
+
+        # Retrieve attachments for channel 1001
+        atts_1001 = await repo.get_channel_attachments(1001)
+        self.assertEqual(len(atts_1001), 1)
+        self.assertEqual(atts_1001[0].attachment_id, 3001)
+
+        # Delete attachments for channel 1001
+        await repo.delete_channel_attachments(1001)
+        self.assertEqual(len(await repo.get_channel_attachments(1001)), 0)
+        # Ensure channel 1002 is unaffected
+        self.assertEqual(len(await repo.get_channel_attachments(1002)), 1)
+
+        # 2. Transcript operations
+        archive_id = await repo.save_transcript(
+            guild_id=5001,
+            channel_id=1001,
+            channel_name="modmail-user",
+            exported_by=9001,
+            html_content="<html><body>Transcript 1</body></html>",
+        )
+        self.assertIsInstance(archive_id, int)
+
+        # Get transcript by id
+        transcript = await repo.get_transcript(archive_id)
+        self.assertIsNotNone(transcript)
+        assert transcript is not None
+        self.assertEqual(transcript.channel_name, "modmail-user")
+        self.assertEqual(transcript.exported_by, 9001)
+        self.assertEqual(transcript.html_content, "<html><body>Transcript 1</body></html>")
+
+        # Get transcript with guild_id matching
+        self.assertIsNotNone(await repo.get_transcript(archive_id, guild_id=5001))
+        # Get transcript with non-matching guild_id
+        self.assertIsNone(await repo.get_transcript(archive_id, guild_id=9999))
+        # Non-existent ID
+        self.assertIsNone(await repo.get_transcript(999999))
+
+        # Save second transcript for list_transcripts
+        await repo.save_transcript(
+            guild_id=5001,
+            channel_id=1002,
+            channel_name="modmail-user2",
+            exported_by=9002,
+            html_content="<html><body>Transcript 2</body></html>",
+        )
+        # Save transcript for another guild
+        await repo.save_transcript(
+            guild_id=5002,
+            channel_id=1003,
+            channel_name="modmail-user3",
+            exported_by=9003,
+            html_content="<html><body>Transcript 3</body></html>",
+        )
+
+        transcripts = await repo.list_transcripts(5001, limit=10)
+        self.assertEqual(len(transcripts), 2)
+        # Most recent first
+        self.assertEqual(transcripts[0].channel_name, "modmail-user2")
+        self.assertEqual(transcripts[1].channel_name, "modmail-user")
+
+        # Test limit
+        limited = await repo.list_transcripts(5001, limit=1)
+        self.assertEqual(len(limited), 1)
+        self.assertEqual(limited[0].channel_name, "modmail-user2")
 
 
 if __name__ == "__main__":

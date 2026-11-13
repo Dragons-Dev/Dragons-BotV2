@@ -2,7 +2,7 @@ from .bot import Bot
 from .checks import is_team
 from .classes import CommandDisabledError, Event, InsufficientPermission
 from .database import ShortTermStorage
-from .enums import InfractionsEnum, SettingsEnum, StatTypeEnum, WebhookType
+from .enums import InfractionsEnum, ModerationEnum, SettingsEnum, StatTypeEnum, WebhookType
 from .logger import CustomLogger, rem_log
 from .orm_database import NON_EXTENSION_FILES, NON_EXTENSION_MODULES, BaseRepository, ORMDataBase, Settings
 from .utils import VersionInfo, sec_to_readable
@@ -15,6 +15,7 @@ __all__ = [
     "InsufficientPermission",
     "ShortTermStorage",
     "InfractionsEnum",
+    "ModerationEnum",
     "SettingsEnum",
     "StatTypeEnum",
     "WebhookType",

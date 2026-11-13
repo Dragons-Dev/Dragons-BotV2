@@ -1,18 +1,13 @@
 import re
-import typing as t
-from datetime import datetime
 from urllib.parse import urlsplit
 
 import aiohttp
 from aiocache import SimpleMemoryCache
 import discord
 from discord.ext import commands
-from discord.utils import format_dt, get_or_fetch
 
 from config import GOOGLE_API_KEY
-from utils import Bot, ButtonInfo, CustomLogger, InfractionsEnum, SettingsEnum
-
-from .repository import InfractionsRepository
+from utils import Bot, CustomLogger, InfractionsEnum
 
 GOOGLE_API_KEY_REGEX = r"AIza[0-9A-Za-z-_]{35}"
 
@@ -105,6 +100,40 @@ def parse_protobuf(data: bytes) -> list[tuple[int, int, bytes | int]]:
     return fields
 
 
+def _parse_threat_types(t_wire: int, t_val: bytes | int) -> list[int]:
+    if t_wire == 0:
+        return [int(t_val)]
+    if t_wire == 2 and isinstance(t_val, bytes):
+        types = []
+        p_idx = 0
+        while p_idx < len(t_val):
+            p_val, p_idx = read_varint(t_val, p_idx)
+            types.append(p_val)
+        return types
+    return []
+
+
+def _parse_threat_fields(threat_fields: list[tuple[int, int, bytes | int]]) -> dict:
+    threat_url = ""
+    threat_types = []
+    for t_num, t_wire, t_val in threat_fields:
+        if t_num == 1 and t_wire == 2 and isinstance(t_val, bytes):
+            threat_url = t_val.decode("utf-8", errors="ignore")
+        elif t_num == 2:
+            threat_types.extend(_parse_threat_types(t_wire, t_val))
+    return {
+        "url": threat_url,
+        "threat_types": [THREAT_TYPES.get(t, f"UNKNOWN({t})") for t in threat_types],
+    }
+
+
+def _parse_duration_fields(duration_fields: list[tuple[int, int, bytes | int]]) -> int | None:
+    for d_num, d_wire, d_val in duration_fields:
+        if d_num == 1 and d_wire == 0 and isinstance(d_val, int):
+            return d_val
+    return None
+
+
 def parse_search_urls_response(data: bytes) -> dict:
     """Parse a Safe Browsing `urls:search` response.
 
@@ -128,37 +157,10 @@ def parse_search_urls_response(data: bytes) -> dict:
     cache_duration_sec = None
 
     for field_num, wire_type, value in fields:
-        if field_num == 1 and wire_type == 2:
-            # Parse ThreatUrl message.
-            threat_fields = parse_protobuf(value)
-            threat_url = ""
-            threat_types = []
-            for t_num, t_wire, t_val in threat_fields:
-                if t_num == 1 and t_wire == 2:
-                    # URL is stored as a UTF-8 string.
-                    threat_url = t_val.decode("utf-8", errors="ignore")
-                elif t_num == 2:
-                    # Threat type can be encoded as a single enum value...
-                    if t_wire == 0:
-                        threat_types.append(t_val)
-                    # ...or as packed repeated enum values in a length-delimited field.
-                    elif t_wire == 2:
-                        p_idx = 0
-                        while p_idx < len(t_val):
-                            p_val, p_idx = read_varint(t_val, p_idx)
-                            threat_types.append(p_val)
-            matches.append(
-                {
-                    "url": threat_url,
-                    "threat_types": [THREAT_TYPES.get(t, f"UNKNOWN({t})") for t in threat_types],
-                }
-            )
-        elif field_num == 2 and wire_type == 2:
-            # Parse google.protobuf.Duration message.
-            duration_fields = parse_protobuf(value)
-            for d_num, d_wire, d_val in duration_fields:
-                if d_num == 1 and d_wire == 0:
-                    cache_duration_sec = d_val
+        if field_num == 1 and wire_type == 2 and isinstance(value, bytes):
+            matches.append(_parse_threat_fields(parse_protobuf(value)))
+        elif field_num == 2 and wire_type == 2 and isinstance(value, bytes):
+            cache_duration_sec = _parse_duration_fields(parse_protobuf(value))
 
     return {"matches": matches, "cache_duration_sec": cache_duration_sec}
 
@@ -201,105 +203,95 @@ class SafebrowsingCog(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
         self.url_cache: SimpleMemoryCache = SimpleMemoryCache()
         self.reg_url = r"(?:(?:https?):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+"
 
-    @commands.Cog.listener("on_message")
-    async def message_event(self, msg: discord.Message) -> None:
-        if not self.client.user:
-            return
-        if msg.author.id == self.client.user.id:
-            return
-        if not msg.guild:
-            return
-
-        matches = re.finditer(self.reg_url, msg.content, re.MULTILINE)
-        removed_protocolls = []
+    def _extract_urls(self, content: str) -> set[str]:
+        matches = re.finditer(self.reg_url, content, re.MULTILINE)
+        removed_protocols = []
         for match in matches:
             if match is None:
                 continue
             url_fragments = urlsplit(match.group().lower())
             hostname = f"{url_fragments.hostname}{url_fragments.path}"
-            removed_protocolls.append(hostname[4:] if hostname.startswith("None") else hostname)
-        urls = set(removed_protocolls)
-        # insert all regex matches into this list
+            removed_protocols.append(hostname[4:] if hostname.startswith("None") else hostname)
+        return set(removed_protocols)
 
-        if len(urls) > 0:  # if there are no messages in the message don't continue
-            filtered_urls = []
-            urls_to_fetch = []  # prepare lists to fetch urls or get cached data
-            for url in urls:
-                cached_result = await self.url_cache.get(url)
-                if cached_result is not None:
-                    if cached_result is True:
-                        filtered_urls.append(url)  # url is in cache
-                    else:
-                        pass  # if not true, the url is checked against safebrowsing and returned as safe
-                else:
-                    urls_to_fetch.append(url)  # url needs to be fetched
+    async def _check_cache(self, urls: set[str]) -> tuple[list[str], list[str]]:
+        filtered_urls = []
+        urls_to_fetch = []
+        for url in urls:
+            cached_result = await self.url_cache.get(url)
+            if cached_result is True:
+                filtered_urls.append(url)
+            elif cached_result is None:
+                urls_to_fetch.append(url)
+        return filtered_urls, urls_to_fetch
 
-            if len(urls_to_fetch) > 0:
-                api_result = await fetch_safebrowsing(urls_to_fetch, self.logger)  # urls not cached need to be fetched
-                if api_result is not None:
-                    if api_result["matches"]:
-                        for match in api_result["matches"]:
-                            await self.url_cache.set(match["url"], True, ttl=3600)  # add returned bad urls to cache
-                            if match["url"] in urls_to_fetch:
-                                urls_to_fetch.remove(match["url"])  # remove bad urls, we use this list to cache as safe
-                            filtered_urls.append(match["url"])  # append returned urls to the filter which are bad
-                    for url in urls_to_fetch:
-                        await self.url_cache.set(url, False, ttl=3600)  # every url which was not returned is safe
-                else:
-                    self.logger.warning(
-                        f"Failed to fetch Safe Browsing results for URLs: {urls_to_fetch} | API Result: {api_result}"
-                    )
-                    return
+    async def _fetch_and_cache(self, urls_to_fetch: list[str]) -> list[str] | None:
+        api_result = await fetch_safebrowsing(urls_to_fetch, self.logger)
+        if api_result is None:
+            self.logger.warning(
+                f"Failed to fetch Safe Browsing results for URLs: {urls_to_fetch} | API Result: {api_result}"
+            )
+            return None
+        new_bad_urls = []
+        if api_result.get("matches"):
+            for match in api_result["matches"]:
+                await self.url_cache.set(match["url"], True, ttl=3600)
+                if match["url"] in urls_to_fetch:
+                    urls_to_fetch.remove(match["url"])
+                new_bad_urls.append(match["url"])
+        for url in urls_to_fetch:
+            await self.url_cache.set(url, False, ttl=3600)
+        return new_bad_urls
 
-            if len(filtered_urls) > 0:
-                await msg.delete(reason="Detected as bad url")  # First delete the bad urls
-                case_id = await self.infractions_repo.create_infraction(
-                    user=msg.author, infraction=InfractionsEnum.Warn, reason="Bad URL sent", guild=msg.guild
-                )  # create infraction in db to get an infraction id
+    async def _filter_urls(self, urls: set[str]) -> list[str] | None:
+        filtered_urls, urls_to_fetch = await self._check_cache(urls)
+        if not urls_to_fetch:
+            return filtered_urls
 
-                em = discord.Embed(title="Message delete", color=discord.Color.yellow())
-                em.add_field(name="User", value=msg.author.mention, inline=False)
-                em.add_field(name="Moderator", value=self.client.user.mention, inline=False)
-                em.add_field(name="Reason", value="Sending a malicious link", inline=False)
-                em.add_field(name="Date", value=format_dt(datetime.now(), "F"), inline=False)
-                em.set_footer(text=f"Case ID: {case_id}")
+        new_bad = await self._fetch_and_cache(urls_to_fetch)
+        if new_bad is None:
+            return None
+        filtered_urls.extend(new_bad)
+        return filtered_urls
 
-                link_bed = discord.Embed(
-                    title="Message context",
-                    description=f"{msg.content}\n\nYou were warned due to these links.\n"
-                    f"{'\n'.join(f'- `{url}`' for url in filtered_urls)}",
-                    color=discord.Color.green(),
-                )
-                link_bed.set_author(name=msg.author.display_name, icon_url=msg.author.display_avatar.url)
-                link_bed.set_footer(text="If you believe this is a mistake, please contact a moderator.")
-                try:
-                    await msg.author.send(
-                        embeds=[em, link_bed],
-                        view=ButtonInfo("You were warned due to the message above."),
-                    )
-                except discord.Forbidden:
-                    pass  # ignore closed dms
-                except discord.HTTPException:
-                    self.logger.warning(f"Couldn't send a message to {msg.author} due to HTTPException.")
+    @commands.Cog.listener("on_message")
+    async def message_event(self, msg: discord.Message) -> None:
+        if not self.client.user or msg.author.id == self.client.user.id or not msg.guild:
+            return
 
-                setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=msg.guild)
-                # logic to get modmail channel
-                if setting:
-                    if isinstance(setting, (tuple, list, t.Sequence)):
-                        log_channel: discord.TextChannel | None = await get_or_fetch(
-                            msg.guild, discord.TextChannel, setting[0].value, default=None
-                        )
-                    else:
-                        log_channel: discord.TextChannel | None = await get_or_fetch(
-                            msg.guild, discord.TextChannel, setting.value, default=None
-                        )
+        urls = self._extract_urls(msg.content)
+        if not urls:
+            return
 
-                    if log_channel:
-                        await log_channel.send(embed=em)
+        filtered_urls = await self._filter_urls(urls)
+        if not filtered_urls:
+            return
+
+        await msg.delete(reason="Detected as bad url")
+        link_bed = discord.Embed(
+            title="Message context",
+            description=f"{msg.content}\n\nYou were warned due to these links.\n"
+            f"{'\n'.join(f'- `{url}`' for url in filtered_urls)}",
+            color=discord.Color.green(),
+        )
+        link_bed.set_author(name=msg.author.display_name, icon_url=msg.author.display_avatar.url)
+        link_bed.set_footer(text="If you believe this is a mistake, please contact a moderator.")
+
+        self.client.dispatch(
+            "moderation_action",
+            InfractionsEnum.Warn,
+            msg.author,
+            msg.guild,
+            "Bad URL sent",
+            self.client.user,
+            log_reason="Sending a malicious link",
+            embed_title="Message delete",
+            extra_embeds=[link_bed],
+            dm_info_text="You were warned due to the message above.",
+        )
 
 
 def setup(client: Bot):
