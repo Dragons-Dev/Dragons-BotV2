@@ -10,7 +10,7 @@ from extensions.moderation.bad_urls import SafebrowsingCog
 from extensions.moderation.ban import Ban
 from extensions.moderation.kick import Kick
 from extensions.moderation.models import Infractions
-from extensions.moderation.moderation_events import ModerationEvents
+from extensions.moderation.moderation_events import ModerationEvents, ModerationQuickTicketView
 from extensions.moderation.repository import InfractionsRepository
 from extensions.moderation.timeout import Timeout, _parse_duration  # type: ignore[attr-defined]
 from extensions.moderation.warn import Warn
@@ -133,6 +133,8 @@ class TestModerationEvents(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(dm_embed.title, "Ban")
         self.assertEqual(dm_embed.color, discord.Color.brand_red())
         self.assertIn(f"Case ID: {case_id}", dm_embed.footer.text)
+        dm_view = dm_call_kwargs.get("view")
+        self.assertIsInstance(dm_view, ModerationQuickTicketView)
 
         # 5. Log channel sent
         self.log_channel.send.assert_awaited_once()
@@ -348,6 +350,9 @@ class TestModerationEvents(unittest.IsolatedAsyncioTestCase):
         reason_field = next(f for f in embeds[0].fields if f.name == "Reason")
         self.assertEqual(reason_field.value, "Sending a malicious link")
         self.assertEqual(embeds[1], link_bed)
+        self.assertIn("view", call_kwargs)
+        self.assertIsInstance(call_kwargs["view"], ModerationQuickTicketView)
+        self.assertEqual(call_kwargs["view"].info_text, "You were warned due to the message above.")
 
     async def test_on_moderation_action_dm_forbidden_handled(self):
         self.member.send.side_effect = discord.Forbidden(MagicMock(), "Cannot DM")
