@@ -24,11 +24,43 @@ class ButtonEnum(enum.Enum):
     RESET_PERMISSIONS = enum.auto()
 
 
+def _get_overwrite_for_item(
+    item: discord.Role | discord.Member,
+    *,
+    banning: bool,
+    team_role_id: int | None,
+    derived_overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite],
+) -> tuple[bool, discord.PermissionOverwrite | None]:
+    if team_role_id is not None and getattr(item, "id", None) == team_role_id:
+        if banning:
+            return True, None
+        matching_ow = next((ow for t, ow in derived_overwrites.items() if getattr(t, "id", None) == item.id), None)
+        team_ow = (
+            discord.PermissionOverwrite.from_pair(*matching_ow.pair())
+            if matching_ow is not None
+            else discord.PermissionOverwrite()
+        )
+        team_ow.update(view_channel=True, connect=True, move_members=True)
+        return True, team_ow
+
+    if banning:
+        return True, discord.PermissionOverwrite.from_pair(
+            allow=discord.Permissions.none(),
+            deny=discord.Permissions.all(),
+        )
+
+    matching_ow = next((ow for t, ow in derived_overwrites.items() if getattr(t, "id", None) == item.id), None)
+    if matching_ow is not None:
+        return True, matching_ow
+
+    return False, None
+
+
 async def create_overwrite_from_select(
     *, channel: discord.VoiceChannel, overwrite_items: list[discord.Role | discord.Member], banning: bool, bot: Bot
 ) -> dict[discord.Member | discord.Role, discord.PermissionOverwrite]:
     permission_overwrites = channel.overwrites
-    derived_overwrites = {}
+    derived_overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite] = {}
     if not banning:
         join2create_repo = Join2CreateRepository(bot.db.session_maker)
         current_join2create = await join2create_repo.get(channel)
@@ -39,17 +71,69 @@ async def create_overwrite_from_select(
             if derived_channel is not None:
                 derived_overwrites = derived_channel.overwrites
 
+    team_role_setting = (
+        await bot.db.get_setting(setting=SettingsEnum.TeamRole, guild=channel.guild) if channel.guild else None
+    )
+    team_role_id = team_role_setting.value if isinstance(team_role_setting, Settings) else None
+
     for o_item in overwrite_items:
-        if banning:
-            permission_overwrites[o_item] = discord.PermissionOverwrite.from_pair(
-                allow=discord.Permissions.none(),
-                deny=discord.Permissions.all(),
-            )
-        elif o_item in derived_overwrites:
-            permission_overwrites[o_item] = derived_overwrites[o_item]
-        else:
+        keep, ow = _get_overwrite_for_item(
+            o_item,
+            banning=banning,
+            team_role_id=team_role_id,
+            derived_overwrites=derived_overwrites,
+        )
+        if keep and ow is not None:
+            permission_overwrites[o_item] = ow
+        elif not keep:
             permission_overwrites.pop(o_item, None)
     return permission_overwrites
+
+
+def _apply_j2c_permissions(
+    overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite],
+    target: discord.Role | discord.Member,
+) -> None:
+    existing_target = next((t for t in overwrites if getattr(t, "id", None) == target.id), None)
+    if existing_target is not None:
+        existing_ow = overwrites[existing_target]
+        ow = discord.PermissionOverwrite.from_pair(*existing_ow.pair())
+        key = existing_target
+    else:
+        ow = discord.PermissionOverwrite()
+        key = target
+    ow.update(view_channel=True, connect=True, move_members=True)
+    overwrites[key] = ow
+
+
+async def _get_team_role(bot: Bot, guild: discord.Guild) -> discord.Role | None:
+    team_role_setting = await bot.db.get_setting(setting=SettingsEnum.TeamRole, guild=guild)
+    if not isinstance(team_role_setting, Settings):
+        return None
+    team_role = guild.get_role(team_role_setting.value)
+    if team_role is None and hasattr(guild, "get_or_fetch"):
+        team_role = await guild.get_or_fetch(discord.Role, team_role_setting.value, default=None)
+    return team_role
+
+
+async def build_join2create_overwrites(
+    *,
+    derived_overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite],
+    guild: discord.Guild | None,
+    owner: discord.Member | None,
+    bot: Bot,
+) -> dict[discord.Role | discord.Member, discord.PermissionOverwrite]:
+    overwrites = dict(derived_overwrites)
+
+    if guild is not None:
+        team_role = await _get_team_role(bot, guild)
+        if team_role is not None:
+            _apply_j2c_permissions(overwrites, team_role)
+
+    if owner is not None:
+        _apply_j2c_permissions(overwrites, owner)
+
+    return overwrites
 
 
 async def _next_button_func(interaction: discord.Interaction, next_function: ButtonEnum):
@@ -153,6 +237,71 @@ class SetUserLimit(ui.DesignerModal):
             await interaction.respond("Please enter a valid number between 0-99 (0 is unlimited).", ephemeral=True)
 
 
+def _get_target_overwrite(
+    channel: discord.VoiceChannel,
+    target: discord.Member | discord.Role,
+) -> discord.PermissionOverwrite:
+    if hasattr(channel, "overwrites_for"):
+        ow = channel.overwrites_for(target)
+        if isinstance(ow, discord.PermissionOverwrite):
+            return discord.PermissionOverwrite.from_pair(*ow.pair())
+    existing = next((t for t in getattr(channel, "overwrites", {}) if getattr(t, "id", None) == target.id), None)
+    if existing is not None:
+        return discord.PermissionOverwrite.from_pair(*channel.overwrites[existing].pair())
+    return discord.PermissionOverwrite()
+
+
+def _get_derived_owner_overwrite(
+    derived_channel: discord.VoiceChannel | None,
+    previous_owner_id: int,
+    prev_target: discord.Member,
+) -> discord.PermissionOverwrite | None:
+    if not derived_channel:
+        return None
+    derived_overwrites = getattr(derived_channel, "overwrites", {})
+    has_derived_ow = any(getattr(t, "id", None) == previous_owner_id for t in derived_overwrites)
+    if not has_derived_ow:
+        return None
+    if hasattr(derived_channel, "overwrites_for"):
+        ow = derived_channel.overwrites_for(prev_target)
+        if isinstance(ow, discord.PermissionOverwrite):
+            return discord.PermissionOverwrite.from_pair(*ow.pair())
+    prev_ow = next(
+        (ow for t, ow in derived_overwrites.items() if getattr(t, "id", None) == previous_owner_id),
+        None,
+    )
+    return discord.PermissionOverwrite.from_pair(*prev_ow.pair()) if prev_ow is not None else None
+
+
+async def _cleanup_previous_owner_permissions(
+    *,
+    channel: discord.VoiceChannel,
+    previous_owner_id: int,
+    derived_channel_id: int,
+    bot: Bot,
+) -> None:
+    if not channel.guild:
+        return
+
+    prev_target: discord.Member | None = channel.guild.get_member(previous_owner_id)
+    if prev_target is None and hasattr(channel.guild, "fetch_member"):
+        try:
+            prev_target = await channel.guild.fetch_member(previous_owner_id)
+        except (discord.NotFound, discord.HTTPException):
+            prev_target = None
+
+    if prev_target is None:
+        return
+
+    derived_channel = await bot.get_or_fetch(discord.VoiceChannel, derived_channel_id)
+    new_ow = _get_derived_owner_overwrite(derived_channel, previous_owner_id, prev_target)
+
+    try:
+        await channel.set_permissions(prev_target, overwrite=new_ow)
+    except (discord.Forbidden, discord.HTTPException):
+        pass
+
+
 async def transfer_ownership(interaction: discord.Interaction, channel: discord.VoiceChannel, temp_voice):
     """
     Transfers ownership of the temporary voice channel to the interaction user.
@@ -171,9 +320,30 @@ async def transfer_ownership(interaction: discord.Interaction, channel: discord.
         return
 
     client: Bot = interaction.client
+
+    owner_ow = _get_target_overwrite(channel, interaction.user)
+    owner_ow.update(view_channel=True, connect=True, move_members=True)
+    try:
+        await channel.set_permissions(interaction.user, overwrite=owner_ow)
+    except (discord.Forbidden, discord.HTTPException) as e:
+        logger = CustomLogger("Join2Create/VoiceBoard", client.boot_time)
+        logger.error(f"Failed to set permissions for new owner {interaction.user.id}: {e}")
+        await interaction.respond(
+            "Failed to update channel permissions. Ownership was not transferred.", ephemeral=True
+        )
+        return
+
     join2create_repo = Join2CreateRepository(client.db.session_maker)
     # Transfer ownership in the database
     await join2create_repo.update(channel, interaction.user)
+
+    await _cleanup_previous_owner_permissions(
+        channel=channel,
+        previous_owner_id=temp_voice.owner_id,
+        derived_channel_id=temp_voice.derived_channel,
+        bot=client,
+    )
+
     if interaction.message:
         await interaction.message.edit(view=VoiceBoard(client=client, voice_owner=interaction.user))
     await interaction.respond(f"You are now the owner of {channel.name}.", ephemeral=True)
@@ -197,6 +367,16 @@ class BanRole(ui.DesignerModal):
         selected_roles: list[discord.Role] = select.values
         if not selected_roles:
             return  # this case can't happen since the field is required to be filled
+
+        team_role_setting = await interaction.client.db.get_setting(
+            setting=SettingsEnum.TeamRole, guild=interaction.guild
+        )
+        if isinstance(team_role_setting, Settings):
+            selected_roles = [role for role in selected_roles if role.id != team_role_setting.value]
+            if not selected_roles:
+                await interaction.respond("The team role cannot be banned.", ephemeral=True)
+                return
+
         channel: discord.VoiceChannel = interaction.channel
         await channel.edit(
             overwrites=await create_overwrite_from_select(
@@ -243,6 +423,19 @@ class UnbanRole(ui.DesignerModal):
         )
 
 
+def _is_team_member(
+    user: discord.Member | discord.User,
+    guild: discord.Guild | None,
+    team_role_id: int | None,
+) -> bool:
+    if team_role_id is None:
+        return False
+    member = user if isinstance(user, discord.Member) else (guild.get_member(user.id) if guild else None)
+    if member is None:
+        return False
+    return any(getattr(r, "id", None) == team_role_id for r in getattr(member, "roles", []))
+
+
 class BanUser(ui.DesignerModal):
     def __init__(self):
         super().__init__(title="Ban User")
@@ -261,9 +454,20 @@ class BanUser(ui.DesignerModal):
         selected_users: list[discord.Member] = select.values
         if not selected_users:
             return  # this case can't happen since the field is required to be filled
-        selected_users = [u for u in selected_users if u.id not in (interaction.user.id, interaction.client.user.id)]
+
+        team_role_setting = await interaction.client.db.get_setting(
+            setting=SettingsEnum.TeamRole, guild=interaction.guild
+        )
+        team_role_id = team_role_setting.value if isinstance(team_role_setting, Settings) else None
+
+        selected_users = [
+            u
+            for u in selected_users
+            if u.id not in (interaction.user.id, interaction.client.user.id)
+            and not _is_team_member(u, interaction.guild, team_role_id)
+        ]
         if not selected_users:
-            await interaction.respond("You cannot ban yourself or the bot.", ephemeral=True)
+            await interaction.respond("You cannot ban yourself, the bot, or team members.", ephemeral=True)
             return
         channel: discord.VoiceChannel = interaction.channel
         await channel.edit(
@@ -361,7 +565,27 @@ async def reset_permission(interaction: discord.Interaction, channel: discord.Vo
         return await interaction.respond(
             "Couldn't find original join2create channel. Couldn't reset permissions!", ephemeral=True
         )
-    await channel.edit(overwrites=derived_channel.overwrites)
+
+    owner: discord.Member | None = channel.guild.get_member(current_join2create.owner_id) if channel.guild else None
+    if (
+        owner is None
+        and interaction.user.id == current_join2create.owner_id
+        and isinstance(interaction.user, discord.Member)
+    ):
+        owner = interaction.user
+    if owner is None and channel.guild and hasattr(channel.guild, "fetch_member"):
+        try:
+            owner = await channel.guild.fetch_member(current_join2create.owner_id)
+        except (discord.NotFound, discord.HTTPException):
+            owner = None
+
+    overwrites = await build_join2create_overwrites(
+        derived_overwrites=derived_channel.overwrites,
+        guild=channel.guild,
+        owner=owner,
+        bot=bot,
+    )
+    await channel.edit(overwrites=overwrites)
     await interaction.respond(f"Reset permissions to the permissions of {derived_channel.mention}", ephemeral=True)
 
 
@@ -473,6 +697,60 @@ class Join2Create(commands.Cog):
             self.status = json.load(f)
             self.suffixes = [*self.status]
 
+    async def _handle_join(self, member: discord.Member, trigger_channel: discord.VoiceChannel):
+        join2create_setting = await self.client.db.get_setting(
+            setting=SettingsEnum.Join2CreateChannel, guild=member.guild
+        )
+        if not isinstance(join2create_setting, Settings) or trigger_channel.id != join2create_setting.value:
+            return
+
+        channel_name = choice(self.suffixes)
+        member_name = member.display_name
+        if member_name[-1].lower() != "s" and self.status[channel_name]["s_flag"]:
+            member_name += "s"
+
+        overwrites = await build_join2create_overwrites(
+            derived_overwrites=trigger_channel.overwrites,
+            guild=member.guild,
+            owner=member,
+            bot=self.client,
+        )
+
+        try:
+            channel = await trigger_channel.category.create_voice_channel(
+                name=f"{member_name}{channel_name}",
+                user_limit=25,
+                reason="Join2Create",
+                overwrites=overwrites,
+            )
+        except (discord.Forbidden, discord.HTTPException, discord.InvalidArgument) as e:
+            self.logger.error(e)
+            return
+
+        if self.status[channel_name]["status"]:
+            status = choice(self.status[channel_name]["status"])
+            await channel.set_status(status=status, reason="Join2Create")
+
+        check = await self.join2create_repo.create(channel, member, derived_channel=trigger_channel)
+        if not check:
+            await channel.delete(reason="Join2Create-Failed")
+            self.logger.error("Database entry for temp voice channel could not be created")
+            return
+        self.logger.debug(f"{member.name} created {channel.name} in {member.guild}")
+        try:
+            await member.move_to(channel)
+        except (discord.Forbidden, discord.HTTPException) as e:
+            self.logger.error(f"Couldn't move member | {e}")
+            return
+        await channel.send(view=VoiceBoard(client=self.client, voice_owner=member))
+
+    async def _handle_leave(self, member: discord.Member, channel: discord.VoiceChannel):
+        if await self.join2create_repo.get(channel):
+            if len([m for m in channel.members if not m.bot]) == 0:
+                await self.join2create_repo.delete(channel)
+                self.logger.debug(f"{channel.name} was deleted on {member.guild}")
+                await channel.delete(reason="Join2Delete")
+
     @commands.Cog.listener("on_voice_state_update")
     async def on_join2create(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         """
@@ -487,51 +765,9 @@ class Join2Create(commands.Cog):
         if before.channel == after.channel:
             return
         if after.channel is not None:
-            join2create_setting = await self.client.db.get_setting(
-                setting=SettingsEnum.Join2CreateChannel, guild=member.guild
-            )
-            if not isinstance(join2create_setting, Settings):
-                return
-            if after.channel.id == join2create_setting.value:
-                channel_name = choice(self.suffixes)
-                member_name = member.display_name
-                if member_name[-1].lower() != "s" and self.status[channel_name]["s_flag"]:
-                    member_name += "s"
-
-                try:
-                    channel = await after.channel.category.create_voice_channel(
-                        name=f"{member_name}{channel_name}",
-                        user_limit=25,
-                        reason="Join2Create",
-                        overwrites=after.channel.overwrites,
-                    )
-                except (discord.Forbidden, discord.HTTPException, discord.InvalidArgument) as e:
-                    self.logger.error(e)
-                    return
-
-                if self.status[channel_name]["status"]:
-                    status = choice(self.status[channel_name]["status"])
-                    await channel.set_status(status=status, reason="Join2Create")
-
-                check = await self.join2create_repo.create(channel, member, derived_channel=after.channel)
-                if not check:
-                    await channel.delete(reason="Join2Create-Failed")
-                    self.logger.error("Database entry for temp voice channel could not be created")
-                    return
-                self.logger.debug(f"{member.name} created {channel.name} in {member.guild}")
-                try:
-                    await member.move_to(channel)
-                except (discord.Forbidden, discord.HTTPException) as e:
-                    self.logger.error(f"Couldn't move member | {e}")
-                    return
-                await channel.send(view=VoiceBoard(client=self.client, voice_owner=member))
-
+            await self._handle_join(member, after.channel)
         if before.channel is not None:
-            if await self.join2create_repo.get(before.channel):
-                if len([m for m in before.channel.members if not m.bot]) == 0:
-                    await self.join2create_repo.delete(before.channel)
-                    self.logger.debug(f"{before.channel.name} was deleted on {member.guild}")
-                    await before.channel.delete(reason="Join2Delete")
+            await self._handle_leave(member, before.channel)
 
     @commands.Cog.listener("on_ready", once=True)
     async def on_ready(self):
