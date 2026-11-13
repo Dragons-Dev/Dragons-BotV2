@@ -18,6 +18,7 @@ from extensions.economy.gambling import (
     PlaceWagerModal,
     ResolveBetView,
     ResolveButton,
+    _build_bet_embed,
     _calculate_slot_multiplier,
     _parse_bet_duration,
     _parse_bet_options,
@@ -30,6 +31,10 @@ from utils.orm_database import Base, ORMDataBase
 class TestSlotMultiplier(unittest.TestCase):
     def test_three_dragons_returns_ten(self):
         self.assertEqual(_calculate_slot_multiplier(["🐉", "🐉", "🐉"]), 10)
+
+    def test_three_custom_dragon_emojis_returns_ten(self):
+        custom = "<:dragon_scale:123456>"
+        self.assertEqual(_calculate_slot_multiplier([custom, custom, custom], dragon_symbol=custom), 10)
 
     def test_three_other_symbols_returns_five(self):
         self.assertEqual(_calculate_slot_multiplier(["🍒", "🍒", "🍒"]), 5)
@@ -570,6 +575,22 @@ class TestGamblingCogMiniGames(unittest.IsolatedAsyncioTestCase):
         embed = ctx.response.send_message.call_args[1]["embed"]
         self.assertIn("Lost", embed.title)
 
+    async def test_slots_uses_custom_app_dragon_emoji(self):
+        self.mock_client.app_emojis = {"dragon_scale": "<:dragon_scale:777>"}
+        ctx = self._make_ctx()
+        self.mock_economy_repo.remove_balance = AsyncMock(return_value=True)
+        self.mock_economy_repo.add_balance = AsyncMock(return_value=1000)
+        self.mock_economy_repo.get_balance = AsyncMock(return_value=1000)
+
+        with patch("random.choices", return_value=["<:dragon_scale:777>"] * 3):
+            await self.cog.slots(ctx, amount=100)
+
+        self.mock_economy_repo.add_balance.assert_called_once_with(ctx.author.id, ctx.guild.id, 1000)
+        embed = ctx.response.send_message.call_args[1]["embed"]
+        self.assertIn("10x", embed.description)
+        self.assertIn("<:dragon_scale:777> | <:dragon_scale:777> | <:dragon_scale:777>", embed.description)
+        self.assertIn("1,000 <:dragon_scale:777> Dragon Scales", embed.description)
+
 
 class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -877,6 +898,7 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
 
         await self.cog.bet_list(ctx)
         self.assertIn("no open bet pools", ctx.response.send_message.call_args[0][0])
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
 
     async def test_bet_list_with_pools_and_jump_links(self):
         ctx = self._make_ctx()
@@ -895,6 +917,7 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
         self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[wager])
 
         await self.cog.bet_list(ctx)
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
         embed = ctx.response.send_message.call_args[1]["embed"]
         self.assertEqual(embed.title, "Active Prediction Bet Pools")
         self.assertEqual(len(embed.fields), 1)
@@ -917,9 +940,31 @@ class TestGamblingCogPredictionPools(unittest.IsolatedAsyncioTestCase):
         self.mock_gambling_repo.get_pool_wagers = AsyncMock(return_value=[])
 
         await self.cog.bet_list(ctx)
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
         embed = ctx.response.send_message.call_args[1]["embed"]
         self.assertEqual(len(embed.fields), 10)
         self.assertIn("Showing 10 of 12", embed.footer.text)
+
+    async def test_build_bet_embed_naive_utc_locks_at(self):
+        naive_utc = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(tzinfo=None)
+        expected_ts = int(naive_utc.replace(tzinfo=timezone.utc).timestamp())
+        pool = BetPool(
+            id=7,
+            guild_id=10,
+            creator_id=100,
+            title="UTC Check",
+            is_open=True,
+            is_locked=False,
+            locks_at=naive_utc,
+        )
+        guild = MagicMock(id=10, emojis=[])
+        self.mock_client.app_emojis = {"dragon_scale": "<:dragon_scale:888>"}
+
+        embed = _build_bet_embed(pool, [], [], guild, self.mock_client)
+        locks_field = next(f for f in embed.fields if f.name == "Locks At")
+        self.assertEqual(locks_field.value, f"<t:{expected_ts}:R> (<t:{expected_ts}:f>)")
+        total_field = next(f for f in embed.fields if f.name == "Total Pool")
+        self.assertIn("<:dragon_scale:888>", total_field.value)
 
     async def test_auto_lock_task(self):
         expired_pool = BetPool(id=1, guild_id=10, creator_id=100, title="T", is_open=True, is_locked=True)

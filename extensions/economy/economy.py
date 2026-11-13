@@ -148,10 +148,10 @@ class Economy(commands.Cog):
         bal = await self.economy_repo.get_balance(target.id, guild_id)
         embed = discord.Embed(
             title="Dragon Scales Balance",
-            description=f"{target.mention} has **{format_scales(bal, ctx.guild)}**.",
+            description=f"{target.mention} has **{format_scales(bal, ctx.guild, self.client)}**.",
             color=discord.Color.gold(),
         )
-        await ctx.response.send_message(embed=embed)
+        await ctx.response.send_message(embed=embed, ephemeral=True)
 
     @pycog.subcommand("economy")
     @commands.slash_command(name="pay", description="Pay Dragon Scales to another member.")
@@ -184,13 +184,14 @@ class Economy(commands.Cog):
         if not success:
             bal = await self.economy_repo.get_balance(ctx.author.id, guild_id)
             await ctx.response.send_message(
-                f"You do not have enough Dragon Scales. Your current balance is {format_scales(bal, ctx.guild)}.",
+                f"You do not have enough Dragon Scales. "
+                f"Your current balance is {format_scales(bal, ctx.guild, self.client)}.",
                 ephemeral=True,
             )
             return
 
         await ctx.response.send_message(
-            f"Successfully transferred {format_scales(amount, ctx.guild)} to {member.mention}!"
+            f"Successfully transferred {format_scales(amount, ctx.guild, self.client)} to {member.mention}!"
         )
 
     @pycog.subcommand("economy")
@@ -199,11 +200,11 @@ class Economy(commands.Cog):
         guild_id = get_guild_id(ctx)
         leaders = await self.economy_repo.get_leaderboard(guild_id, limit=10)
         if not leaders:
-            await ctx.response.send_message("No members have any Dragon Scales yet.")
+            await ctx.response.send_message("No members have any Dragon Scales yet.", ephemeral=True)
             return
 
         lines = [
-            f"**#{idx}** <@{wallet.user_id}> — {format_scales(wallet.balance, ctx.guild)}"
+            f"**#{idx}** <@{wallet.user_id}> — {format_scales(wallet.balance, ctx.guild, self.client)}"
             for idx, wallet in enumerate(leaders, start=1)
         ]
         embed = discord.Embed(
@@ -211,7 +212,7 @@ class Economy(commands.Cog):
             description="\n".join(lines),
             color=discord.Color.gold(),
         )
-        await ctx.response.send_message(embed=embed)
+        await ctx.response.send_message(embed=embed, ephemeral=True)
 
     @pycog.subcommand("economy")
     @commands.slash_command(name="give", description="Give Dragon Scales to a member.")
@@ -237,8 +238,9 @@ class Economy(commands.Cog):
         guild_id = get_guild_id(ctx)
         new_bal = await self.economy_repo.add_balance(member.id, guild_id, amount)
         await ctx.response.send_message(
-            f"Added {format_scales(amount, ctx.guild)} to {member.mention}. "
-            f"New balance: {format_scales(new_bal, ctx.guild)}."
+            f"Added {format_scales(amount, ctx.guild, self.client)} to {member.mention}. "
+            f"New balance: {format_scales(new_bal, ctx.guild, self.client)}.",
+            ephemeral=True,
         )
 
     @pycog.subcommand("economy")
@@ -267,16 +269,17 @@ class Economy(commands.Cog):
         if not success:
             bal = await self.economy_repo.get_balance(member.id, guild_id)
             await ctx.response.send_message(
-                f"Cannot take {format_scales(amount, ctx.guild)} from {member.mention}. "
-                f"Current balance: {format_scales(bal, ctx.guild)}.",
+                f"Cannot take {format_scales(amount, ctx.guild, self.client)} from {member.mention}. "
+                f"Current balance: {format_scales(bal, ctx.guild, self.client)}.",
                 ephemeral=True,
             )
             return
 
         new_bal = await self.economy_repo.get_balance(member.id, guild_id)
         await ctx.response.send_message(
-            f"Took {format_scales(amount, ctx.guild)} from {member.mention}. "
-            f"New balance: {format_scales(new_bal, ctx.guild)}."
+            f"Took {format_scales(amount, ctx.guild, self.client)} from {member.mention}. "
+            f"New balance: {format_scales(new_bal, ctx.guild, self.client)}.",
+            ephemeral=True,
         )
 
     @pycog.subcommand("economy")
@@ -302,7 +305,10 @@ class Economy(commands.Cog):
 
         guild_id = get_guild_id(ctx)
         new_bal = await self.economy_repo.set_balance(member.id, guild_id, amount)
-        await ctx.response.send_message(f"Set balance of {member.mention} to {format_scales(new_bal, ctx.guild)}.")
+        await ctx.response.send_message(
+            f"Set balance of {member.mention} to {format_scales(new_bal, ctx.guild, self.client)}.",
+            ephemeral=True,
+        )
 
 
 def setup(client: Bot) -> None:

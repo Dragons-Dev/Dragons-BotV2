@@ -255,6 +255,8 @@ class GamblingRepository(BaseRepository):
         locks_at = pool.locks_at
         if locks_at.tzinfo is None:
             locks_at = locks_at.replace(tzinfo=timezone.utc)
+        else:
+            locks_at = locks_at.astimezone(timezone.utc)
         return now >= locks_at
 
     def _check_pool_accepts_options(self, pool: BetPool | None) -> str | None:
@@ -304,6 +306,10 @@ class GamblingRepository(BaseRepository):
         opt_list = [o.strip() for o in options] if options else []
         if not opt_list:
             allow_custom_options = True
+        if locks_at is not None:
+            locks_at = (
+                locks_at.replace(tzinfo=timezone.utc) if locks_at.tzinfo is None else locks_at.astimezone(timezone.utc)
+            )
 
         async with self.session() as session:
             pool = BetPool(

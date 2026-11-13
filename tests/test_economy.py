@@ -1,4 +1,6 @@
 from datetime import datetime
+from pathlib import Path
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -6,9 +8,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from extensions.economy.economy import Economy
-from extensions.economy.models import format_scales
+from extensions.economy.models import format_scales, get_dragon_scale_emoji
 from extensions.economy.repository import EconomyRepository
+from utils.bot import Bot
 from utils.orm_database import Base, ORMDataBase
+from utils.utils import VersionInfo
 
 
 class MockEmoji:
@@ -54,6 +58,86 @@ class TestFormatScales(unittest.TestCase):
 
         result = format_scales(5, mock_guild)  # type: ignore[arg-type]
         self.assertEqual(result, "5 🐉 Dragon Scales")
+
+    def test_format_scales_app_emoji_fallback(self):
+        mock_guild = SimpleNamespace(emojis=[])
+        mock_bot = SimpleNamespace(app_emojis={"dragon_scale": "<:dragon_scale:111222333>"})
+
+        result = format_scales(25, mock_guild, mock_bot)  # type: ignore[arg-type]
+        self.assertEqual(result, "25 <:dragon_scale:111222333> Dragon Scales")
+
+    def test_get_dragon_scale_emoji_guild_overrides_app_emoji(self):
+        guild_emoji = MockEmoji("dragon_scale", "<:dragon_scale:999>")
+        mock_guild = SimpleNamespace(emojis=[guild_emoji])
+        mock_bot = SimpleNamespace(app_emojis={"dragon_scale": "<:dragon_scale:111>"})
+
+        result = get_dragon_scale_emoji(mock_guild, mock_bot)  # type: ignore[arg-type]
+        self.assertEqual(result, "<:dragon_scale:999>")
+
+    def test_get_dragon_scale_emoji_ignores_non_dict_app_emojis(self):
+        mock_guild = SimpleNamespace(emojis=[])
+        mock_bot = MagicMock()
+
+        result = get_dragon_scale_emoji(mock_guild, mock_bot)  # type: ignore[arg-type]
+        self.assertEqual(result, "🐉")
+
+
+class TestBotApplicationEmoji(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        with (
+            patch("utils.bot.CustomLogger"),
+            patch("utils.bot.ORMDataBase"),
+            patch("utils.bot.ShortTermStorage"),
+            patch("utils.bot.ipc.Server"),
+        ):
+            self.bot = Bot(version=VersionInfo(3, 0, 1, ""), command_prefix="!")
+
+    async def test_ensure_application_emoji_returns_cached(self):
+        self.bot.app_emojis["dragon_scale"] = "<:dragon_scale:100>"
+        self.bot.fetch_emojis = AsyncMock()  # type: ignore[method-assign]
+        self.bot.create_emoji = AsyncMock()  # type: ignore[method-assign]
+
+        result = await self.bot.ensure_application_emoji("dragon_scale", "assets/dragon_scale.png")
+        self.assertEqual(result, "<:dragon_scale:100>")
+        self.bot.fetch_emojis.assert_not_called()
+        self.bot.create_emoji.assert_not_called()
+
+    async def test_ensure_application_emoji_fetches_and_caches_existing(self):
+        existing = MockEmoji("dragon_scale", "<:dragon_scale:200>")
+        self.bot.fetch_emojis = AsyncMock(return_value=[existing])  # type: ignore[method-assign]
+        self.bot.create_emoji = AsyncMock()  # type: ignore[method-assign]
+
+        result = await self.bot.ensure_application_emoji("dragon_scale", "assets/dragon_scale.png")
+        self.assertEqual(result, "<:dragon_scale:200>")
+        self.assertEqual(self.bot.app_emojis["dragon_scale"], "<:dragon_scale:200>")
+        self.bot.fetch_emojis.assert_called_once()
+        self.bot.create_emoji.assert_not_called()
+
+    async def test_ensure_application_emoji_creates_when_missing(self):
+        created = MockEmoji("dragon_scale", "<:dragon_scale:300>")
+        self.bot.fetch_emojis = AsyncMock(return_value=[])  # type: ignore[method-assign]
+        self.bot.create_emoji = AsyncMock(return_value=created)  # type: ignore[method-assign]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            icon_file = Path(tmpdir) / "dragon_scale.png"
+            icon_file.write_bytes(b"fake-png-bytes")
+            result = await self.bot.ensure_application_emoji("dragon_scale", icon_file)
+
+        self.assertEqual(result, "<:dragon_scale:300>")
+        self.assertEqual(self.bot.app_emojis["dragon_scale"], "<:dragon_scale:300>")
+        self.bot.create_emoji.assert_called_once_with(name="dragon_scale", image=b"fake-png-bytes")
+
+    async def test_ensure_application_emoji_handles_missing_asset_and_api_error(self):
+        self.bot.fetch_emojis = AsyncMock(return_value=[])  # type: ignore[method-assign]
+        self.bot.create_emoji = AsyncMock()  # type: ignore[method-assign]
+
+        missing_res = await self.bot.ensure_application_emoji("dragon_scale", "nonexistent/dragon_scale.png")
+        self.assertIsNone(missing_res)
+        self.bot.create_emoji.assert_not_called()
+
+        self.bot.fetch_emojis = AsyncMock(side_effect=RuntimeError("Discord API down"))  # type: ignore[method-assign]
+        error_res = await self.bot.ensure_application_emoji("dragon_scale", "assets/dragon_scale.png")
+        self.assertIsNone(error_res)
 
 
 class TestEconomyRepository(unittest.IsolatedAsyncioTestCase):
@@ -455,6 +539,7 @@ class TestEconomyCogSlashCommands(unittest.IsolatedAsyncioTestCase):
         await self.cog.balance(ctx, member=None)
         self.mock_repo.get_balance.assert_called_once_with(1, 100)
         ctx.response.send_message.assert_called_once()
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
         embed = ctx.response.send_message.call_args[1]["embed"]
         self.assertIn("150 🐉 Dragon Scales", embed.description)
 
@@ -468,8 +553,22 @@ class TestEconomyCogSlashCommands(unittest.IsolatedAsyncioTestCase):
 
         await self.cog.balance(ctx, member=target)
         self.mock_repo.get_balance.assert_called_once_with(2, 100)
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
         embed = ctx.response.send_message.call_args[1]["embed"]
         self.assertIn("1 🐉 Dragon Scale", embed.description)
+
+    async def test_balance_uses_app_emoji(self):
+        self.mock_client.app_emojis = {"dragon_scale": "<:dragon_scale:555>"}
+        ctx = MagicMock()
+        ctx.author = MagicMock(id=1, mention="<@1>")
+        ctx.guild = MagicMock(id=100, emojis=[])
+        ctx.response.send_message = AsyncMock()
+        self.mock_repo.get_balance = AsyncMock(return_value=150)
+
+        await self.cog.balance(ctx, member=None)
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
+        embed = ctx.response.send_message.call_args[1]["embed"]
+        self.assertIn("150 <:dragon_scale:555> Dragon Scales", embed.description)
 
     async def test_pay_bot_fails(self):
         ctx = MagicMock()
@@ -536,7 +635,7 @@ class TestEconomyCogSlashCommands(unittest.IsolatedAsyncioTestCase):
         self.mock_repo.get_leaderboard = AsyncMock(return_value=[])
 
         await self.cog.leaderboard(ctx)
-        ctx.response.send_message.assert_called_once_with("No members have any Dragon Scales yet.")
+        ctx.response.send_message.assert_called_once_with("No members have any Dragon Scales yet.", ephemeral=True)
 
     async def test_leaderboard_populated(self):
         ctx = MagicMock()
@@ -548,6 +647,7 @@ class TestEconomyCogSlashCommands(unittest.IsolatedAsyncioTestCase):
 
         await self.cog.leaderboard(ctx)
         ctx.response.send_message.assert_called_once()
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
         embed = ctx.response.send_message.call_args[1]["embed"]
         self.assertIn("**#1** <@1> — 500 🐉 Dragon Scales", embed.description)
         self.assertIn("**#2** <@2> — 250 🐉 Dragon Scales", embed.description)
@@ -567,6 +667,7 @@ class TestEconomyCogSlashCommands(unittest.IsolatedAsyncioTestCase):
         await self.cog.give(ctx, member=target, amount=100)
         self.mock_repo.add_balance.assert_called_once_with(2, 100, 100)
         self.assertIn("Added 100 🐉 Dragon Scales to <@2>", ctx.response.send_message.call_args[0][0])
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
 
     async def test_take_command(self):
         ctx = MagicMock()
@@ -583,12 +684,14 @@ class TestEconomyCogSlashCommands(unittest.IsolatedAsyncioTestCase):
         self.mock_repo.get_balance = AsyncMock(return_value=20)
         await self.cog.take(ctx, member=target, amount=50)
         self.assertIn("Cannot take 50 🐉 Dragon Scales from <@2>", ctx.response.send_message.call_args[0][0])
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
 
         # Success
         self.mock_repo.remove_balance = AsyncMock(return_value=True)
         self.mock_repo.get_balance = AsyncMock(return_value=50)
         await self.cog.take(ctx, member=target, amount=50)
         self.assertIn("Took 50 🐉 Dragon Scales from <@2>", ctx.response.send_message.call_args[0][0])
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])
 
     async def test_set_balance_command(self):
         ctx = MagicMock()
@@ -605,3 +708,4 @@ class TestEconomyCogSlashCommands(unittest.IsolatedAsyncioTestCase):
         await self.cog.set_balance(ctx, member=target, amount=400)
         self.mock_repo.set_balance.assert_called_once_with(2, 100, 400)
         self.assertIn("Set balance of <@2> to 400 🐉 Dragon Scales.", ctx.response.send_message.call_args[0][0])
+        self.assertTrue(ctx.response.send_message.call_args[1]["ephemeral"])

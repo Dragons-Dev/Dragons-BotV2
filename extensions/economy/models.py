@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 import discord
 from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, UniqueConstraint
@@ -13,6 +14,7 @@ __all__ = [
     "BetWager",
     "EconomyWallet",
     "format_scales",
+    "get_dragon_scale_emoji",
     "get_guild_id",
 ]
 
@@ -26,20 +28,39 @@ def get_guild_id(ctx: discord.ApplicationContext | discord.Interaction) -> int:
     return guild.id
 
 
-def format_scales(amount: int, guild: discord.Guild | None = None) -> str:
+def get_dragon_scale_emoji(guild: discord.Guild | None = None, bot: Any | None = None) -> str:
     """
-    Format an amount of Dragon Scales with custom guild emoji or fallback.
+    Resolve the Dragon Scale emoji using guild override -> global app emoji -> Unicode fallback.
 
-    :param amount: Amount of Dragon Scales
     :param guild: Discord guild to check for custom dragon_scale emoji
-    :return: Formatted string (e.g. '1,000 🐉 Dragon Scales')
+    :param bot: Bot instance containing cached application emojis
+    :return: Emoji string (e.g. '<:dragon_scale:123>' or '🐉')
     """
-    emoji = "🐉"
     if guild is not None and hasattr(guild, "emojis") and guild.emojis:
         custom_emoji = discord.utils.get(guild.emojis, name="dragon_scale")
         if custom_emoji is not None:
-            emoji = str(custom_emoji)
+            return str(custom_emoji)
 
+    if bot is not None:
+        app_emojis = getattr(bot, "app_emojis", None)
+        if isinstance(app_emojis, dict):
+            app_emoji = app_emojis.get("dragon_scale")
+            if isinstance(app_emoji, str) and app_emoji:
+                return app_emoji
+
+    return "🐉"
+
+
+def format_scales(amount: int, guild: discord.Guild | None = None, bot: Any | None = None) -> str:
+    """
+    Format an amount of Dragon Scales with custom guild/app emoji or fallback.
+
+    :param amount: Amount of Dragon Scales
+    :param guild: Discord guild to check for custom dragon_scale emoji
+    :param bot: Bot instance to check for global application dragon_scale emoji
+    :return: Formatted string (e.g. '1,000 🐉 Dragon Scales')
+    """
+    emoji = get_dragon_scale_emoji(guild, bot)
     suffix = "Dragon Scale" if amount == 1 else "Dragon Scales"
     return f"{amount:,} {emoji} {suffix}"
 
