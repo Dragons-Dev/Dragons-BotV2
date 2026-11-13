@@ -24,6 +24,7 @@ EXPECTED_TABLES = {
     "Confirmation",
     "Events",
     "botstatus",
+    "economy_wallets",
     "enabledcommands",
     "infractions",
     "join2create",
