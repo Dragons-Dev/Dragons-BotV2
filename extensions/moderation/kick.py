@@ -1,31 +1,22 @@
-from datetime import datetime
-import typing as t
-
 import discord
 from discord.ext import commands
-from discord.utils import format_dt
 import pycord.multicog as pycog
 
 from extensions.internal.error_handler import error_embed
 from utils import (
     Bot,
     ButtonConfirm,
-    ButtonInfo,
     CommandDisabledError,
     CustomLogger,
     InfractionsEnum,
-    SettingsEnum,
     is_team,
 )
-
-from .repository import InfractionsRepository
 
 
 class Kick(commands.Cog):
     def __init__(self, client):
         self.client: Bot = client
         self.logger = CustomLogger(self.qualified_name, self.client.boot_time)
-        self.infractions_repo = InfractionsRepository(self.client.db.session_maker)
 
     @pycog.subcommand("mod")
     @commands.slash_command(name="kick", description="Kicks a given member")
@@ -42,11 +33,6 @@ class Kick(commands.Cog):
             return await ctx.response.send_message(
                 "I can't kick that member since his top role is higher or even to mine", ephemeral=True
             )
-        em = discord.Embed(title="Kick successful", color=discord.Color.brand_green())
-        em.add_field(name="User", value=member.mention, inline=False)
-        em.add_field(name="Moderator", value=ctx.author.mention, inline=False)
-        em.add_field(name="Reason", value=reason, inline=False)
-        em.add_field(name="Date", value=format_dt(datetime.now(), "F"), inline=False)
 
         view = ButtonConfirm(cancel_title="Kick cancelled!")
         msg = await ctx.response.send_message(f"Do you really want to kick {member.mention}", view=view, ephemeral=True)
@@ -54,39 +40,16 @@ class Kick(commands.Cog):
         await view.wait()
         if view.value is None or not view.value:
             return
-        else:
-            case_id = await self.infractions_repo.create_infraction(
-                user=member, infraction=InfractionsEnum.Kick, reason=reason, guild=ctx.guild
-            )
-            em.set_footer(text=f"Case ID: {case_id}")
-            member_em = em.copy()
-            member_em.title = "Kick"
-            member_em.colour = discord.Color.brand_red()
-            try:
-                await member.send(
-                    embed=member_em,
-                    view=ButtonInfo("A copy of this was sent to the log channel and was stored in the database!"),
-                )
-            except discord.HTTPException or discord.Forbidden:
-                pass
-            await member.kick(reason=reason)
-            setting = await self.client.db.get_setting(setting=SettingsEnum.ModLogChannel, guild=ctx.guild)
-            if setting:
-                if isinstance(setting, (tuple, list, t.Sequence)):
-                    log_channel: discord.TextChannel | None = await ctx.guild.get_or_fetch(
-                        discord.TextChannel, setting[0].value, default=None
-                    )
-                else:
-                    log_channel: discord.TextChannel | None = await ctx.guild.get_or_fetch(
-                        discord.TextChannel, setting.value, default=None
-                    )
-                if log_channel:
-                    await log_channel.send(embed=member_em)
-            await ctx.followup.send(
-                embed=em,
-                view=ButtonInfo("A copy of this was sent to the warned member and the log channel!"),
-                ephemeral=True,
-            )
+
+        self.client.dispatch(
+            "moderation_action",
+            InfractionsEnum.Kick,
+            member,
+            ctx.guild,
+            reason,
+            ctx.author,
+            ctx=ctx,
+        )
 
     @kick.error
     async def kick_error_handler(self, ctx: discord.ApplicationContext, exc: discord.DiscordException):
